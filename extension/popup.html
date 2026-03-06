@@ -1,76 +1,217 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <link
+      id="popupFont"
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+    />
     <style>
-      :root {
-        --primary: #2563eb;
-        --bg: #f8fafc;
-        --text: #1e293b;
-        --card-bg: #ffffff;
-        --border: #e2e8f0;
+      /* ── PALETTE DEFINITIONS (Synced with Dashboard) ── */
+      :root,
+      [data-theme="indigo"] {
+        --bg: #f6f7f9;
+        --sur: #fff;
+        --bdr: #e4e7ec;
+        --ink: #101828;
+        --ink2: #344054;
+        --mut: #667085;
+        --mut2: #98a2b3;
+        --acc: #4f46e5;
+        --acc-bg: #eef2ff;
+        --acc-hover: #4338ca;
+        --hbg: #fffbeb;
+        --hbdr: #f59e0b;
+        --logo1: #6366f1;
+        --logo2: #4f46e5;
       }
-      body {
-        width: 330px;
-        margin: 0;
-        padding: 16px;
-        font-family: "Segoe UI", sans-serif;
-        background: var(--bg);
-        color: var(--text);
-        border-radius: 16px;
-        overflow: hidden;
+      [data-theme="emerald"] {
+        --bg: #f3faf7;
+        --sur: #fff;
+        --bdr: #d1fae5;
+        --ink: #064e3b;
+        --ink2: #065f46;
+        --mut: #34d399;
+        --mut2: #6ee7b7;
+        --acc: #059669;
+        --acc-bg: #d1fae5;
+        --acc-hover: #047857;
+        --hbg: #ecfdf5;
+        --hbdr: #10b981;
+        --logo1: #34d399;
+        --logo2: #059669;
+      }
+      [data-theme="rose"] {
+        --bg: #fff1f2;
+        --sur: #fff;
+        --bdr: #fecdd3;
+        --ink: #4c0519;
+        --ink2: #881337;
+        --mut: #f43f5e;
+        --mut2: #fb7185;
+        --acc: #e11d48;
+        --acc-bg: #ffe4e6;
+        --acc-hover: #be123c;
+        --hbg: #fff1f2;
+        --hbdr: #fb7185;
+        --logo1: #fb7185;
+        --logo2: #e11d48;
+      }
+      [data-theme="amber"] {
+        --bg: #fffbeb;
+        --sur: #fff;
+        --bdr: #fde68a;
+        --ink: #451a03;
+        --ink2: #78350f;
+        --mut: #d97706;
+        --mut2: #fbbf24;
+        --acc: #d97706;
+        --acc-bg: #fef3c7;
+        --acc-hover: #b45309;
+        --hbg: #fef3c7;
+        --hbdr: #f59e0b;
+        --logo1: #fbbf24;
+        --logo2: #d97706;
+      }
+      [data-theme="slate"] {
+        --bg: #0f172a;
+        --sur: #1e293b;
+        --bdr: #334155;
+        --ink: #f1f5f9;
+        --ink2: #cbd5e1;
+        --mut: #64748b;
+        --mut2: #475569;
+        --acc: #38bdf8;
+        --acc-bg: #0c4a6e;
+        --acc-hover: #0ea5e9;
+        --hbg: #1e3a5f;
+        --hbdr: #38bdf8;
+        --logo1: #38bdf8;
+        --logo2: #0ea5e9;
+      }
+      [data-theme="violet"] {
+        --bg: #faf5ff;
+        --sur: #fff;
+        --bdr: #e9d5ff;
+        --ink: #2e1065;
+        --ink2: #4c1d95;
+        --mut: #7c3aed;
+        --mut2: #a78bfa;
+        --acc: #7c3aed;
+        --acc-bg: #ede9fe;
+        --acc-hover: #6d28d9;
+        --hbg: #f5f3ff;
+        --hbdr: #8b5cf6;
+        --logo1: #a78bfa;
+        --logo2: #7c3aed;
       }
 
+      /* ── DESIGN TOKENS ── */
+      :root {
+        --card-radius: 12px;
+        --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        --card-border-left: none;
+      }
+
+      *,
+      *::before,
+      *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        width: 330px;
+        padding: 14px;
+        font-family: "Plus Jakarta Sans", sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        border-radius: 16px;
+        overflow: hidden;
+        transition:
+          background 0.3s,
+          color 0.3s;
+      }
+
+      /* ── HEADER ── */
       .header-wrap {
         display: flex;
         justify-content: space-between;
         align-items: center;
         margin-bottom: 12px;
       }
-      h3 {
-        font-size: 18px;
-        margin: 0;
-        color: var(--primary);
-        font-weight: 700;
+      .brand {
         display: flex;
         align-items: center;
         gap: 8px;
       }
+      .brand-logo {
+        width: 26px;
+        height: 26px;
+        border-radius: 7px;
+        background: linear-gradient(135deg, var(--logo1), var(--logo2));
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        transition: background 0.3s;
+      }
+      .brand-logo svg {
+        width: 13px;
+        height: 13px;
+        fill: #fff;
+      }
+      h3 {
+        font-size: 16px;
+        margin: 0;
+        color: var(--ink);
+        font-weight: 700;
+        letter-spacing: -0.2px;
+      }
+      h3 span {
+        color: var(--acc);
+      }
 
       .popout-btn {
         background: none;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
+        border: 1.5px solid var(--bdr);
+        border-radius: 7px;
         cursor: pointer;
-        padding: 4px 8px;
-        font-size: 13px;
-        color: #475569;
+        padding: 5px 10px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--mut);
+        font-family: inherit;
         transition: all 0.2s;
         display: flex;
         align-items: center;
         gap: 4px;
       }
       .popout-btn:hover {
-        background: #e2e8f0;
-        color: var(--primary);
+        background: var(--acc-bg);
+        border-color: var(--acc);
+        color: var(--acc);
       }
 
-      /* NEW: Toggle Switch CSS */
+      /* ── HIGHLIGHT TOGGLE ── */
       .toggle-container {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        background: #fff;
-        padding: 10px 12px;
-        border-radius: 8px;
-        border: 1px solid var(--border);
-        margin-bottom: 16px;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+        background: var(--sur);
+        padding: 9px 12px;
+        border-radius: 10px;
+        border: 1.5px solid var(--bdr);
+        margin-bottom: 14px;
+        transition:
+          background 0.3s,
+          border-color 0.3s;
       }
       .toggle-label {
-        font-size: 13px;
+        font-size: 12.5px;
         font-weight: 600;
-        color: #475569;
+        color: var(--ink2);
         display: flex;
         align-items: center;
         gap: 6px;
@@ -93,7 +234,7 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background-color: #cbd5e1;
+        background-color: var(--bdr);
         transition: 0.3s;
         border-radius: 20px;
       }
@@ -109,155 +250,209 @@
         border-radius: 50%;
       }
       input:checked + .slider {
-        background-color: var(--primary);
+        background-color: var(--acc);
       }
       input:checked + .slider:before {
         transform: translateX(16px);
       }
 
+      /* ── NOTES LIST ── */
       #notesList {
-        max-height: 240px;
+        max-height: 220px;
         overflow-y: auto;
-        margin-bottom: 16px;
-        padding-right: 4px;
+        margin-bottom: 14px;
+        padding-right: 2px;
       }
       #notesList::-webkit-scrollbar {
-        width: 5px;
+        width: 4px;
       }
       #notesList::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
+        background: var(--bdr);
         border-radius: 10px;
       }
+
       .note-card {
         position: relative;
-        background: var(--card-bg);
-        border-radius: 10px;
-        padding: 12px;
-        margin-bottom: 12px;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-        border-left: 4px solid var(--primary);
+        background: var(--sur);
+        border-radius: var(--card-radius);
+        padding: 11px 12px;
+        margin-bottom: 10px;
+        box-shadow: var(--card-shadow);
+        border: 1.5px solid var(--bdr);
+        border-left: var(--card-border-left, 1.5px solid var(--bdr));
+        transition:
+          background 0.3s,
+          border-color 0.2s,
+          box-shadow 0.2s;
       }
+      .note-card:hover {
+        border-color: var(--acc);
+        box-shadow:
+          var(--card-shadow),
+          0 4px 12px color-mix(in srgb, var(--acc) 10%, transparent);
+      }
+
       .note-title {
-        font-size: 14px;
+        font-size: 13.5px;
         font-weight: 700;
-        color: var(--text);
-        margin-bottom: 6px;
-        padding-right: 40px;
+        color: var(--ink);
+        margin-bottom: 5px;
+        padding-right: 44px;
         word-wrap: break-word;
+        line-height: 1.35;
       }
       .context {
         font-size: 11px;
         color: #92400e;
-        background: #fffbeb;
-        padding: 8px;
-        margin-bottom: 8px;
+        background: var(--hbg);
+        padding: 7px 9px;
+        margin-bottom: 7px;
         border-radius: 6px;
-        border-left: 3px solid #f59e0b;
+        border-left: 3px solid var(--hbdr);
         line-height: 1.4;
         font-style: italic;
         display: block;
         word-wrap: break-word;
       }
       .content {
-        font-size: 13px;
+        font-size: 12.5px;
         line-height: 1.5;
-        font-weight: 400;
-        color: #334155;
+        color: var(--ink2);
         word-wrap: break-word;
       }
-      .btn-edit {
+
+      .btn-edit,
+      .btn-delete {
         position: absolute;
-        top: 8px;
-        right: 32px;
-        font-size: 14px;
-        color: #94a3b8;
         background: none;
         border: none;
         cursor: pointer;
         padding: 0;
+        color: var(--mut2);
+        transition: color 0.15s;
+      }
+      .btn-edit {
+        top: 8px;
+        right: 30px;
+        font-size: 13px;
       }
       .btn-edit:hover {
-        color: var(--primary);
+        color: var(--acc);
       }
       .btn-delete {
-        position: absolute;
         top: 6px;
         right: 8px;
-        font-size: 18px;
+        font-size: 17px;
         font-weight: 300;
-        color: #94a3b8;
-        border: none;
-        background: transparent;
-        cursor: pointer;
         line-height: 1;
-        padding: 0;
-        transition: color 0.2s;
       }
       .btn-delete:hover {
         color: #ef4444;
       }
 
+      /* ── INPUT AREA ── */
       input[type="text"],
       textarea {
         width: 100%;
-        border: 1px solid #cbd5e1;
-        border-radius: 8px;
-        padding: 10px;
+        border: 1.5px solid var(--bdr);
+        border-radius: 9px;
+        padding: 9px 11px;
         box-sizing: border-box;
         font-family: inherit;
         margin-bottom: 8px;
-        transition: border-color 0.2s;
+        background: var(--sur);
+        color: var(--ink);
+        transition:
+          border-color 0.2s,
+          box-shadow 0.2s,
+          background 0.3s;
       }
       input[type="text"] {
-        font-size: 14px;
+        font-size: 13.5px;
         font-weight: 600;
       }
       textarea {
         resize: none;
-        min-height: 70px;
+        min-height: 64px;
         font-size: 13px;
       }
       input[type="text"]:focus,
       textarea:focus {
         outline: none;
-        border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        border-color: var(--acc);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 12%, transparent);
       }
+      input::placeholder,
+      textarea::placeholder {
+        color: var(--mut2);
+      }
+
       button#saveBtn {
         width: 100%;
-        background: var(--primary);
+        background: var(--acc);
         color: white;
         border: none;
-        padding: 12px;
-        border-radius: 8px;
+        padding: 11px;
+        border-radius: 9px;
         cursor: pointer;
-        font-weight: 600;
-        font-size: 14px;
-        transition: background 0.2s;
+        font-weight: 700;
+        font-size: 13.5px;
+        font-family: inherit;
+        letter-spacing: 0.01em;
+        transition:
+          background 0.2s,
+          transform 0.1s;
       }
       button#saveBtn:hover {
-        background: #1d4ed8;
+        background: var(--acc-hover);
       }
+      button#saveBtn:active {
+        transform: scale(0.98);
+      }
+
+      /* ── FOOTER ── */
+      .footer {
+        text-align: center;
+        margin-top: 13px;
+        border-top: 1px solid var(--bdr);
+        padding-top: 11px;
+      }
+      .footer a {
+        font-size: 12.5px;
+        color: var(--acc);
+        text-decoration: none;
+        font-weight: 600;
+        transition: opacity 0.15s;
+      }
+      .footer a:hover {
+        opacity: 0.75;
+      }
+
       .empty-state {
         text-align: center;
-        font-size: 13px;
-        color: #94a3b8;
-        margin: 20px 0;
+        font-size: 12.5px;
+        color: var(--mut2);
+        margin: 16px 0;
       }
     </style>
   </head>
   <body>
     <div class="header-wrap">
-      <h3>
-      <img src="./icons/icon-24.png" alt="notes icon" class="icon-img" />
-      ContextNote
-    </h3>
+      <div class="brand">
+        <div class="brand-logo">
+          <svg viewBox="0 0 24 24">
+            <path
+              d="M9 12h6M9 16h6M7 8h10M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"
+            />
+          </svg>
+        </div>
+        <h3>Context<span>Note</span></h3>
+      </div>
       <button id="popOutBtn" class="popout-btn" title="Open sticky window">
         📌 Pop Out
       </button>
     </div>
 
-    <!-- NEW: Toggle Switch -->
     <div class="toggle-container">
       <div class="toggle-label"><span>🖍️</span> Show Webpage Highlights</div>
       <label class="switch">
@@ -267,6 +462,7 @@
     </div>
 
     <div id="notesList"><div class="empty-state">Loading notes...</div></div>
+
     <input type="text" id="noteTitle" placeholder="Note Heading..." />
     <textarea
       id="noteInput"
@@ -274,26 +470,11 @@
     ></textarea>
     <button id="saveBtn">Save Note</button>
 
-    <div
-      style="
-        text-align: center;
-        margin-top: 15px;
-        border-top: 1px solid #e2e8f0;
-        padding-top: 10px;
-      "
-    >
-      <a
-        href="#"
-        id="openDashboard"
-        style="
-          font-size: 13px;
-          color: var(--primary);
-          text-decoration: none;
-          font-weight: 600;
-        "
-        >Open Full Dashboard ↗</a
-      >
+    <div class="footer">
+      <a href="#" id="openDashboard">Open Full Dashboard ↗</a>
     </div>
+
+    <!-- Removed themes.js. It's natively handled by the attributes now -->
     <script src="popup.js"></script>
   </body>
 </html>

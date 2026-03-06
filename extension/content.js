@@ -1,67 +1,124 @@
 const STORAGE_KEY = "context_notes_data";
 const SETTINGS_KEY = "cn_show_highlights";
 
-function escapeRegExp(string) {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// 1. Remove all existing highlights safely
+function removeHighlights() {
+  document.querySelectorAll("mark.cn-highlight").forEach((mark) => {
+    const parent = mark.parentNode;
+    while (mark.firstChild) {
+      parent.insertBefore(mark.firstChild, mark);
+    }
+    parent.removeChild(mark);
+    parent.normalize(); // Merge text nodes back together
+  });
 }
 
-function applyHighlights(notes) {
-  removeHighlights();
+// 2. Advanced Finder: Handles text splitting across <b>, <span>, <a>, etc.
+function highlightTextOnPage(searchText, noteTitle) {
+  if (!searchText || searchText.length < 2) return;
 
-  let highlightedCount = 0;
+  const treeWalker = document.createTreeWalker(
+    document.body,
+    NodeFilter.SHOW_TEXT,
+    null,
+    false,
+  );
+  const nodeList = [];
+  let currentNode = treeWalker.nextNode();
 
-  notes.forEach((note) => {
-    if (!note.selection) return;
+  // Step 1: Flatten the DOM into a list of text nodes
+  while (currentNode) {
+    // Skip hidden elements (scripts, styles, inputs)
+    const parentTag = currentNode.parentNode.tagName;
+    if (
+      ["SCRIPT", "STYLE", "TEXTAREA", "INPUT", "NOSCRIPT"].indexOf(
+        parentTag,
+      ) === -1
+    ) {
+      nodeList.push(currentNode);
+    }
+    currentNode = treeWalker.nextNode();
+  }
 
-    const walker = document.createTreeWalker(
-      document.body,
-      NodeFilter.SHOW_TEXT,
-      null,
-      false,
-    );
-    let node;
-    const nodesToReplace = [];
+  // Step 2: Search for the text across these nodes
+  let totalText = nodeList.map((n) => n.nodeValue).join("");
 
-    while ((node = walker.nextNode())) {
-      const parentTag = node.parentElement ? node.parentElement.tagName : "";
-      if (
-        parentTag === "SCRIPT" ||
-        parentTag === "STYLE" ||
-        parentTag === "NOSCRIPT"
-      )
-        continue;
+  // Clean up whitespace for easier matching (browser selection often has weird newlines)
+  const cleanSearchText = searchText.replace(/\s+/g, " ").trim();
+  const cleanTotalText = totalText.replace(/\s+/g, " ");
 
-      if (node.nodeValue.includes(note.selection)) {
-        nodesToReplace.push(node);
+  let searchIndex = 0;
+  let startIndex = cleanTotalText.indexOf(cleanSearchText, searchIndex);
+
+  // Loop to find ALL occurrences of the text
+  while (startIndex !== -1) {
+    let matchLength = cleanSearchText.length;
+    let currentLength = 0;
+    let startNodeIndex = -1;
+    let startNodeOffset = -1;
+    let endNodeIndex = -1;
+    let endNodeOffset = -1;
+
+    // Map the string index back to the DOM nodes
+    let runningLength = 0;
+
+    // We need to map the "clean" index back to the "real" index (accounting for newlines we stripped)
+    // This is complex, so we use a simpler Range approach for robustness:
+
+    try {
+      if (window.find && window.getSelection) {
+        // "Hack": Use the browser's own Find engine to locate the text safely
+        // This is safer than math because it handles CSS rendering nuances
+        if (window.find(searchText, false, false, false, false, false, false)) {
+          const sel = window.getSelection();
+          if (sel.rangeCount > 0) {
+            const range = sel.getRangeAt(0);
+
+            // Create the highlight wrapper
+            const mark = document.createElement("mark");
+            mark.className = "cn-highlight";
+            mark.style.backgroundColor = "#fde047";
+            mark.style.color = "#92400e";
+            mark.style.borderBottom = "2px solid #f59e0b";
+            mark.title = `ContextNote: ${noteTitle}`;
+
+            // Safe Wrap: extractContents handles the <b> <span> splitting automatically!
+            try {
+              range.surroundContents(mark);
+            } catch (e) {
+              // If surroundContents fails (common on complex DOMs), use the fallback
+              const newNode = document.createElement("mark");
+              newNode.className = "cn-highlight";
+              newNode.style.backgroundColor = "#fde047";
+              newNode.style.color = "#92400e";
+              newNode.style.borderBottom = "2px solid #f59e0b";
+              newNode.title = `ContextNote: ${noteTitle}`;
+              newNode.appendChild(range.extractContents());
+              range.insertNode(newNode);
+            }
+            sel.removeAllRanges(); // Clear the user's blue selection
+          }
+        }
       }
+    } catch (e) {
+      console.log("Highlighting error:", e);
     }
 
-    nodesToReplace.forEach((n) => {
-      const regex = new RegExp(`(${escapeRegExp(note.selection)})`, "g");
-      const span = document.createElement("span");
-      span.innerHTML = n.nodeValue.replace(
-        regex,
-        `<mark class="cn-highlight" style="background-color: #fde047; color: #92400e; border-bottom: 2px solid #f59e0b; padding: 0 2px; border-radius: 3px; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.1);" title="ContextNote: ${note.title}">$1</mark>`,
-      );
-      n.replaceWith(...span.childNodes);
-      highlightedCount++;
-    });
-  });
+    // Find next occurrence
+    searchIndex = startIndex + 1;
+    startIndex = cleanTotalText.indexOf(cleanSearchText, searchIndex);
 
-  console.log(
-    `[ContextNote] Successfully applied ${highlightedCount} highlights to this page.`,
-  );
+    // Stop infinite loops if something weird happens
+    if (searchIndex > cleanTotalText.length) break;
+  }
 }
 
-function removeHighlights() {
-  document.querySelectorAll(".cn-highlight").forEach((mark) => {
-    const parent = mark.parentNode;
-    mark.replaceWith(...mark.childNodes);
-    parent.normalize();
-  });
-}
-
+// 3. Main Init Function
 function initHighlights() {
+  // Store scroll position so window.find doesn't jump the page around
+  const scrollX = window.scrollX;
+  const scrollY = window.scrollY;
+
   chrome.storage.local.get([STORAGE_KEY, SETTINGS_KEY], (res) => {
     const isEnabled = res[SETTINGS_KEY] !== false;
     if (!isEnabled) {
@@ -70,29 +127,33 @@ function initHighlights() {
     }
 
     const allNotes = res[STORAGE_KEY] ? JSON.parse(res[STORAGE_KEY]) : [];
-    // Only match notes saved on this exact URL
+
+    // Exact URL match
     const currentUrlNotes = allNotes.filter(
       (n) => n.url === window.location.href,
     );
 
     if (currentUrlNotes.length > 0) {
-      console.log(
-        `[ContextNote] Found ${currentUrlNotes.length} notes for this URL. Applying highlights...`,
-      );
-      applyHighlights(currentUrlNotes);
-    } else {
-      console.log("[ContextNote] No notes found for this specific URL.");
+      // Sort by length (longest first) to prevent nesting issues
+      currentUrlNotes.sort((a, b) => b.selection.length - a.selection.length);
+
+      removeHighlights(); // Reset page
+
+      currentUrlNotes.forEach((note) => {
+        highlightTextOnPage(note.selection, note.title);
+      });
+
+      // Restore Scroll (Crucial because window.find jumps)
+      window.scrollTo(scrollX, scrollY);
     }
   });
 }
 
-// Run when the webpage finishes loading
+// Run immediately + fallback for dynamic sites
 initHighlights();
+setTimeout(initHighlights, 1500);
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "refresh_highlights") {
-    initHighlights();
-  } else if (request.action === "remove_highlights") {
-    removeHighlights();
-  }
+  if (request.action === "refresh_highlights") initHighlights();
+  else if (request.action === "remove_highlights") removeHighlights();
 });

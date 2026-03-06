@@ -47,7 +47,11 @@ E($("synbtn"), "click", (e) => {
   $("synmenu").classList.toggle("on");
 });
 E(document, "click", (e) => {
-  if (!$("synmenu").contains(e.target) && e.target !== $("synbtn"))
+  if (
+    $("synmenu") &&
+    !$("synmenu").contains(e.target) &&
+    e.target !== $("synbtn")
+  )
     $("synmenu").classList.remove("on");
 });
 
@@ -65,17 +69,21 @@ E($("proceedLoginBtn"), "click", () => {
 // Logout Actions
 E($("cancelLogout"), "click", () => $("logoutModal").classList.remove("on"));
 E($("logoutKeepBtn"), "click", async () => {
-  await fetch(`${API_BASE}/api/logout`, {
-    method: "POST",
-    credentials: "include",
-  });
+  try {
+    await fetch(`${API_BASE}/api/logout`, {
+      method: "POST",
+      credentials: "include",
+    });
+  } catch (e) {}
   window.location.reload();
 });
 E($("logoutWipeBtn"), "click", async () => {
-  await fetch(`${API_BASE}/api/logout`, {
-    method: "POST",
-    credentials: "include",
-  });
+  try {
+    await fetch(`${API_BASE}/api/logout`, {
+      method: "POST",
+      credentials: "include",
+    });
+  } catch (e) {}
   chrome.storage.local.clear(() => window.location.reload());
 });
 
@@ -151,7 +159,6 @@ function render(groupedData) {
 
         let gridHTML = displayNotes.map((n) => card(n, site.domain)).join("");
 
-        // Clean up the URL for display (remove https:// and truncate)
         let niceUrl = site.url.replace(/^https?:\/\/(www\.)?/, "");
         niceUrl =
           niceUrl.length > 50 ? niceUrl.substring(0, 50) + "..." : niceUrl;
@@ -171,7 +178,6 @@ function render(groupedData) {
           hiddenCount > 0
             ? `
           <div style="margin-top:10px;">
-            <!-- Note we pass site.url instead of site.domain now! -->
             <button class="btn-view-more" data-url="${site.url}">
               View ${hiddenCount} More Notes ➔
             </button>
@@ -385,14 +391,13 @@ E($("search"), "input", () => {
   $("nores")?.classList.toggle("on", vis === 0 && q.length > 0);
 });
 
-// --- GROUP BY URL INSTEAD OF DOMAIN ---
+// --- GROUP BY URL ---
 function loadLocalUI() {
   chrome.storage.local.get(STORAGE_KEY, (res) => {
     allNotesFlat = res[STORAGE_KEY] ? JSON.parse(res[STORAGE_KEY]) : [];
 
     const grouped = {};
     allNotesFlat.forEach((n) => {
-      // Grouping by Exact Webpage URL
       if (!grouped[n.url])
         grouped[n.url] = { domain: n.domain, url: n.url, notes: [] };
       grouped[n.url].notes.push(n);
@@ -402,8 +407,29 @@ function loadLocalUI() {
   });
 }
 
+// Listen for updates from the popup/extension so the dashboard auto-refreshes
+if (typeof chrome !== "undefined" && chrome.storage) {
+  chrome.storage.onChanged.addListener((changes, namespace) => {
+    if (namespace === "local" && changes[STORAGE_KEY]) {
+      // Don't refresh if the user is currently editing a note or looking at a specific page
+      if (
+        !$("modal").classList.contains("on") &&
+        $("singlePageView").style.display !== "block"
+      ) {
+        loadLocalUI();
+      }
+    }
+  });
+}
+
 // SYNC ENGINE & LOGOUT
+let isCheckingAuth = false;
+let initialLoadDone = false; // Prevents reloading the DOM repeatedly on failures
+
 async function checkAuthAndSync() {
+  if (isCheckingAuth) return;
+  isCheckingAuth = true;
+
   try {
     const res = await fetch(`${API_BASE}/api/me`, { credentials: "include" });
     if (res.ok) {
@@ -411,21 +437,26 @@ async function checkAuthAndSync() {
       isLoggedIn = true;
       $("uStatus").textContent = `✓ Synced as ${user.email}`;
 
-      $("loginBtn").outerHTML =
-        `<div class="sitem danger" id="logoutBtn">🚪 Logout</div>`;
+      if ($("loginBtn")) {
+        $("loginBtn").outerHTML =
+          `<div class="sitem danger" id="logoutBtn">🚪 Logout</div>`;
+      }
 
       chrome.storage.local.get(STORAGE_KEY, async (localRes) => {
         const localNotes = localRes[STORAGE_KEY]
           ? JSON.parse(localRes[STORAGE_KEY])
           : [];
         if (localNotes.length > 0) {
-          await fetch(`${API_BASE}/api/sync`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(localNotes),
-            credentials: "include",
-          });
+          try {
+            await fetch(`${API_BASE}/api/sync`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(localNotes),
+              credentials: "include",
+            });
+          } catch (e) {}
         }
+
         const cloudRes = await fetch(`${API_BASE}/api/notes`, {
           credentials: "include",
         });
@@ -446,16 +477,30 @@ async function checkAuthAndSync() {
         );
         chrome.storage.local.set(
           { [STORAGE_KEY]: JSON.stringify(flattenedCloudNotes) },
-          loadLocalUI,
+          () => {
+            loadLocalUI(); // Always load local UI if we successfully pulled cloud updates
+            initialLoadDone = true;
+          },
         );
       });
     } else {
       $("uStatus").textContent = "Local Mode Only";
-      loadLocalUI();
+      if (!initialLoadDone) {
+        loadLocalUI();
+        initialLoadDone = true;
+      }
     }
   } catch (e) {
     $("uStatus").textContent = "Offline / Server Unreachable";
-    loadLocalUI();
+    if (!initialLoadDone) {
+      loadLocalUI();
+      initialLoadDone = true;
+    }
+  } finally {
+    // Cooldown prevents fetching repeatedly when swapping tabs
+    setTimeout(() => {
+      isCheckingAuth = false;
+    }, 4000);
   }
 }
 
@@ -469,3 +514,49 @@ window.addEventListener("focus", () => {
   if (!isLoggedIn) checkAuthAndSync();
 });
 window.onload = checkAuthAndSync;
+
+// ── THEME ENGINE (Moved from HTML to JS for Extensions) ──
+const THEME_KEY = "cn_theme";
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  document.querySelectorAll(".palette-swatch").forEach((s) => {
+    s.classList.toggle("active", s.dataset.theme === theme);
+  });
+
+  if (typeof chrome !== "undefined" && chrome.storage) {
+    chrome.storage.local.set({ [THEME_KEY]: theme });
+  }
+}
+
+// Load saved theme initially
+if (typeof chrome !== "undefined" && chrome.storage) {
+  chrome.storage.local.get([THEME_KEY], (res) => {
+    applyTheme(res[THEME_KEY] || "indigo");
+  });
+} else {
+  applyTheme("indigo");
+}
+
+// Theme Event Listeners
+E($("themeBtn"), "click", (e) => {
+  e.stopPropagation();
+  $("themePanel").classList.toggle("on");
+});
+
+document.querySelectorAll(".palette-swatch").forEach((swatch) => {
+  swatch.addEventListener("click", () => {
+    applyTheme(swatch.dataset.theme);
+    $("themePanel").classList.remove("on");
+  });
+});
+
+document.addEventListener("click", (e) => {
+  if (
+    $("themePanel") &&
+    !$("themePanel").contains(e.target) &&
+    e.target !== $("themeBtn")
+  ) {
+    $("themePanel").classList.remove("on");
+  }
+});

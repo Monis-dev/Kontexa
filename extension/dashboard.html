@@ -9,7 +9,9 @@
       rel="stylesheet"
     />
     <style>
-      :root {
+      /* ── PALETTE DEFINITIONS ── */
+      :root,
+      [data-theme="indigo"] {
         --bg: #f6f7f9;
         --sur: #fff;
         --bdr: #e4e7ec;
@@ -20,8 +22,117 @@
         --mut2: #98a2b3;
         --acc: #4f46e5;
         --acc-bg: #eef2ff;
+        --acc-hover: #4338ca;
         --hbg: #fffbeb;
         --hbdr: #f59e0b;
+        --logo1: #6366f1;
+        --logo2: #4f46e5;
+        --tag-bg: #f1f5f9;
+        --tag-color: #64748b;
+      }
+
+      [data-theme="emerald"] {
+        --bg: #f3faf7;
+        --sur: #fff;
+        --bdr: #d1fae5;
+        --bdrs: #a7f3d0;
+        --ink: #064e3b;
+        --ink2: #065f46;
+        --mut: #34d399;
+        --mut2: #6ee7b7;
+        --acc: #059669;
+        --acc-bg: #d1fae5;
+        --acc-hover: #047857;
+        --hbg: #ecfdf5;
+        --hbdr: #10b981;
+        --logo1: #34d399;
+        --logo2: #059669;
+        --tag-bg: #ecfdf5;
+        --tag-color: #047857;
+      }
+
+      [data-theme="rose"] {
+        --bg: #fff1f2;
+        --sur: #fff;
+        --bdr: #fecdd3;
+        --bdrs: #fda4af;
+        --ink: #4c0519;
+        --ink2: #881337;
+        --mut: #f43f5e;
+        --mut2: #fb7185;
+        --acc: #e11d48;
+        --acc-bg: #ffe4e6;
+        --acc-hover: #be123c;
+        --hbg: #fff1f2;
+        --hbdr: #fb7185;
+        --logo1: #fb7185;
+        --logo2: #e11d48;
+        --tag-bg: #ffe4e6;
+        --tag-color: #be123c;
+      }
+
+      [data-theme="amber"] {
+        --bg: #fffbeb;
+        --sur: #fff;
+        --bdr: #fde68a;
+        --bdrs: #fbbf24;
+        --ink: #451a03;
+        --ink2: #78350f;
+        --mut: #d97706;
+        --mut2: #fbbf24;
+        --acc: #d97706;
+        --acc-bg: #fef3c7;
+        --acc-hover: #b45309;
+        --hbg: #fef3c7;
+        --hbdr: #f59e0b;
+        --logo1: #fbbf24;
+        --logo2: #d97706;
+        --tag-bg: #fef3c7;
+        --tag-color: #b45309;
+      }
+
+      [data-theme="slate"] {
+        --bg: #0f172a;
+        --sur: #1e293b;
+        --bdr: #334155;
+        --bdrs: #475569;
+        --ink: #f1f5f9;
+        --ink2: #cbd5e1;
+        --mut: #64748b;
+        --mut2: #475569;
+        --acc: #38bdf8;
+        --acc-bg: #0c4a6e;
+        --acc-hover: #0ea5e9;
+        --hbg: #1e3a5f;
+        --hbdr: #38bdf8;
+        --logo1: #38bdf8;
+        --logo2: #0ea5e9;
+        --tag-bg: #1e293b;
+        --tag-color: #94a3b8;
+      }
+
+      [data-theme="violet"] {
+        --bg: #faf5ff;
+        --sur: #fff;
+        --bdr: #e9d5ff;
+        --bdrs: #d8b4fe;
+        --ink: #2e1065;
+        --ink2: #4c1d95;
+        --mut: #7c3aed;
+        --mut2: #a78bfa;
+        --acc: #7c3aed;
+        --acc-bg: #ede9fe;
+        --acc-hover: #6d28d9;
+        --hbg: #f5f3ff;
+        --hbdr: #8b5cf6;
+        --logo1: #a78bfa;
+        --logo2: #7c3aed;
+        --tag-bg: #ede9fe;
+        --tag-color: #6d28d9;
+      }
+
+      /* ── BASE STYLES ── */
+      :root {
         --nav: 260px;
         --top: 60px;
       }
@@ -32,6 +143,7 @@
         padding: 0;
         box-sizing: border-box;
       }
+
       body {
         font-family: "Plus Jakarta Sans", sans-serif;
         background: var(--bg);
@@ -40,6 +152,9 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
+        transition:
+          background 0.3s,
+          color 0.3s;
       }
 
       /* Topbar */
@@ -52,6 +167,9 @@
         flex-shrink: 0;
         z-index: 100;
         padding-right: 20px;
+        transition:
+          background 0.3s,
+          border-color 0.3s;
       }
       .tl {
         width: var(--nav);
@@ -66,11 +184,12 @@
       .logo {
         width: 32px;
         height: 32px;
-        background: linear-gradient(135deg, #6366f1, #4f46e5);
+        background: linear-gradient(135deg, var(--logo1), var(--logo2));
         border-radius: 8px;
         display: grid;
         place-items: center;
         flex-shrink: 0;
+        transition: background 0.3s;
       }
       .logo svg {
         width: 17px;
@@ -178,15 +297,16 @@
         outline: none;
         transition:
           border-color 0.2s,
-          box-shadow 0.2s;
+          box-shadow 0.2s,
+          background 0.3s;
       }
       .sb input::placeholder {
         color: var(--mut2);
       }
       .sb input:focus {
         border-color: var(--acc);
-        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
-        background: #fff;
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 15%, transparent);
+        background: var(--sur);
       }
       .sc {
         position: absolute;
@@ -209,7 +329,7 @@
         display: block;
       }
 
-      /* Sync Menu & Buttons */
+      /* Top Actions */
       .top-actions {
         display: flex;
         align-items: center;
@@ -236,6 +356,108 @@
         background: var(--acc-bg);
       }
 
+      /* ── THEME PICKER ── */
+      .theme-wrap {
+        position: relative;
+      }
+      .theme-btn {
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        border: 1.5px solid var(--bdr);
+        background: var(--sur);
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        transition: all 0.2s;
+      }
+      .theme-btn:hover {
+        border-color: var(--acc);
+        background: var(--acc-bg);
+      }
+      .theme-btn svg {
+        width: 16px;
+        height: 16px;
+        stroke: var(--ink2);
+        fill: none;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .theme-btn:hover svg {
+        stroke: var(--acc);
+      }
+
+      .theme-panel {
+        position: absolute;
+        top: calc(100% + 8px);
+        right: 0;
+        background: var(--sur);
+        border: 1px solid var(--bdr);
+        box-shadow: 0 10px 36px rgba(0, 0, 0, 0.14);
+        border-radius: 14px;
+        padding: 14px;
+        display: none;
+        flex-direction: column;
+        gap: 10px;
+        z-index: 300;
+        width: 220px;
+        animation: fadeDown 0.18s ease;
+      }
+      .theme-panel.on {
+        display: flex;
+      }
+      .theme-panel-title {
+        font-size: 10.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--mut);
+        padding: 0 2px;
+      }
+      .palette-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+      .palette-swatch {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+        cursor: pointer;
+        padding: 8px 6px;
+        border-radius: 10px;
+        border: 2px solid transparent;
+        transition: all 0.18s;
+      }
+      .palette-swatch:hover {
+        background: var(--bg);
+        border-color: var(--bdr);
+      }
+      .palette-swatch.active {
+        border-color: var(--acc);
+        background: var(--acc-bg);
+      }
+      .swatch-circle {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: 2px solid rgba(0, 0, 0, 0.08);
+        flex-shrink: 0;
+      }
+      .swatch-label {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--mut);
+        text-align: center;
+        white-space: nowrap;
+      }
+      .palette-swatch.active .swatch-label {
+        color: var(--acc);
+      }
+
+      /* Sync Menu */
       .synw {
         position: relative;
       }
@@ -358,7 +580,8 @@
         overflow: hidden;
         transition:
           width 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-          border-color 0.3s;
+          border-color 0.3s,
+          background 0.3s;
         z-index: 90;
       }
       .side.closed {
@@ -398,6 +621,7 @@
         background: var(--bdr);
         border-radius: 3px;
       }
+
       .na {
         display: flex;
         align-items: center;
@@ -605,11 +829,12 @@
         transition:
           border-color 0.2s,
           box-shadow 0.2s,
-          transform 0.2s;
+          transform 0.2s,
+          background 0.3s;
       }
       .card:hover {
         border-color: var(--acc);
-        box-shadow: 0 4px 18px rgba(79, 70, 229, 0.1);
+        box-shadow: 0 4px 18px color-mix(in srgb, var(--acc) 12%, transparent);
         transform: translateY(-2px);
       }
       .ca {
@@ -684,8 +909,8 @@
         font-weight: 600;
         padding: 2px 9px;
         border-radius: 20px;
-        background: var(--bg);
-        color: var(--mut);
+        background: var(--tag-bg, var(--bg));
+        color: var(--tag-color, var(--mut));
         border: 1px solid var(--bdr);
       }
       .divider {
@@ -695,9 +920,9 @@
       }
 
       .btn-view-more {
-        background: #eef2ff;
-        color: #4f46e5;
-        border: 1px solid #c7d2fe;
+        background: var(--acc-bg);
+        color: var(--acc);
+        border: 1px solid var(--bdr);
         border-radius: 8px;
         padding: 8px 16px;
         font-size: 13px;
@@ -708,9 +933,10 @@
         display: inline-flex;
         align-items: center;
         gap: 6px;
+        font-family: inherit;
       }
       .btn-view-more:hover {
-        background: #4f46e5;
+        background: var(--acc);
         color: white;
       }
       .back-btn {
@@ -727,6 +953,7 @@
         align-items: center;
         gap: 6px;
         transition: all 0.2s;
+        font-family: inherit;
       }
       .back-btn:hover {
         background: var(--bg);
@@ -794,9 +1021,8 @@
         font-size: 16px;
         font-weight: 700;
         margin-bottom: 14px;
+        color: var(--ink);
       }
-
-      /* Info Modal Styling */
       .info-box {
         background: var(--bg);
         border: 1px solid var(--bdr);
@@ -816,7 +1042,6 @@
         font-size: 16px;
         margin-right: 6px;
       }
-
       .modal input[type="text"],
       .modal textarea {
         width: 100%;
@@ -825,6 +1050,7 @@
         padding: 10px 12px;
         font-family: inherit;
         color: var(--ink);
+        background: var(--bg);
         outline: none;
         transition:
           border-color 0.2s,
@@ -844,9 +1070,8 @@
       .modal input[type="text"]:focus,
       .modal textarea:focus {
         border-color: var(--acc);
-        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 12%, transparent);
       }
-
       .macts {
         display: flex;
         gap: 8px;
@@ -874,8 +1099,8 @@
         border-color: var(--acc);
       }
       .btn.pri:hover {
-        background: #4338ca;
-        border-color: #4338ca;
+        background: var(--acc-hover);
+        border-color: var(--acc-hover);
       }
       .btn.danger {
         background: #ef4444;
@@ -894,7 +1119,7 @@
         left: 50%;
         transform: translateX(-50%) translateY(10px);
         background: var(--ink);
-        color: #fff;
+        color: var(--sur);
         padding: 10px 20px;
         border-radius: 10px;
         font-size: 13px;
@@ -939,7 +1164,13 @@
         <button class="hbtn open" id="hbtn" aria-label="Toggle sidebar">
           <div class="hico"><span></span><span></span><span></span></div>
         </button>
-        
+        <div class="logo">
+          <svg viewBox="0 0 24 24">
+            <path
+              d="M9 12h6M9 16h6M7 8h10M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"
+            />
+          </svg>
+        </div>
         <span class="lname">Context<span>Note</span></span>
       </div>
 
@@ -960,27 +1191,80 @@
       </div>
 
       <div class="top-actions">
-        <!-- New Info Button -->
         <button class="icon-btn" id="infoBtn" title="How your data is stored">
           ?
         </button>
 
+        <!-- Theme Picker -->
+        <div class="theme-wrap">
+          <button class="theme-btn" id="themeBtn" title="Change color theme">
+            <svg viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 2a10 10 0 0 1 0 20" />
+              <path d="M12 12a5 5 0 0 1 5-5" />
+              <circle cx="12" cy="12" r="2" />
+            </svg>
+          </button>
+          <div class="theme-panel" id="themePanel">
+            <span class="theme-panel-title">Color Theme</span>
+            <div class="palette-grid">
+              <div class="palette-swatch" data-theme="indigo">
+                <div
+                  class="swatch-circle"
+                  style="background: linear-gradient(135deg, #6366f1, #4f46e5)"
+                ></div>
+                <span class="swatch-label">Indigo</span>
+              </div>
+              <div class="palette-swatch" data-theme="violet">
+                <div
+                  class="swatch-circle"
+                  style="background: linear-gradient(135deg, #a78bfa, #7c3aed)"
+                ></div>
+                <span class="swatch-label">Violet</span>
+              </div>
+              <div class="palette-swatch" data-theme="emerald">
+                <div
+                  class="swatch-circle"
+                  style="background: linear-gradient(135deg, #34d399, #059669)"
+                ></div>
+                <span class="swatch-label">Emerald</span>
+              </div>
+              <div class="palette-swatch" data-theme="rose">
+                <div
+                  class="swatch-circle"
+                  style="background: linear-gradient(135deg, #fb7185, #e11d48)"
+                ></div>
+                <span class="swatch-label">Rose</span>
+              </div>
+              <div class="palette-swatch" data-theme="amber">
+                <div
+                  class="swatch-circle"
+                  style="background: linear-gradient(135deg, #fbbf24, #d97706)"
+                ></div>
+                <span class="swatch-label">Amber</span>
+              </div>
+              <div class="palette-swatch" data-theme="slate">
+                <div
+                  class="swatch-circle"
+                  style="
+                    background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+                    border-color: #334155;
+                  "
+                ></div>
+                <span class="swatch-label">Dark</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="synw">
           <button class="synbtn" id="synbtn">
-            <svg
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-              fill="none"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-              <circle cx="12" cy="7" r="4"></circle>
+            <svg viewBox="0 0 24 24">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
             </svg>
             <span>Account</span>
           </button>
-
           <div class="synmenu" id="synmenu">
             <div id="uStatus">Local Mode Only</div>
             <div class="sdiv"></div>
@@ -1013,7 +1297,6 @@
           ></div>
         </div>
       </main>
-
       <main class="main" id="singlePageView" style="display: none"></main>
     </div>
 
@@ -1034,32 +1317,31 @@
     <div class="mbg" id="guideModal">
       <div class="modal">
         <h3>How ContextNote Stores Your Data</h3>
-
         <div class="info-box">
           <strong><span>🏠</span> Local by Default (Offline)</strong>
           If you don't log in, your notes live entirely on your computer's hard
           drive. They are fast, completely private, and available offline.
         </div>
-
         <div
           class="info-box"
-          style="background: var(--acc-bg); border-color: #c7d2fe"
+          style="background: var(--acc-bg); border-color: var(--bdr)"
         >
           <strong><span>☁️</span> Cloud Sync (Cross-Device)</strong>
           Logging in backs up your notes to our cloud servers so you can view
-          them on your laptop, desktop, or mobile device.
+          them on any device.
         </div>
-
         <div
           class="info-box"
-          style="background: #fffbeb; border-color: #fcd34d; color: #92400e"
+          style="
+            background: var(--hbg);
+            border-color: var(--hbdr);
+            color: #92400e;
+          "
         >
           <strong><span>⚠️</span> Important Warning</strong>
-          ContextNote uses free cloud hosting. In the rare event of a server
-          error, cloud backups might be lost.
-          <b>Your local offline device remains your safest primary backup!</b>
+          ContextNote uses free cloud hosting. In rare cases, cloud backups
+          might be lost. <b>Your local device is your safest primary backup!</b>
         </div>
-
         <div class="macts" id="guideActs">
           <button class="btn" id="closeGuideBtn">Got it</button>
           <button class="btn pri" id="proceedLoginBtn" style="display: none">
@@ -1082,7 +1364,7 @@
           "
         >
           You are about to disconnect from the cloud. What would you like to do
-          with the notes currently saved on <b>this device</b>?
+          with the notes on <b>this device</b>?
         </p>
         <div class="macts" style="flex-direction: column; gap: 10px">
           <button class="btn" id="cancelLogout">Cancel</button>
@@ -1101,7 +1383,6 @@
     </div>
 
     <div class="toast" id="toast"></div>
-
     <script src="dashboard.js"></script>
   </body>
 </html>
