@@ -1,30 +1,62 @@
 // popup.js — ContextNote Extension Popup
 
 const STORAGE_KEY = "context_notes_data";
+const FOLDERS_KEY = "cn_user_folders";
 const SETTINGS_KEY = "cn_show_highlights";
 const THEME_KEY = "cn_theme";
 const API_BASE = "http://127.0.0.1:5000";
-// ── THEME ENGINE (Synced natively with CSS attributes) ──
+
+// ── THEME ENGINE ──
 function applyThemeToPopup(theme) {
-  if (theme) {
-    document.documentElement.setAttribute("data-theme", theme);
-  }
+  if (theme) document.documentElement.setAttribute("data-theme", theme);
 }
 
-// Load saved theme on popup open
 chrome.storage.local.get([THEME_KEY], (res) => {
   applyThemeToPopup(res[THEME_KEY] || "indigo");
 });
 
-// Live-sync theme if user changes it in dashboard while popup is open
 chrome.storage.onChanged.addListener((changes) => {
-  if (changes[THEME_KEY]) {
-    applyThemeToPopup(changes[THEME_KEY].newValue);
-  }
+  if (changes[THEME_KEY]) applyThemeToPopup(changes[THEME_KEY].newValue);
+  // If folders are updated from the dashboard, refresh the dropdown live
+  if (changes[FOLDERS_KEY]) loadFolderDropdown();
 });
 
-// ── HIGHLIGHT TOGGLE ──
+// ── FOLDER DROPDOWN LOADER ──
+function loadFolderDropdown() {
+  const select = document.getElementById("folderSelect");
+  if (!select) return;
+
+  chrome.storage.local.get([FOLDERS_KEY, "cn_show_pro_ui"], (res) => {
+    const folders = res[FOLDERS_KEY] || [];
+
+    if (folders.length === 0) {
+      // Hide the whole folder row if no folders exist yet
+      const row = document.getElementById("folderRow");
+      if (row) row.style.display = "none";
+      return;
+    }
+
+    // Show the folder row
+    const row = document.getElementById("folderRow");
+    if (row) row.style.display = "flex";
+
+    select.innerHTML =
+      `<option value="">No folder</option>` +
+      folders
+        .map(
+          (f) =>
+            `<option value="${f.replace(/"/g, "&quot;")}">${f.replace(/</g, "&lt;")}</option>`,
+        )
+        .join("");
+  });
+}
+
+// ── MAIN ──
 document.addEventListener("DOMContentLoaded", () => {
+  // Load folder dropdown on open
+  loadFolderDropdown();
+
+  // ── HIGHLIGHT TOGGLE ──
   const toggleEl = document.getElementById("highlightToggle");
   if (toggleEl) {
     chrome.storage.local.get(SETTINGS_KEY, (res) => {
@@ -43,7 +75,7 @@ document.addEventListener("DOMContentLoaded", () => {
           .sendMessage(tab.id, {
             action: isEnabled ? "refresh_highlights" : "remove_highlights",
           })
-          .catch(() => {}); // catch errors if injected script isn't on page
+          .catch(() => {});
       }
     });
   }
@@ -58,11 +90,11 @@ document.addEventListener("DOMContentLoaded", () => {
         height: 650,
       },
       (win) => {
-        // Only close original if window creation succeeded
         if (win) window.close();
       },
     );
   });
+
   // ── OPEN DASHBOARD ──
   document.getElementById("openDashboard").addEventListener("click", () => {
     chrome.tabs.create({
@@ -74,8 +106,12 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("saveBtn").addEventListener("click", async () => {
     const noteTitleInput = document.getElementById("noteTitle");
     const noteInput = document.getElementById("noteInput");
+    const folderSelect = document.getElementById("folderSelect");
+
     const title = noteTitleInput.value.trim() || "Untitled";
     const content = noteInput.value.trim();
+    const selectedFolder = folderSelect ? folderSelect.value : "";
+
     if (!content && title === "Untitled") return;
 
     const [tab] = await chrome.tabs.query({
@@ -96,6 +132,8 @@ document.addEventListener("DOMContentLoaded", () => {
       content,
       selection: "",
       pinned: false,
+      // Save folder if one was selected, otherwise null
+      folder: selectedFolder || null,
     };
 
     const result = await chrome.storage.local.get(STORAGE_KEY);
@@ -103,8 +141,11 @@ document.addEventListener("DOMContentLoaded", () => {
     notes.push(noteData);
     await chrome.storage.local.set({ [STORAGE_KEY]: JSON.stringify(notes) });
 
+    // Reset inputs
     noteTitleInput.value = "";
     noteInput.value = "";
+    if (folderSelect) folderSelect.value = "";
+
     window.location.reload();
   });
 
@@ -143,26 +184,24 @@ document.addEventListener("DOMContentLoaded", () => {
             data-title="${n.title.replace(/"/g, "&quot;")}"
             data-content="${(n.content || "").replace(/"/g, "&quot;")}">✎</button>
           <button class="btn-delete" data-id="${n.id}">&times;</button>
-          <div class="note-title">${n.pinned ? "⭐ " : ""}${n.title.replace(/</g, "&lt;")}</div>
+          <div class="note-title">${n.pinned ? "⭐ " : ""}${n.title.replace(/</g, "&lt;")}${n.folder ? ` <span class="note-folder-tag">${n.folder.replace(/</g, "&lt;")}</span>` : ""}</div>
           ${n.selection ? `<div class="context">"${n.selection.replace(/</g, "&lt;")}"</div>` : ""}
           ${n.content ? `<div class="content">${n.content.replace(/</g, "&lt;")}</div>` : ""}
         `;
         notesList.appendChild(card);
       });
 
-    // Delete Notes
+    // Delete
     document.querySelectorAll(".btn-delete").forEach((btn) => {
       btn.addEventListener("click", async (e) => {
         const id = e.target.getAttribute("data-id");
         if (!confirm("Delete this note?")) return;
 
-        // 1. Remove from local storage
         allNotes = allNotes.filter((n) => n.id !== id);
         await chrome.storage.local.set({
           [STORAGE_KEY]: JSON.stringify(allNotes),
         });
 
-        // 2. Push deletion to server (only if logged in)
         try {
           const res = await fetch(`${API_BASE}/api/notes/${id}`, {
             method: "DELETE",
@@ -178,7 +217,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
 
-    // Edit Notes
+    // Edit
     document.querySelectorAll(".btn-edit").forEach((btn) => {
       btn.addEventListener("click", async (e) => {
         const id = e.target.getAttribute("data-id");
@@ -198,25 +237,17 @@ document.addEventListener("DOMContentLoaded", () => {
           allNotes[idx].title = newTitle;
           allNotes[idx].content = newContent;
 
-          // 1. Update Local Storage
           await chrome.storage.local.set({
             [STORAGE_KEY]: JSON.stringify(allNotes),
           });
 
-          // 2. NEW: Push update to server if logged in
           try {
-            const res = await fetch(`${API_BASE}/api/notes/${id}`, {
+            await fetch(`${API_BASE}/api/notes/${id}`, {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ title: newTitle, content: newContent }),
               credentials: "include",
             });
-
-            if (res.ok) {
-              console.log("Cloud sync successful");
-            } else {
-              console.warn("Cloud sync failed (maybe not logged in)");
-            }
           } catch (err) {
             console.error("Server is offline, update saved locally only.");
           }
@@ -226,7 +257,6 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
   }
+
   loadPageNotes();
 });
-
-// AI Logic

@@ -130,9 +130,7 @@
         color: var(--ink);
         border-radius: 16px;
         overflow: hidden;
-        transition:
-          background 0.3s,
-          color 0.3s;
+        transition: background 0.3s, color 0.3s;
       }
 
       /* ── HEADER ── */
@@ -204,9 +202,7 @@
         border-radius: 10px;
         border: 1.5px solid var(--bdr);
         margin-bottom: 14px;
-        transition:
-          background 0.3s,
-          border-color 0.3s;
+        transition: background 0.3s, border-color 0.3s;
       }
       .toggle-label {
         font-size: 12.5px;
@@ -230,10 +226,7 @@
       .slider {
         position: absolute;
         cursor: pointer;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
+        top: 0; left: 0; right: 0; bottom: 0;
         background-color: var(--bdr);
         transition: 0.3s;
         border-radius: 20px;
@@ -249,12 +242,8 @@
         transition: 0.3s;
         border-radius: 50%;
       }
-      input:checked + .slider {
-        background-color: var(--acc);
-      }
-      input:checked + .slider:before {
-        transform: translateX(16px);
-      }
+      input:checked + .slider { background-color: var(--acc); }
+      input:checked + .slider:before { transform: translateX(16px); }
 
       /* ── NOTES LIST ── */
       #notesList {
@@ -263,9 +252,7 @@
         margin-bottom: 14px;
         padding-right: 2px;
       }
-      #notesList::-webkit-scrollbar {
-        width: 4px;
-      }
+      #notesList::-webkit-scrollbar { width: 4px; }
       #notesList::-webkit-scrollbar-thumb {
         background: var(--bdr);
         border-radius: 10px;
@@ -280,16 +267,11 @@
         box-shadow: var(--card-shadow);
         border: 1.5px solid var(--bdr);
         border-left: var(--card-border-left, 1.5px solid var(--bdr));
-        transition:
-          background 0.3s,
-          border-color 0.2s,
-          box-shadow 0.2s;
+        transition: background 0.3s, border-color 0.2s, box-shadow 0.2s;
       }
       .note-card:hover {
         border-color: var(--acc);
-        box-shadow:
-          var(--card-shadow),
-          0 4px 12px color-mix(in srgb, var(--acc) 10%, transparent);
+        box-shadow: var(--card-shadow), 0 4px 12px color-mix(in srgb, var(--acc) 10%, transparent);
       }
 
       .note-title {
@@ -321,6 +303,21 @@
         word-wrap: break-word;
       }
 
+      /* Folder tag shown on note cards */
+      .note-folder-tag {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--acc);
+        background: var(--acc-bg);
+        border: 1px solid color-mix(in srgb, var(--acc) 25%, transparent);
+        border-radius: 4px;
+        padding: 1px 5px;
+        margin-left: 5px;
+        vertical-align: middle;
+        font-style: normal;
+      }
+
       .btn-edit,
       .btn-delete {
         position: absolute;
@@ -331,28 +328,15 @@
         color: var(--mut2);
         transition: color 0.15s;
       }
-      .btn-edit {
-        top: 8px;
-        right: 30px;
-        font-size: 13px;
-      }
-      .btn-edit:hover {
-        color: var(--acc);
-      }
-      .btn-delete {
-        top: 6px;
-        right: 8px;
-        font-size: 17px;
-        font-weight: 300;
-        line-height: 1;
-      }
-      .btn-delete:hover {
-        color: #ef4444;
-      }
+      .btn-edit { top: 8px; right: 30px; font-size: 13px; }
+      .btn-edit:hover { color: var(--acc); }
+      .btn-delete { top: 6px; right: 8px; font-size: 17px; font-weight: 300; line-height: 1; }
+      .btn-delete:hover { color: #ef4444; }
 
       /* ── INPUT AREA ── */
       input[type="text"],
-      textarea {
+      textarea,
+      select {
         width: 100%;
         border: 1.5px solid var(--bdr);
         border-radius: 9px;
@@ -362,29 +346,42 @@
         margin-bottom: 8px;
         background: var(--sur);
         color: var(--ink);
-        transition:
-          border-color 0.2s,
-          box-shadow 0.2s,
-          background 0.3s;
+        transition: border-color 0.2s, box-shadow 0.2s, background 0.3s;
       }
-      input[type="text"] {
-        font-size: 13.5px;
-        font-weight: 600;
-      }
-      textarea {
-        resize: none;
-        min-height: 64px;
-        font-size: 13px;
-      }
+      input[type="text"] { font-size: 13.5px; font-weight: 600; }
+      textarea { resize: none; min-height: 64px; font-size: 13px; }
       input[type="text"]:focus,
-      textarea:focus {
+      textarea:focus,
+      select:focus {
         outline: none;
         border-color: var(--acc);
         box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 12%, transparent);
       }
       input::placeholder,
-      textarea::placeholder {
-        color: var(--mut2);
+      textarea::placeholder { color: var(--mut2); }
+
+      /* ── FOLDER ROW ── */
+      #folderRow {
+        display: none; /* shown by JS only when folders exist */
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      #folderRow label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--mut);
+        white-space: nowrap;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      #folderRow select {
+        margin-bottom: 0;
+        flex: 1;
+        font-size: 12.5px;
+        padding: 7px 10px;
+        cursor: pointer;
       }
 
       button#saveBtn {
@@ -399,16 +396,10 @@
         font-size: 13.5px;
         font-family: inherit;
         letter-spacing: 0.01em;
-        transition:
-          background 0.2s,
-          transform 0.1s;
+        transition: background 0.2s, transform 0.1s;
       }
-      button#saveBtn:hover {
-        background: var(--acc-hover);
-      }
-      button#saveBtn:active {
-        transform: scale(0.98);
-      }
+      button#saveBtn:hover { background: var(--acc-hover); }
+      button#saveBtn:active { transform: scale(0.98); }
 
       /* ── FOOTER ── */
       .footer {
@@ -424,9 +415,7 @@
         font-weight: 600;
         transition: opacity 0.15s;
       }
-      .footer a:hover {
-        opacity: 0.75;
-      }
+      .footer a:hover { opacity: 0.75; }
 
       .empty-state {
         text-align: center;
@@ -441,9 +430,7 @@
       <div class="brand">
         <div class="brand-logo">
           <svg viewBox="0 0 24 24">
-            <path
-              d="M9 12h6M9 16h6M7 8h10M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"
-            />
+            <path d="M9 12h6M9 16h6M7 8h10M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"/>
           </svg>
         </div>
         <h3>Context<span>Note</span></h3>
@@ -457,7 +444,6 @@
       <div class="toggle-label"><span>🖍️</span> Show Webpage Highlights</div>
       <label class="switch">
         <input type="checkbox" id="highlightToggle" />
-        <!-- Ensure this ID matches! -->
         <span class="slider"></span>
       </label>
     </div>
@@ -465,17 +451,25 @@
     <div id="notesList"><div class="empty-state">Loading notes...</div></div>
 
     <input type="text" id="noteTitle" placeholder="Note Heading..." />
-    <textarea
-      id="noteInput"
-      placeholder="Description / Note details..."
-    ></textarea>
+    <textarea id="noteInput" placeholder="Description / Note details..."></textarea>
+
+    <!-- Folder row — hidden until folders exist -->
+    <div id="folderRow">
+      <label for="folderSelect">
+        <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:var(--mut);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        Folder
+      </label>
+      <select id="folderSelect">
+        <option value="">No folder</option>
+      </select>
+    </div>
+
     <button id="saveBtn">Save Note</button>
 
     <div class="footer">
       <a href="#" id="openDashboard">Open Full Dashboard ↗</a>
     </div>
 
-    <!-- Removed themes.js. It's natively handled by the attributes now -->
     <script src="popup.js"></script>
   </body>
 </html>
