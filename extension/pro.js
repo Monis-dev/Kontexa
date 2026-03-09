@@ -1,6 +1,65 @@
 const API_URL = "http://127.0.0.1:5000"; // Change to your Render URL
 
 const ProMode = {
+
+  async checkAuthStatus() {
+    try {
+      const res = await fetch(`${API_URL}/api/me`, { credentials: "include" });
+      if (res.ok) {
+        const user = await res.json();
+        return {
+          isLoggedIn: true,
+          isPro: user.is_pro === true
+        };
+      }
+      return { isLoggedIn: false, isPro: false }; // 401 Not Logged in
+    } catch (e) {
+      console.error("Auth check failed", e);
+      return { isLoggedIn: false, isPro: false }; // Server unreachable
+    }
+  },
+
+  // 2. The Strict Gatekeeper: (Logged In + Pro) AND (Has API Key)
+  async canAccessAI() {
+    // Step 1 & 2: Check Login & Pro
+    const status = await this.checkAuthStatus();
+
+    if (!status.isLoggedIn || !status.isPro) {
+      // Block: Hide AI modal, Show Paywall
+      const paywall = document.getElementById("paywallModal");
+      const aiModal = document.getElementById("aiModal");
+      
+      if (aiModal) aiModal.classList.remove("on");
+      
+      if (paywall) {
+        paywall.classList.add("on");
+      } else {
+        alert("🔒 Pro Feature: Please log in and upgrade to Pro to use AI tools.");
+      }
+      return false; // Access Denied
+    }
+
+    // Step 3: Check for Local API Key
+    const res = await chrome.storage.local.get(['gemini_key']);
+    if (!res.gemini_key) {
+      // Block: Hide AI modal, Show API Settings Modal
+      const apiModal = document.getElementById("apiSettingsModal");
+      const aiModal = document.getElementById("aiModal");
+      
+      if (aiModal) aiModal.classList.remove("on");
+      
+      if (apiModal) {
+        apiModal.classList.add("on");
+      } else {
+        alert("Please set your Gemini API Key in Settings.");
+      }
+      return false; // Access Denied
+    }
+
+    return true; // Access Granted!
+  },
+
+
   // 1. Check Status (Double check with server)
   async isProUser() {
     try {

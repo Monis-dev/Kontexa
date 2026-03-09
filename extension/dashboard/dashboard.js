@@ -408,12 +408,48 @@ if (typeof chrome !== "undefined" && chrome.storage) {
 }
 
 // Paywall Actions
+// Paywall Logout Action (SAFE VERSION - NEVER DELETES LOCAL NOTES)
 E($("paywallLogoutBtn"), "click", async () => {
-  await fetch(`${API_BASE}/api/logout`, {
-    method: "POST",
-    credentials: "include",
-  });
-  window.location.reload();
+  const btn = $("paywallLogoutBtn");
+  btn.textContent = "Disconnecting...";
+  btn.disabled = true;
+
+  try {
+    // 1. Tell the server to kill the session (if server is online)
+    await fetch(`${API_BASE}/api/logout`, {
+      method: "POST",
+      credentials: "include",
+    });
+  } catch (e) {
+    console.warn("Server offline, logging out locally.");
+  }
+
+  // 2. Clear auth state variable, but DO NOT touch chrome.storage
+  isLoggedIn = false;
+  
+  // 3. Hide the Paywall
+  $("paywallModal").classList.remove("on");
+  
+  // 4. Update the UI to reflect Local Mode
+  $("uStatus").textContent = "Local Mode Only";
+  
+  const logoutBtnEl = $("logoutBtn");
+  if (logoutBtnEl) {
+    // Change the "Logout" button back to the "Login" button
+    logoutBtnEl.outerHTML = `<div class="sitem" id="loginBtn">🔑 Sync via Google</div>`;
+    
+    // Re-attach the listener for the new login button
+    E($("loginBtn"), "click", () => {
+      $("synmenu").classList.remove("on");
+      $("proceedLoginBtn").style.display = "block";
+      $("guideModal").classList.add("on");
+    });
+  }
+
+  // 5. Notify user and reset button
+  toast("Disconnected. Your notes are safe locally.");
+  btn.textContent = "No thanks, Log me out";
+  btn.disabled = false;
 });
 
 E($("upgradeBtn"), "click", async () => {
@@ -563,6 +599,134 @@ function openSpecificPage(targetUrl) {
   });
 }
 
+//AI logic
+E($("aiBtn"), "click", () => {
+  // If general chat, pass all notes or empty context
+  $("aiModal").dataset.context = JSON.stringify(allNotesFlat);
+  $("aiModal").classList.add("on");
+});
+
+E($("closeAiBtn"), "click", () => $("aiModal").classList.remove("on"));
+
+// Replace your existing E($("aiSendBtn"), "click", ...) with this:
+
+let isAiProcessing = false; // Add this global flag near the top of your dashboard.js
+
+// AI Send Function Logic
+async function handleAiSubmit() {
+  if (isAiProcessing) return; // Prevent spamming
+
+  const input = $("aiInput");
+  const sendBtn = $("aiSendBtn");
+  const q = input.value.trim();
+
+  if (!q || q === "Thinking..." || q === "Checking permissions...") return;
+
+  isAiProcessing = true;
+  sendBtn.disabled = true;
+  input.disabled = true;
+
+  const chatBox = $("aiChatBox");
+
+  // 1. Temporarily show user message in chat
+  const tempMsgId = "msg-" + Date.now();
+  chatBox.innerHTML += `<div class="chat-msg chat-user" id="${tempMsgId}">${esc(q)}</div>`;
+  chatBox.scrollTop = chatBox.scrollHeight;
+
+  // Clear input visually while processing
+  input.value = "Checking permissions...";
+
+  // 2. STRICT GATING: (Logged In -> Pro -> Has API Key)
+  const hasAccess = await ProMode.canAccessAI();
+
+  if (!hasAccess) {
+    // Access Denied: Remove the temporary message so it doesn't stay stuck
+    const tempMsg = document.getElementById(tempMsgId);
+    if (tempMsg) tempMsg.remove();
+
+    // Reset UI
+    input.value = q; // Put their question back so they don't lose it
+    input.disabled = false;
+    sendBtn.disabled = false;
+    isAiProcessing = false;
+    return; // Stop execution
+  }
+
+  // 3. Access Granted: Proceed with AI Call
+  input.value = "Thinking...";
+
+  try {
+    const contextNotes = JSON.parse($("aiModal").dataset.context || "[]");
+
+    // Call client-side AI Service directly
+    const answer = await AIService.chat(q, contextNotes);
+
+    // Show the AI's response
+    chatBox.innerHTML += `<div class="chat-msg chat-ai">${esc(answer).replace(/\n/g, "<br>")}</div>`;
+  } catch (e) {
+    console.error(e);
+    chatBox.innerHTML += `<div class="chat-msg chat-ai">Error: Could not connect to AI. Please check your network or API key.</div>`;
+  }
+
+  // 4. Reset UI
+  input.value = "";
+  input.disabled = false;
+  sendBtn.disabled = false;
+  isAiProcessing = false;
+  chatBox.scrollTop = chatBox.scrollHeight;
+
+  // Focus back on input for the next question
+  setTimeout(() => input.focus(), 10);
+}
+
+// Attach to Send Button
+E($("aiSendBtn"), "click", handleAiSubmit);
+
+// Attach to Enter Key on the Input field
+E($("aiInput"), "keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    // Prevent firing on Shift+Enter if you ever change to a textarea
+    e.preventDefault(); // Stop default form submission or newlines
+    handleAiSubmit();
+  }
+});
+//API key logic
+E($("closeApiSettingsBtn"), "click", () =>
+  $("apiSettingsModal").classList.remove("on"),
+);
+
+// Open API Settings
+E($("apiSettingsBtn"), "click", () => {
+  chrome.storage.local.get(["gemini_key"], (res) => {
+    $("apiKeyInput").value = res.gemini_key || "";
+    $("apiSettingsModal").classList.add("on");
+  });
+});
+
+// Save API Settings
+E($("saveApiKey"), "click", () => {
+  const key = $("apiKeyInput").value.trim();
+  chrome.storage.local.set({ gemini_key: key }, () => {
+    toast("API Key saved securely.");
+    $("apiSettingsModal").classList.remove("on");
+  });
+});
+
+// GATING LOGIC
+async function executeProFeature(callback) {
+  const res = await chrome.storage.local.get(["gemini_key"]);
+  const hasKey = !!res.gemini_key;
+
+  // Logic: If user is Pro OR has their own key, allow it.
+  if (isLoggedIn || hasKey) {
+    callback();
+  } else {
+    toast("Please set your Gemini API Key in Settings or Upgrade to Pro");
+    // Open Settings modal instead
+    $("apiSettingsModal").classList.add("on");
+  }
+}
+
 // ── THEME ENGINE (Moved from HTML to JS for Extensions) ──
 const THEME_KEY = "cn_theme";
 
@@ -607,35 +771,4 @@ document.addEventListener("click", (e) => {
   ) {
     $("themePanel").classList.remove("on");
   }
-});
-
-//AI logic
-E($("aiBtn"), "click", () => {
-  // If general chat, pass all notes or empty context
-  $("aiModal").dataset.context = JSON.stringify(allNotesFlat);
-  $("aiModal").classList.add("on");
-});
-
-E($("closeAiBtn"), "click", () => $("aiModal").classList.remove("on"));
-
-E($("aiSendBtn"), "click", async () => {
-  const input = $("aiInput");
-  const q = input.value.trim();
-  if (!q) return;
-
-  const chatBox = $("aiChatBox");
-  chatBox.innerHTML += `<div class="chat-msg chat-user">${esc(q)}</div>`;
-  input.value = "Thinking...";
-  input.disabled = true;
-
-  // Get context from the modal's dataset (set by the specific page button)
-  const contextNotes = JSON.parse($("aiModal").dataset.context || "[]");
-
-  const answer = await ProMode.aiChat(q, contextNotes);
-
-  input.value = "";
-  input.disabled = false;
-  // Use a simple parser for the AI response
-  chatBox.innerHTML += `<div class="chat-msg chat-ai">${esc(answer).replace(/\n/g, "<br>")}</div>`;
-  chatBox.scrollTop = chatBox.scrollHeight;
 });

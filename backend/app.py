@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 from authlib.integrations.flask_client import OAuth
 from flask_cors import CORS
 from dotenv import load_dotenv
-from ai_agent import get_ai_answer, get_ai_summary
+# from ai_agent import get_ai_answer, get_ai_summary
 
 load_dotenv()
 app = Flask(__name__)
@@ -148,22 +148,33 @@ def get_notes():
         })
     return jsonify(result)
 
-@app.route('/api/notes/<string:local_id>', methods=['PUT']) # Must be <string:local_id>
+@app.route('/api/notes/<string:local_id>', methods=['PUT'])
 def update_note(local_id):
-    if 'user_id' not in session: return jsonify({"error": "Login required"}), 401
+    if 'user_id' not in session: 
+        return jsonify({"error": "Login required"}), 401
     
-    # Crucial: Filter by local_id (the timestamp string)
+    # 1. Fetch note
     note = Note.query.join(Website).filter(
         Website.user_id == session['user_id'], 
         Note.local_id == local_id
     ).first()
     
-    if note:
-        note.title = request.json.get('title', note.title)
-        note.content = request.json.get('content', note.content)
-        db.session.commit()
-        return jsonify({"message": "Updated"})
-    return jsonify({"error": "Note not found"}), 404
+    if not note: 
+        return jsonify({"error": "Note not found"}), 404
+    
+    # 2. Get data safely
+    data = request.json
+    
+    # 3. Update fields (this avoids the dictionary syntax error)
+    if 'title' in data:
+        note.title = data['title']
+    if 'content' in data:
+        note.content = data['content']
+    if 'pinned' in data:
+        note.pinned = data['pinned'] # This is now safe
+        
+    db.session.commit()
+    return jsonify({"message": "Updated successfully"})
 
 @app.route('/api/notes/<string:local_id>', methods=['DELETE'])
 def delete_note(local_id):
@@ -182,21 +193,21 @@ def delete_note(local_id):
         
     return jsonify({"error": "Note not found or Unauthorized"}), 404
 
-@app.route('/api/ai/chat', methods=['POST'])
-def ai_chat():
-    user = db.session.get(User, session.get('user_id'))
-    if not user or not user.is_pro: return jsonify({"error": "Pro only"}), 403
+# @app.route('/api/ai/chat', methods=['POST'])
+# def ai_chat():
+#     user = db.session.get(User, session.get('user_id'))
+#     if not user or not user.is_pro: return jsonify({"error": "Pro only"}), 403
     
-    data = request.json
-    answer = get_ai_answer(data['question'], data.get('context', []))
-    return jsonify({"answer": answer})
+#     data = request.json
+#     answer = get_ai_answer(data['question'], data.get('context', []))
+#     return jsonify({"answer": answer})
 
-@app.route('/api/ai/summarize', methods=['POST'])
-def ai_summarize():
-    user = db.session.get(User, session.get('user_id'))
-    if not user or not user.is_pro: return jsonify({"error": "Pro only"}), 403
+# @app.route('/api/ai/summarize', methods=['POST'])
+# def ai_summarize():
+#     user = db.session.get(User, session.get('user_id'))
+#     if not user or not user.is_pro: return jsonify({"error": "Pro only"}), 403
     
-    summary = get_ai_summary(request.json.get('content', ''))
-    return jsonify({"summary": summary})
+#     summary = get_ai_summary(request.json.get('content', ''))
+#     return jsonify({"summary": summary})
 
 if __name__ == '__main__': app.run(debug=True, port=5000)

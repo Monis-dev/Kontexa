@@ -46,6 +46,14 @@
         <button class="icon-btn" id="infoBtn" title="How your data is stored">
           ?
         </button>
+        <button class="icon-btn" id="apiSettingsBtn" title="AI API Settings">
+          <svg viewBox="0 0 24 24" style="width: 20px; height: 20px">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+            />
+          </svg>
+        </button>
         <!-- Theme Picker -->
         <div class="theme-wrap">
           <button class="theme-btn" id="themeBtn" title="Change color theme">
@@ -309,6 +317,22 @@
 
         <div class="macts" style="margin-top: 15px">
           <button class="btn" id="closeAiBtn">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Settings Modal -->
+    <div class="mbg" id="apiSettingsModal">
+      <div class="modal">
+        <h3>AI API Settings</h3>
+        <p style="font-size: 13px; color: var(--mut); margin-bottom: 15px">
+          Enter your Google Gemini API Key to enable AI features directly from
+          your browser. Your key is stored locally on your machine.
+        </p>
+        <input type="password" id="apiKeyInput" placeholder="AIza..." />
+        <div class="macts">
+          <button class="btn" id="closeApiSettingsBtn">Cancel</button>
+          <button class="btn pri" id="saveApiKey">Save Key</button>
         </div>
       </div>
     </div>

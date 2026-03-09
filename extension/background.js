@@ -26,9 +26,26 @@ function getPageMediaData() {
 }
 
 // --- MAIN LOGIC ---
+// --- MAIN LOGIC ---
+// --- MAIN LOGIC ---
+// --- MAIN LOGIC ---
 async function executeContextNoteFlow(tab, explicitSelection = null) {
-  // 1. Get Video Data
-  let mediaData = { timestamp: null };
+  const API_BASE = "http://127.0.0.1:5000"; // Ensure this matches your Render/Local URL
+
+  // 1. Check Auth Status before showing dialog
+  let isPro = false;
+  try {
+    const authRes = await fetch(`${API_BASE}/api/me`, { credentials: "include" });
+    if (authRes.ok) {
+      const user = await authRes.json();
+      isPro = user.is_pro === true;
+    }
+  } catch (e) {
+    console.warn("Server unreachable, defaulting to Free tier.");
+  }
+
+  // 2. Get Video Data
+  let mediaData = { timestamp: null, hasVideo: false };
   try {
     const results = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
@@ -37,20 +54,25 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
     if (results && results[0]) mediaData = results[0].result;
   } catch (e) {}
 
-  // 2. Inject Dialog
+  // ==========================================
+  // 🚨 STRICT DATA WIPE FOR FREE USERS 🚨
+  // ==========================================
+  if (!isPro) {
+    mediaData.timestamp = null; // Completely erase the timestamp from memory
+  }
+
+  // 3. Inject Dialog
   chrome.scripting.executeScript({
     target: { tabId: tab.id },
-    args: [explicitSelection, mediaData.timestamp],
-    func: (passedSelection, timestamp) => {
-      // Logic: If text is selected, use it.
-      // If NOT, but we have a timestamp, use "Video Timestamp" as placeholder.
-      let selectionText =
-        passedSelection || window.getSelection().toString().trim();
+    args: [explicitSelection, mediaData, isPro],
+    func: (passedSelection, media, isProUser) => {
+      
+      let selectionText = passedSelection || window.getSelection().toString().trim();
 
-      if (!selectionText && timestamp) {
-        selectionText = `Saved at timestamp ${timestamp}`;
+      // If no text, try timestamp. If no timestamp, use Title.
+      if (!selectionText && media.timestamp) {
+        selectionText = `Saved at timestamp ${media.timestamp}`;
       } else if (!selectionText) {
-        // Fallback: If no text and no video, maybe they just want a page note?
         selectionText = document.title;
       }
 
@@ -66,10 +88,21 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
         position: fixed; top: 20px; right: 20px; margin: 0;
       `;
 
+      // UI Logic for Timestamps
       let metaHtml = "";
-      if (timestamp) {
-        metaHtml += `<span style="background:#eef2ff; color:#4f46e5; padding:4px 8px; border-radius:4px; font-size:12px; font-weight:bold; display:inline-flex; align-items:center; gap:4px; border:1px solid #c7d2fe;">⏱️ ${timestamp}</span>`;
+      if (media.hasVideo) {
+        if (isProUser && media.timestamp) {
+          metaHtml = `<span style="background:#eef2ff; color:#4f46e5; padding:4px 8px; border-radius:4px; font-size:12px; font-weight:bold; display:inline-flex; align-items:center; gap:4px; border:1px solid #c7d2fe;">⏱️ ${media.timestamp}</span>`;
+        } else {
+          // FREE USER: Show Upsell Badge
+          metaHtml = `<span onclick="alert('👑 Unlock YouTube Timestamps with ContextNote Pro! Open your Dashboard to upgrade.')" title="Upgrade to Pro to save YouTube timestamps" style="background:#fff1f2; color:#e11d48; padding:4px 8px; border-radius:4px; font-size:12px; font-weight:bold; display:inline-flex; align-items:center; gap:4px; border:1px solid #fecdd3; cursor:pointer;">👑 Pro Timestamp</span>`;
+        }
       }
+
+      // UI Logic for Screenshot Button
+      let snapButtonHtml = isProUser 
+        ? `<button id="cn-snap" style="background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; padding:8px 10px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px;">📸 <span id="cn-snap-text">Screenshot</span></button>`
+        : `<button id="cn-snap-upsell" style="background:#fff1f2; color:#e11d48; border:1px solid #fecdd3; padding:8px 10px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px;" title="Pro Feature">👑 Screenshot</button>`;
 
       const content = `
         <h3 style="margin: 0 0 12px 0; font-size: 16px; color: #2563eb; display:flex; justify-content:space-between; align-items:center;">
@@ -90,9 +123,7 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-          <button id="cn-snap" style="background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; padding:8px 10px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px;">
-            📸 <span id="cn-snap-text">Screenshot</span>
-          </button>
+          ${snapButtonHtml}
           <div style="display:flex; gap:8px;">
             <button id="cn-cancel" style="padding: 8px 12px; border: none; background: #f1f5f9; color: #475569; border-radius: 6px; cursor: pointer; font-weight: 600; font-size:12px;">Cancel</button>
             <button id="cn-save" style="padding: 8px 14px; border: none; background: #2563eb; color: white; border-radius: 6px; cursor: pointer; font-weight: 600; font-size:12px;">Save</button>
@@ -108,17 +139,17 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
 
       document.getElementById("cn-cancel").onclick = () => dialog.remove();
 
-      document.getElementById("cn-snap").onclick = () => {
-        const snapBtn = document.getElementById("cn-snap");
-        const prevText = document.getElementById("cn-snap-text").innerText;
-        snapBtn.disabled = true;
-        document.getElementById("cn-snap-text").innerText = "...";
-        dialog.style.opacity = "0";
+      // Attach behavior based on Pro Status
+      if (isProUser) {
+        document.getElementById("cn-snap").onclick = () => {
+          const snapBtn = document.getElementById("cn-snap");
+          const prevText = document.getElementById("cn-snap-text").innerText;
+          snapBtn.disabled = true;
+          document.getElementById("cn-snap-text").innerText = "...";
+          dialog.style.opacity = "0";
 
-        setTimeout(() => {
-          chrome.runtime.sendMessage(
-            { action: "capture_screenshot" },
-            (response) => {
+          setTimeout(() => {
+            chrome.runtime.sendMessage({ action: "capture_screenshot" }, (response) => {
               dialog.style.opacity = "1";
               snapBtn.disabled = false;
               document.getElementById("cn-snap-text").innerText = prevText;
@@ -126,26 +157,34 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
               if (response && response.data) {
                 currentImage = response.data;
                 document.getElementById("cn-img-tag").src = currentImage;
-                document.getElementById("cn-img-preview").style.display =
-                  "block";
+                document.getElementById("cn-img-preview").style.display = "block";
                 document.getElementById("cn-snap").style.display = "none";
               }
-            },
-          );
-        }, 200);
-      };
+            });
+          }, 200);
+        };
+      } else {
+        // UPSELL BEHAVIOR FOR SCREENSHOT
+        document.getElementById("cn-snap-upsell").onclick = () => {
+          alert("👑 Unlock Screenshots with ContextNote Pro! Open your Dashboard to upgrade.");
+        };
+      }
 
-      document.getElementById("cn-remove-img").onclick = () => {
-        currentImage = null;
-        document.getElementById("cn-img-preview").style.display = "none";
-        document.getElementById("cn-snap").style.display = "flex";
-      };
+      // Remove Image handler
+      const removeImgBtn = document.getElementById("cn-remove-img");
+      if (removeImgBtn) {
+        removeImgBtn.onclick = () => {
+          currentImage = null;
+          document.getElementById("cn-img-preview").style.display = "none";
+          if (isProUser) document.getElementById("cn-snap").style.display = "flex";
+        };
+      }
 
+      // Save handler
       document.getElementById("cn-save").onclick = () => {
-        const title =
-          document.getElementById("cn-title").value.trim() || "Note";
+        const title = document.getElementById("cn-title").value.trim() || "Note";
         const desc = document.getElementById("cn-desc").value.trim();
-
+        
         chrome.runtime.sendMessage({
           action: "save_highlight_data",
           data: {
@@ -155,7 +194,7 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
             title: title,
             content: desc,
             selection: selectionText,
-            timestamp: timestamp || null,
+            timestamp: media.timestamp, // <--- This will be exactly null if user is Free!
             image_data: currentImage || null,
             pinned: false,
           },
