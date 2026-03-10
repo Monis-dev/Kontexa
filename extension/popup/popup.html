@@ -448,6 +448,11 @@
       </label>
     </div>
 
+    <button id="aiGenerateBtn" style="width: 100%; padding: 8px; background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; border-radius: 6px; cursor: pointer; font-weight: 600; margin-bottom: 12px; display:flex; align-items:center; justify-content:center; gap:6px;">
+      ✨ Summarize Page to Notes
+    </button>
+    <div id="aiNotesContainer" style="margin-bottom: 12px; display:none;"></div>
+    
     <div id="notesList"><div class="empty-state">Loading notes...</div></div>
 
     <input type="text" id="noteTitle" placeholder="Note Heading..." />
@@ -470,6 +475,8 @@
       <a href="#" id="openDashboard">Open Full Dashboard ↗</a>
     </div>
 
+    <script src="../pro.js"></script>
+    <script src="../ai_service.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

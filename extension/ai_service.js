@@ -3,19 +3,21 @@ const AIService = {
   MODEL_NAME: "gemini-2.5-flash",
 
   async callGemini(prompt, contextNotes) {
-    const res = await chrome.storage.local.get(['gemini_key']);
+    const res = await chrome.storage.local.get(["gemini_key"]);
     const apiKey = res.gemini_key;
 
     if (!apiKey) throw new Error("API_KEY_MISSING");
 
     // 1. Cleanly format the notes so the AI isn't confused by empty fields
-    const notesText = contextNotes.map((n, i) => {
-      let parts = [`--- Note ${i + 1} ---`];
-      if (n.title) parts.push(`Page Title: ${n.title}`);
-      if (n.selection) parts.push(`Highlighted Text: ${n.selection}`);
-      if (n.content) parts.push(`User's Written Note: ${n.content}`);
-      return parts.join("\n");
-    }).join("\n\n");
+    const notesText = contextNotes
+      .map((n, i) => {
+        let parts = [`--- Note ${i + 1} ---`];
+        if (n.title) parts.push(`Page Title: ${n.title}`);
+        if (n.selection) parts.push(`Highlighted Text: ${n.selection}`);
+        if (n.content) parts.push(`User's Written Note: ${n.content}`);
+        return parts.join("\n");
+      })
+      .join("\n\n");
 
     // 2. Stronger System Prompt
     const systemPrompt = `You are an expert research assistant. Your ONLY source of knowledge is the user's notes provided below. 
@@ -34,17 +36,19 @@ const AIService = {
 
     try {
       const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{ 
-            role: "user",
-            parts: [{ text: `${systemPrompt}\n\nUser Question: ${prompt}` }] 
-          }],
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: `${systemPrompt}\n\nUser Question: ${prompt}` }],
+            },
+          ],
           generationConfig: {
             temperature: 0.2, // Lower temperature makes it more factual and strict to the notes
-          }
-        })
+          },
+        }),
       });
 
       if (response.status === 429) {
@@ -58,7 +62,6 @@ const AIService = {
 
       const data = await response.json();
       return data.candidates[0].content.parts[0].text;
-
     } catch (error) {
       console.error("AI Service Error:", error);
       return "Connection error. Please check your internet connection and API key.";
@@ -73,5 +76,58 @@ const AIService = {
     If the text is empty or meaningless, say "No content to summarize."\n\nText: ${content}`;
     // Passing an empty array as context since this is a direct content summary
     return await this.callGemini(prompt, []);
+  },
+
+  // --- NEW: GENERATE INDIVIDUAL NOTES FROM PAGE ---
+  async generateNotesFromPage(pageContent) {
+    const res = await chrome.storage.local.get(["gemini_key"]);
+    const apiKey = res.gemini_key;
+
+    if (!apiKey) throw new Error("API_KEY_MISSING");
+
+    // Limit content length to avoid exceeding token limits on massive pages
+    const safeContent = pageContent.substring(0, 30000);
+
+    const systemPrompt = `You are an expert research assistant. Read the provided documentation/webpage content and extract the 3 to 5 most important concepts.
+    
+    You MUST return your response as a valid JSON array of objects. Do not include markdown formatting like \`\`\`json. Just the raw array.
+    
+    Format:
+    [
+      { "title": "Short Heading", "content": "Detailed explanation (2-3 sentences)." },
+      { "title": "Another Heading", "content": "Another explanation." }
+    ]
+    
+    Content to analyze:
+    ${safeContent}`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.MODEL_NAME}:generateContent?key=${apiKey}`;
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: systemPrompt }] }],
+          generationConfig: { temperature: 0.2 },
+        }),
+      });
+
+      if (!response.ok) return null;
+
+      const data = await response.json();
+      let rawText = data.candidates[0].content.parts[0].text;
+
+      // Clean up markdown in case the AI ignores the "no markdown" rule
+      rawText = rawText
+        .replace(/```json/gi, "")
+        .replace(/```/g, "")
+        .trim();
+
+      return JSON.parse(rawText); // Returns Array of note objects
+    } catch (error) {
+      console.error("AI Generation Error:", error);
+      return null;
+    }
   },
 };
