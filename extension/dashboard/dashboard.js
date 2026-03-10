@@ -246,6 +246,7 @@ document.addEventListener("click", (e) => {
   const moveBtn = e.target.closest(".btn-move");
   const viewMoreBtn = e.target.closest(".btn-view-more");
   const logoutBtn = e.target.closest("#logoutBtn");
+  const cardEl = e.target.closest(".card");
 
   // ✅ FIX 1: Handle folder view-more separately
   if (viewMoreBtn) {
@@ -368,6 +369,57 @@ document.addEventListener("click", (e) => {
         }
       },
     );
+  }
+  
+  // View Card
+  if (cardEl && !e.target.closest(".act") && !e.target.closest("a")) {
+    const id = cardEl.dataset.id;
+    const note = allNotesFlat.find((n) => n.id === id);
+
+    if (note) {
+      $("vTitle").textContent = note.title || "Untitled Note";
+
+      // Build Meta Tags (Timestamp, Folder, Pinned)
+      let metaHtml = "";
+      if (note.timestamp)
+        metaHtml += `<span class="tag" style="background:#eef2ff; color:#4f46e5; border-color:#c7d2fe;">⏱️ ${esc(note.timestamp)}</span>`;
+      if (note.folder)
+        metaHtml += `<span class="tag" style="background:var(--bg); color:var(--mut);">📁 ${esc(note.folder)}</span>`;
+      if (note.pinned)
+        metaHtml += `<span class="tag" style="background:#fffbeb; color:#d97706; border-color:#fde68a;">⭐ Pinned</span>`;
+      $("vMeta").innerHTML = metaHtml;
+
+      // Populate Highlights
+      if (note.selection) {
+        $("vSelection").style.display = "block";
+        $("vSelection").textContent = `"${note.selection}"`;
+      } else {
+        $("vSelection").style.display = "none";
+      }
+
+      // Populate Written Content
+      if (note.content) {
+        $("vContent").style.display = "block";
+        $("vContent").textContent = note.content;
+      } else {
+        $("vContent").style.display = "none";
+      }
+
+      // Populate Image
+      if (note.image_data) {
+        $("vImageWrap").style.display = "block";
+        $("vImage").src = note.image_data;
+      } else {
+        $("vImageWrap").style.display = "none";
+      }
+
+      $("viewModal").classList.add("on");
+    }
+  }
+
+  // Close View Modal
+  if (e.target.id === "closeView" || e.target.id === "viewModal") {
+    $("viewModal").classList.remove("on");
   }
 });
 

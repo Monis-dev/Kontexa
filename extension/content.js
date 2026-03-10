@@ -1,7 +1,10 @@
 const STORAGE_KEY = "context_notes_data";
 const SETTINGS_KEY = "cn_show_highlights";
 
-// 1. Remove all existing highlights safely
+// ==========================================
+// ── 1. HIGHLIGHT ENGINE ──
+// ==========================================
+
 function removeHighlights() {
   document.querySelectorAll("mark.cn-highlight").forEach((mark) => {
     const parent = mark.parentNode;
@@ -13,7 +16,6 @@ function removeHighlights() {
   });
 }
 
-// 2. Advanced Finder: Handles text splitting across <b>, <span>, <a>, etc.
 function highlightTextOnPage(searchText, noteTitle) {
   if (!searchText || searchText.length < 2) return;
 
@@ -26,9 +28,7 @@ function highlightTextOnPage(searchText, noteTitle) {
   const nodeList = [];
   let currentNode = treeWalker.nextNode();
 
-  // Step 1: Flatten the DOM into a list of text nodes
   while (currentNode) {
-    // Skip hidden elements (scripts, styles, inputs)
     const parentTag = currentNode.parentNode.tagName;
     if (
       ["SCRIPT", "STYLE", "TEXTAREA", "INPUT", "NOSCRIPT"].indexOf(
@@ -40,41 +40,20 @@ function highlightTextOnPage(searchText, noteTitle) {
     currentNode = treeWalker.nextNode();
   }
 
-  // Step 2: Search for the text across these nodes
   let totalText = nodeList.map((n) => n.nodeValue).join("");
-
-  // Clean up whitespace for easier matching (browser selection often has weird newlines)
   const cleanSearchText = searchText.replace(/\s+/g, " ").trim();
   const cleanTotalText = totalText.replace(/\s+/g, " ");
 
   let searchIndex = 0;
   let startIndex = cleanTotalText.indexOf(cleanSearchText, searchIndex);
 
-  // Loop to find ALL occurrences of the text
   while (startIndex !== -1) {
-    let matchLength = cleanSearchText.length;
-    let currentLength = 0;
-    let startNodeIndex = -1;
-    let startNodeOffset = -1;
-    let endNodeIndex = -1;
-    let endNodeOffset = -1;
-
-    // Map the string index back to the DOM nodes
-    let runningLength = 0;
-
-    // We need to map the "clean" index back to the "real" index (accounting for newlines we stripped)
-    // This is complex, so we use a simpler Range approach for robustness:
-
     try {
       if (window.find && window.getSelection) {
-        // "Hack": Use the browser's own Find engine to locate the text safely
-        // This is safer than math because it handles CSS rendering nuances
         if (window.find(searchText, false, false, false, false, false, false)) {
           const sel = window.getSelection();
           if (sel.rangeCount > 0) {
             const range = sel.getRangeAt(0);
-
-            // Create the highlight wrapper
             const mark = document.createElement("mark");
             mark.className = "cn-highlight";
             mark.style.backgroundColor = "#fde047";
@@ -82,11 +61,9 @@ function highlightTextOnPage(searchText, noteTitle) {
             mark.style.borderBottom = "2px solid #f59e0b";
             mark.title = `ContextNote: ${noteTitle}`;
 
-            // Safe Wrap: extractContents handles the <b> <span> splitting automatically!
             try {
               range.surroundContents(mark);
             } catch (e) {
-              // If surroundContents fails (common on complex DOMs), use the fallback
               const newNode = document.createElement("mark");
               newNode.className = "cn-highlight";
               newNode.style.backgroundColor = "#fde047";
@@ -96,7 +73,7 @@ function highlightTextOnPage(searchText, noteTitle) {
               newNode.appendChild(range.extractContents());
               range.insertNode(newNode);
             }
-            sel.removeAllRanges(); // Clear the user's blue selection
+            sel.removeAllRanges();
           }
         }
       }
@@ -104,56 +81,196 @@ function highlightTextOnPage(searchText, noteTitle) {
       console.log("Highlighting error:", e);
     }
 
-    // Find next occurrence
     searchIndex = startIndex + 1;
     startIndex = cleanTotalText.indexOf(cleanSearchText, searchIndex);
-
-    // Stop infinite loops if something weird happens
     if (searchIndex > cleanTotalText.length) break;
   }
 }
 
-// 3. Main Init Function
 function initHighlights() {
-  // Store scroll position so window.find doesn't jump the page around
+  // If extension context is dead, abort immediately
+  if (!chrome.runtime?.id) return;
+
   const scrollX = window.scrollX;
   const scrollY = window.scrollY;
 
-  chrome.storage.local.get([STORAGE_KEY, SETTINGS_KEY], (res) => {
-    const isEnabled = res[SETTINGS_KEY] !== false;
-    if (!isEnabled) {
-      removeHighlights();
-      return;
-    }
+  try {
+    chrome.storage.local.get([STORAGE_KEY, SETTINGS_KEY], (res) => {
+      if (chrome.runtime.lastError) return; // Ignore disconnected errors
 
-    const allNotes = res[STORAGE_KEY] ? JSON.parse(res[STORAGE_KEY]) : [];
+      const isEnabled = res[SETTINGS_KEY] !== false;
+      if (!isEnabled) {
+        removeHighlights();
+        return;
+      }
 
-    // Exact URL match
-    const currentUrlNotes = allNotes.filter(
-      (n) => n.url === window.location.href,
-    );
+      const allNotes = res[STORAGE_KEY] ? JSON.parse(res[STORAGE_KEY]) : [];
+      const currentUrlNotes = allNotes.filter(
+        (n) => n.url === window.location.href,
+      );
 
-    if (currentUrlNotes.length > 0) {
-      // Sort by length (longest first) to prevent nesting issues
-      currentUrlNotes.sort((a, b) => b.selection.length - a.selection.length);
-
-      removeHighlights(); // Reset page
-
-      currentUrlNotes.forEach((note) => {
-        highlightTextOnPage(note.selection, note.title);
-      });
-
-      // Restore Scroll (Crucial because window.find jumps)
-      window.scrollTo(scrollX, scrollY);
-    }
-  });
+      if (currentUrlNotes.length > 0) {
+        currentUrlNotes.sort((a, b) => b.selection.length - a.selection.length);
+        removeHighlights();
+        currentUrlNotes.forEach((note) => {
+          highlightTextOnPage(note.selection, note.title);
+        });
+        window.scrollTo(scrollX, scrollY);
+      }
+    });
+  } catch (e) {
+    // Fails silently if context is invalidated
+  }
 }
 
-// Run immediately + fallback for dynamic sites
+// ==========================================
+// ── 2. YOUTUBE VIDEO TIMESTAMPS MARKERS ──
+// ==========================================
+
+function isContextValid() {
+  try {
+    // Accessing chrome.runtime.id throws an error if context is dead
+    return !!chrome.runtime.id;
+  } catch (e) {
+    return false;
+  }
+}
+
+function timeToSeconds(timeStr) {
+  if (!timeStr) return 0;
+  const parts = timeStr.split(":").map(Number);
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return 0;
+}
+
+function getYouTubeVideoId(url) {
+  try {
+    const urlObj = new URL(url);
+    if (urlObj.hostname.includes("youtube.com")) {
+      return urlObj.searchParams.get("v");
+    }
+  } catch (e) {
+    return null;
+  }
+  return null;
+}
+
+function initVideoMarkers() {
+  if (!isContextValid()) return;
+  if (!window.location.hostname.includes("youtube.com")) return;
+
+  const video = document.querySelector("video");
+  const progressBar = document.querySelector(".ytp-progress-list");
+
+  if (!video || !progressBar || isNaN(video.duration) || video.duration === 0)
+    return;
+
+  try {
+    chrome.storage.local.get([STORAGE_KEY, "cn_show_highlights"], (res) => {
+      // Check again inside the async callback
+      if (!isContextValid() || chrome.runtime.lastError) return;
+
+      if (res["cn_show_highlights"] === false) {
+        document.querySelectorAll(".cn-vid-marker").forEach((m) => m.remove());
+        return;
+      }
+
+      const allNotes = res[STORAGE_KEY] ? JSON.parse(res[STORAGE_KEY]) : [];
+      const currentVideoId = getYouTubeVideoId(window.location.href);
+
+      if (!currentVideoId) return;
+
+      const videoNotes = allNotes.filter((n) => {
+        const noteVideoId = getYouTubeVideoId(n.url);
+        return noteVideoId === currentVideoId && n.timestamp;
+      });
+
+      // Clean up old markers
+      document.querySelectorAll(".cn-vid-marker").forEach((m) => m.remove());
+
+      videoNotes.forEach((note) => {
+        const seconds = timeToSeconds(note.timestamp);
+        const duration = video.duration;
+
+        if (seconds > duration) return;
+
+        const percent = (seconds / duration) * 100;
+
+        const marker = document.createElement("div");
+        marker.className = "cn-vid-marker";
+
+        marker.style.cssText = `
+          position: absolute;
+          left: ${percent}%;
+          bottom: -10%; 
+          width: 6px; 
+          height: 120%; 
+          background-color: #fbbf24;
+          border-radius: 2px;
+          box-shadow: 0 0 6px rgba(251, 191, 36, 0.8), 0 0 2px rgba(0,0,0,0.8);
+          z-index: 50;
+          cursor: pointer;
+          transition: transform 0.15s ease, background-color 0.15s ease;
+        `;
+
+        const cleanTitle = note.title || "Timestamp";
+        marker.title = `ContextNote: ${cleanTitle}`;
+
+        marker.addEventListener("mouseenter", () => {
+          marker.style.transform = "scaleX(1.8) scaleY(1.2)";
+          marker.style.backgroundColor = "#fff";
+        });
+        marker.addEventListener("mouseleave", () => {
+          marker.style.transform = "scaleX(1) scaleY(1)";
+          marker.style.backgroundColor = "#fbbf24";
+        });
+
+        marker.addEventListener("click", (e) => {
+          e.stopPropagation();
+          video.currentTime = seconds;
+        });
+
+        progressBar.appendChild(marker);
+      });
+    });
+  } catch (e) {
+    // Silently catch the error so it doesn't print to console
+  }
+}
+
+// ==========================================
+// ── 3. INITIALIZATION & LISTENERS ──
+// ==========================================
+
+// Run highlights immediately
 initHighlights();
 setTimeout(initHighlights, 1500);
 
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "refresh_highlights") initHighlights();
-  else if (request.action === "remove_highlights") removeHighlights();
-});
+// YouTube interval loop
+let ytInterval = setInterval(() => {
+  if (!isContextValid()) {
+    clearInterval(ytInterval); // Permanently stop the loop if extension was reloaded
+    return;
+  }
+  if (window.location.hostname.includes("youtube.com")) {
+    initVideoMarkers();
+  }
+}, 2000);
+
+// Single, clean message listener
+try {
+  if (isContextValid()) {
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      if (request.action === "refresh_highlights") {
+        initHighlights();
+        initVideoMarkers();
+      } else if (request.action === "remove_highlights") {
+        removeHighlights();
+        document.querySelectorAll(".cn-vid-marker").forEach((m) => m.remove());
+      }
+    });
+  }
+} catch (e) {
+  // Catch listener failures quietly
+}
