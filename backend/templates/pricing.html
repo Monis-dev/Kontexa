@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upgrade to ContextNote Pro</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8fafc; color: #0f172a; margin: 0; padding: 40px 20px; }
+        .container { max-width: 900px; margin: 0 auto; text-align: center; }
+        h1 { color: #1e293b; font-size: 32px; margin-bottom: 10px; }
+        p.subtitle { color: #64748b; font-size: 16px; margin-bottom: 40px; }
+        .grid { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; }
+        .card { background: #fff; border-radius: 16px; padding: 32px; width: 300px; text-align: left; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; position: relative; }
+        .card.pro { border: 2px solid #4f46e5; box-shadow: 0 20px 40px rgba(79, 70, 229, 0.15); transform: translateY(-10px); }
+        .badge { position: absolute; top: -12px; right: 20px; background: #4f46e5; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+        h2 { margin: 0 0 10px; font-size: 22px; }
+        .price { font-size: 36px; font-weight: bold; margin-bottom: 20px; color: #0f172a; }
+        .price span { font-size: 16px; color: #64748b; font-weight: normal; }
+        ul { list-style: none; padding: 0; margin: 0 0 30px; }
+        li { margin-bottom: 12px; font-size: 14px; color: #334155; display: flex; align-items: center; gap: 8px; }
+        li::before { content: "✅"; font-size: 12px; }
+        button { width: 100%; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; border: none; transition: 0.2s; }
+        .btn-outline { background: #f1f5f9; color: #475569; }
+        .btn-primary { background: #4f46e5; color: white; }
+        .btn-primary:hover { background: #4338ca; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Supercharge Your Research</h1>
+    <p class="subtitle">Logged in as: <b>{{ email }}</b></p>
+
+    <div class="grid">
+        <!-- Free Tier (Current) -->
+        <div class="card">
+            <h2>Free Tier</h2>
+            <div class="price">$0<span>/forever</span></div>
+            <ul>
+                <li>Unlimited local highlights</li>
+                <li>Save text notes</li>
+                <li>Group by domain</li>
+                <li>Local Dashboard</li>
+                <li>Color themes</li>
+            </ul>
+            <button class="btn-outline" disabled>Your Current Plan</button>
+        </div>
+
+        <!-- Monthly Pro -->
+        <div class="card pro">
+            <div class="badge">Most Popular</div>
+            <h2>Pro Monthly</h2>
+            <div class="price">$5<span>/month</span></div>
+            <ul>
+                <li><b>Everything in Free, plus:</b></li>
+                <li>Cross-device Cloud Sync</li>
+                <li>Custom Note Folders</li>
+                <li>Save Screenshots</li>
+                <li>Save YouTube Timestamps</li>
+                <li>Chat with your notes (AI)</li>
+                <li>AI Page Summaries</li>
+                <li>Bring Your Own API Key (BYOK)</li>
+            </ul>
+            <form action="/create-checkout-session" method="POST">
+                <input type="hidden" name="plan_type" value="monthly">
+                <button type="submit" class="btn-primary">Subscribe Monthly</button>
+            </form>
+        </div>
+
+        <!-- Lifetime Pro -->
+        <div class="card">
+            <h2>Pro Lifetime</h2>
+            <div class="price">$50<span>/once</span></div>
+            <ul>
+                <li><b>Everything in Pro</b></li>
+                <li>Pay once, use forever</li>
+                <li>Never pay a subscription fee</li>
+                <li>Free lifetime updates</li>
+            </ul>
+            <form action="/create-checkout-session" method="POST">
+                <input type="hidden" name="plan_type" value="lifetime">
+                <button type="submit" class="btn-primary" style="background:#0f172a;">Get Lifetime Access</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

@@ -827,18 +827,25 @@ body {
   transform: translateY(-2px);
 }
 .ca {
-  position: absolute;
-  top: 12px;
-  right: 12px;
   display: flex;
   gap: 4px;
+  justify-content: flex-end;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--bdr);
 }
 .card:hover .ca {
   opacity: 1;
   pointer-events: auto;
+}
+.card-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: auto;   /* pushes the whole footer (tags + buttons) to bottom */
 }
 .act {
   width: 26px;
@@ -866,7 +873,6 @@ body {
   font-size: 14px;
   font-weight: 700;
   line-height: 1.4;
-  padding-right: 60px;
   color: var(--ink);
 }
 .chi {
@@ -891,7 +897,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  margin-top: auto;
+  margin-bottom: 5px;
 }
 .tag {
   font-size: 10.5px;
@@ -948,6 +954,13 @@ body {
   background: var(--bg);
   color: var(--ink);
   border-color: var(--bdrs);
+}
+
+.sdom[data-open-url]:hover,
+.sdom[data-open-folder]:hover {
+  color: var(--acc);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 /* Empty */
@@ -1180,3 +1193,4 @@ body {
 #aiModal .macts {
   margin-top: 0;
 }
+

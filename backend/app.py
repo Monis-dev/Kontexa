@@ -1,6 +1,6 @@
 import os
-
-from flask import Flask, request, jsonify, session, redirect, url_for
+import stripe
+from flask import Flask, request, jsonify, session, redirect, url_for, render_template
 from flask_sqlalchemy import SQLAlchemy
 from urllib.parse import urlparse
 from authlib.integrations.flask_client import OAuth
@@ -12,10 +12,18 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "prod_secret_123")
 
+# DataBase
 uri = os.getenv("DATABASE_URL", "sqlite:///local.db")
 if uri.startswith("postgres://"): uri = uri.replace("postgres://", "postgresql://", 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Stripe
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "sk_test_123...")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "whsec_123...")
+PRICE_MONTHLY_ID = os.getenv("STRIPE_PRICE_MONTHLY", "price_123...")
+PRICE_LIFETIME_ID = os.getenv("STRIPE_PRICE_LIFETIME", "price_456...")
+
 
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
 
@@ -95,6 +103,98 @@ def upgrade_user():
     user.is_pro = True
     db.session.commit()
     return jsonify({"message": "Upgraded to Pro"}), 200
+
+# --- PRICING PAGE ---
+@app.route('/pricing')
+def pricing():
+    # Force login if they somehow landed here logged out
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    user = db.session.get(User, session['user_id'])
+    
+    # If they are already Pro, don't let them buy it again!
+    if user.is_pro:
+        return "<h2>You are already a Pro user! 🎉 Close this tab and enjoy the extension.</h2>"
+        
+    return render_template('pricing.html', email=user.email)
+
+# --- CREATE CHECKOUT SESSION ---
+@app.route('/create-checkout-session', methods=['POST'])
+def create_checkout_session():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    user_id = session['user_id']
+    user_email = session['user_email']
+    plan_type = request.form.get('plan_type') # 'monthly' or 'lifetime'
+
+    if plan_type == 'monthly':
+        price_id = PRICE_MONTHLY_ID
+        mode = 'subscription'
+    else:
+        price_id = PRICE_LIFETIME_ID
+        mode = 'payment'
+
+    try:
+        checkout_session = stripe.checkout.Session.create(
+            customer_email=user_email,
+            client_reference_id=str(user_id), # CRITICAL: This tells the webhook WHO paid
+            payment_method_types=['card'],
+            line_items=[{'price': price_id, 'quantity': 1}],
+            mode=mode,
+            success_url=request.host_url + 'success',
+            cancel_url=request.host_url + 'pricing',
+        )
+        return redirect(checkout_session.url, code=303)
+    except Exception as e:
+        return str(e), 400
+
+# --- SUCCESS PAGE ---
+@app.route('/success')
+def success():
+    return """
+    <div style="text-align:center; font-family:sans-serif; margin-top:50px;">
+        <h1 style="color:#4f46e5;">Payment Successful! 🎉</h1>
+        <p>Your account has been upgraded to ContextNote Pro.</p>
+        <p><b>Please close this tab and click 'Account' -> 'Sync' in your extension to activate your features!</b></p>
+    </div>
+    """
+
+# --- STRIPE WEBHOOK (THE MAGIC GATEKEEPER) ---
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    payload = request.data
+    sig_header = request.headers.get('Stripe-Signature')
+
+    try:
+        event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+    except ValueError as e:
+        return 'Invalid payload', 400
+    except stripe.error.SignatureVerificationError as e:
+        return 'Invalid signature', 400
+
+    # Handle the checkout.session.completed event
+    if event['type'] == 'checkout.session.completed':
+        session_data = event['data']['object']
+        
+        # Grab the user_id we passed in client_reference_id
+        user_id = session_data.get('client_reference_id')
+        
+        if user_id:
+            user = db.session.get(User, int(user_id))
+            if user:
+                user.is_pro = True # UPGRADE THE USER!
+                db.session.commit()
+                print(f"Successfully upgraded user {user.email}")
+
+    # If subscription is canceled or fails later, downgrade them
+    elif event['type'] in ['customer.subscription.deleted', 'invoice.payment_failed']:
+        # Note: Handling subscription deletion requires mapping Stripe Customer ID to your User table.
+        # For MVP, just getting them upgraded is the priority!
+        pass
+
+    return '', 200
 
 # --- Sync (Pro Only Gate) ---
 @app.route('/api/sync', methods=['POST'])
@@ -196,6 +296,7 @@ def delete_note(local_id):
         return '', 204
         
     return jsonify({"error": "Note not found or Unauthorized"}), 404
+
 
 # @app.route('/api/ai/chat', methods=['POST'])
 # def ai_chat():
