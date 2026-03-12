@@ -96,13 +96,37 @@ def logout():
     return jsonify({"message": "Logged out"}), 200
 
 # --- PAYMENT SIMULATION (For Testing) ---
-@app.route('/api/upgrade', methods=['POST'])
-def upgrade_user():
-    if 'user_id' not in session: return jsonify({"error": "Login required"}), 401
+# @app.route('/api/upgrade', methods=['POST'])
+# def upgrade_user():
+#     if 'user_id' not in session: return jsonify({"error": "Login required"}), 401
+#     user = db.session.get(User, session['user_id'])
+#     user.is_pro = True
+#     db.session.commit()
+#     return jsonify({"message": "Upgraded to Pro"}), 200
+
+# --- TESTING ROUTE: REVOKE PRO STATUS ---
+@app.route("/revoke")
+def revoke():
+    if 'user_id' not in session: 
+        return jsonify({"error": "Login required. Please open your extension dashboard first."}), 401
+        
     user = db.session.get(User, session['user_id'])
-    user.is_pro = True
-    db.session.commit()
-    return jsonify({"message": "Upgraded to Pro"}), 200
+    
+    if user:
+        user.is_pro = False
+        db.session.commit()
+        return """
+        <html>
+            <body style="font-family:sans-serif; text-align:center; margin-top:50px;">
+                <h2 style="color:#e11d48;">Access Revoked ❌</h2>
+                <p>Your account (<b>{}</b>) is now on the Free Tier.</p>
+                <p>Close this tab and reload your extension dashboard to test.</p>
+                <script>setTimeout(()=>window.close(), 3000);</script>
+            </body>
+        </html>
+        """.format(user.email)
+        
+    return jsonify({"error": "User not found"}), 404
 
 # --- PRICING PAGE ---
 @app.route('/pricing')
@@ -117,38 +141,57 @@ def pricing():
     if user.is_pro:
         return "<h2>You are already a Pro user! 🎉 Close this tab and enjoy the extension.</h2>"
         
+    # DO NOT set is_pro = True here! That is what the webhook is for!
     return render_template('pricing.html', email=user.email)
 
 # --- CREATE CHECKOUT SESSION ---
 @app.route('/create-checkout-session', methods=['POST'])
 def create_checkout_session():
+    print("--- CHECKOUT BUTTON CLICKED ---")
+    
     if 'user_id' not in session:
+        print("Error: User not logged in.")
         return redirect(url_for('login'))
 
     user_id = session['user_id']
     user_email = session['user_email']
-    plan_type = request.form.get('plan_type') # 'monthly' or 'lifetime'
+    plan_type = request.form.get('plan_type')
 
+    print(f"User Email: {user_email} | Plan Selected: {plan_type}")
+
+    # Fetching securely from your .env file
     if plan_type == 'monthly':
-        price_id = PRICE_MONTHLY_ID
+        price_id = os.getenv("STRIPE_PRICE_MONTHLY")
         mode = 'subscription'
     else:
-        price_id = PRICE_LIFETIME_ID
+        price_id = os.getenv("STRIPE_PRICE_LIFETIME")
         mode = 'payment'
+
+    print(f"Using Price ID: {price_id}")
 
     try:
         checkout_session = stripe.checkout.Session.create(
             customer_email=user_email,
-            client_reference_id=str(user_id), # CRITICAL: This tells the webhook WHO paid
+            client_reference_id=str(user_id), # Crucial for the webhook
             payment_method_types=['card'],
             line_items=[{'price': price_id, 'quantity': 1}],
             mode=mode,
             success_url=request.host_url + 'success',
             cancel_url=request.host_url + 'pricing',
         )
+        print("Stripe Session Created! Redirecting...")
         return redirect(checkout_session.url, code=303)
+    
     except Exception as e:
-        return str(e), 400
+        print(f"STRIPE ERROR: {str(e)}")
+        return f"""
+        <div style="font-family: sans-serif; padding: 40px; text-align: center;">
+            <h2 style="color: red;">Stripe Error</h2>
+            <p><b>{str(e)}</b></p>
+            <p>Check your Flask terminal for more details.</p>
+            <a href="/pricing">Go Back</a>
+        </div>
+        """, 400
 
 # --- SUCCESS PAGE ---
 @app.route('/success')
@@ -180,7 +223,7 @@ def webhook():
         
         # Grab the user_id we passed in client_reference_id
         user_id = session_data.get('client_reference_id')
-        
+        print(f"WEBHOOK RECEIVED: Payment successful for User ID: {user_id}")
         if user_id:
             user = db.session.get(User, int(user_id))
             if user:

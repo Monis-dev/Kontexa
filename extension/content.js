@@ -12,7 +12,7 @@ function removeHighlights() {
       parent.insertBefore(mark.firstChild, mark);
     }
     parent.removeChild(mark);
-    parent.normalize(); // Merge text nodes back together
+    parent.normalize();
   });
 }
 
@@ -88,7 +88,6 @@ function highlightTextOnPage(searchText, noteTitle) {
 }
 
 function initHighlights() {
-  // If extension context is dead, abort immediately
   if (!chrome.runtime?.id) return;
 
   const scrollX = window.scrollX;
@@ -96,7 +95,7 @@ function initHighlights() {
 
   try {
     chrome.storage.local.get([STORAGE_KEY, SETTINGS_KEY], (res) => {
-      if (chrome.runtime.lastError) return; // Ignore disconnected errors
+      if (chrome.runtime.lastError) return;
 
       const isEnabled = res[SETTINGS_KEY] !== false;
       if (!isEnabled) {
@@ -118,18 +117,15 @@ function initHighlights() {
         window.scrollTo(scrollX, scrollY);
       }
     });
-  } catch (e) {
-    // Fails silently if context is invalidated
-  }
+  } catch (e) {}
 }
 
 // ==========================================
-// ── 2. YOUTUBE VIDEO TIMESTAMPS MARKERS ──
+// ── 2. YOUTUBE VIDEO TIMESTAMP MARKERS ──
 // ==========================================
 
 function isContextValid() {
   try {
-    // Accessing chrome.runtime.id throws an error if context is dead
     return !!chrome.runtime.id;
   } catch (e) {
     return false;
@@ -156,29 +152,45 @@ function getYouTubeVideoId(url) {
   return null;
 }
 
+// Guard flag so we never run two storage lookups simultaneously
+let isMarkersRunning = false;
+
 function initVideoMarkers() {
   if (!isContextValid()) return;
   if (!window.location.hostname.includes("youtube.com")) return;
+  if (isMarkersRunning) return; // Prevent overlapping async calls
 
   const video = document.querySelector("video");
-  const progressBar = document.querySelector(".ytp-progress-list");
 
-  if (!video || !progressBar || isNaN(video.duration) || video.duration === 0)
+  // ── FIX: Use ".ytp-progress-bar" as the positioning parent, not ".ytp-progress-list"
+  // ".ytp-progress-list" has inner padding that shifts percent-based positions.
+  // ".ytp-progress-bar" is the true full-width bar element markers should be relative to.
+  const progressBar = document.querySelector(".ytp-progress-bar");
+
+  if (!video || !progressBar) return;
+  if (
+    isNaN(video.duration) ||
+    video.duration === 0 ||
+    !isFinite(video.duration)
+  )
     return;
+
+  isMarkersRunning = true;
+
+  // ── FIX: Remove old markers BEFORE the async storage call so there's no
+  // window where two sets of markers exist simultaneously.
+  document.querySelectorAll(".cn-vid-marker").forEach((m) => m.remove());
 
   try {
     chrome.storage.local.get([STORAGE_KEY, "cn_show_highlights"], (res) => {
-      // Check again inside the async callback
+      isMarkersRunning = false; // Release lock after storage returns
+
       if (!isContextValid() || chrome.runtime.lastError) return;
 
-      if (res["cn_show_highlights"] === false) {
-        document.querySelectorAll(".cn-vid-marker").forEach((m) => m.remove());
-        return;
-      }
+      if (res["cn_show_highlights"] === false) return; // Already cleaned up above
 
       const allNotes = res[STORAGE_KEY] ? JSON.parse(res[STORAGE_KEY]) : [];
       const currentVideoId = getYouTubeVideoId(window.location.href);
-
       if (!currentVideoId) return;
 
       const videoNotes = allNotes.filter((n) => {
@@ -186,46 +198,57 @@ function initVideoMarkers() {
         return noteVideoId === currentVideoId && n.timestamp;
       });
 
-      // Clean up old markers
-      document.querySelectorAll(".cn-vid-marker").forEach((m) => m.remove());
+      if (videoNotes.length === 0) return;
+
+      const duration = video.duration;
+
+      // ── FIX: Get the actual rendered width of the progress bar so we can
+      // place markers using pixel offsets instead of % — this avoids any
+      // discrepancy from CSS padding on parent containers.
+      const barRect = progressBar.getBoundingClientRect();
+      const barWidth = barRect.width;
+
+      if (barWidth === 0) return; // Bar not rendered yet, skip this tick
 
       videoNotes.forEach((note) => {
         const seconds = timeToSeconds(note.timestamp);
-        const duration = video.duration;
-
         if (seconds > duration) return;
 
-        const percent = (seconds / duration) * 100;
+        // ── FIX: Calculate pixel position relative to the bar's own width,
+        // not a CSS percentage which can be affected by padding/box-model.
+        const fraction = seconds / duration;
+        const pixelLeft = fraction * barWidth;
 
         const marker = document.createElement("div");
         marker.className = "cn-vid-marker";
 
         marker.style.cssText = `
           position: absolute;
-          left: ${percent}%;
-          bottom: -10%; 
-          width: 6px; 
-          height: 120%; 
+          left: ${pixelLeft}px;
+          top: 0;
+          width: 4px;
+          height: 100%;
           background-color: #fbbf24;
           border-radius: 2px;
-          box-shadow: 0 0 6px rgba(251, 191, 36, 0.8), 0 0 2px rgba(0,0,0,0.8);
+          box-shadow: 0 0 6px rgba(251, 191, 36, 0.9), 0 0 2px rgba(0,0,0,0.6);
           z-index: 50;
           cursor: pointer;
+          pointer-events: all;
           transition: transform 0.15s ease, background-color 0.15s ease;
+          transform-origin: center;
         `;
 
         const cleanTitle = note.title || "Timestamp";
-        marker.title = `ContextNote: ${cleanTitle}`;
+        marker.title = `ContextNote: ${cleanTitle} @ ${note.timestamp}`;
 
         marker.addEventListener("mouseenter", () => {
-          marker.style.transform = "scaleX(1.8) scaleY(1.2)";
-          marker.style.backgroundColor = "#fff";
+          marker.style.transform = "scaleX(2) scaleY(1.15)";
+          marker.style.backgroundColor = "#ffffff";
         });
         marker.addEventListener("mouseleave", () => {
           marker.style.transform = "scaleX(1) scaleY(1)";
           marker.style.backgroundColor = "#fbbf24";
         });
-
         marker.addEventListener("click", (e) => {
           e.stopPropagation();
           video.currentTime = seconds;
@@ -235,7 +258,7 @@ function initVideoMarkers() {
       });
     });
   } catch (e) {
-    // Silently catch the error so it doesn't print to console
+    isMarkersRunning = false;
   }
 }
 
@@ -243,14 +266,12 @@ function initVideoMarkers() {
 // ── 3. INITIALIZATION & LISTENERS ──
 // ==========================================
 
-// Run highlights immediately
 initHighlights();
 setTimeout(initHighlights, 1500);
 
-// YouTube interval loop
 let ytInterval = setInterval(() => {
   if (!isContextValid()) {
-    clearInterval(ytInterval); // Permanently stop the loop if extension was reloaded
+    clearInterval(ytInterval);
     return;
   }
   if (window.location.hostname.includes("youtube.com")) {
@@ -258,7 +279,6 @@ let ytInterval = setInterval(() => {
   }
 }, 2000);
 
-// Single, clean message listener
 try {
   if (isContextValid()) {
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -271,6 +291,4 @@ try {
       }
     });
   }
-} catch (e) {
-  // Catch listener failures quietly
-}
+} catch (e) {}
