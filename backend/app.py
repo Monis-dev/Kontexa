@@ -160,12 +160,8 @@ def create_checkout_session():
     print(f"User Email: {user_email} | Plan Selected: {plan_type}")
 
     # Fetching securely from your .env file
-    if plan_type == 'monthly':
-        price_id = os.getenv("STRIPE_PRICE_MONTHLY")
-        mode = 'subscription'
-    else:
-        price_id = os.getenv("STRIPE_PRICE_LIFETIME")
-        mode = 'payment'
+    price_id = os.getenv("STRIPE_PRICE_LIFETIME")
+    mode = 'payment'
 
     print(f"Using Price ID: {price_id}")
 

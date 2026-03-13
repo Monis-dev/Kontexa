@@ -1,9 +1,11 @@
 const STORAGE_KEY = "context_notes_data";
 const FOLDERS_KEY = "cn_user_folders";
+const NAMES_KEY = "cn_source_names"; // custom display names for URLs
 const API_BASE = "http://127.0.0.1:5000";
 
 let mId = null;
 let userFolders = [];
+let sourceNames = {}; // { [url]: "custom name" }
 let isProUserUI = false;
 
 const $ = (id) => document.getElementById(id);
@@ -91,6 +93,94 @@ E($("logoutWipeBtn"), "click", async () => {
   chrome.storage.local.clear(() => window.location.reload());
 });
 
+// --- OPEN NOTE MODAL ---
+function openNoteModal(noteId) {
+  const n = allNotesFlat.find((note) => note.id === noteId);
+  if (!n) return;
+
+  $("vTitle").textContent = n.title || "Untitled";
+
+  const metaParts = [];
+  if (n.pinned) {
+    metaParts.push(
+      `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;background:#fef3c7;color:#92400e;border:1px solid #fde68a;padding:3px 8px;border-radius:20px;">⭐ Pinned</span>`,
+    );
+  }
+  if (n.folder) {
+    metaParts.push(
+      `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;background:var(--acc-bg);color:var(--acc);border:1px solid var(--bdr);padding:3px 8px;border-radius:20px;">📁 ${esc(n.folder)}</span>`,
+    );
+  }
+  if (n.timestamp) {
+    metaParts.push(
+      `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;background:#eef2ff;color:#4f46e5;border:1px solid #c7d2fe;padding:3px 8px;border-radius:20px;">⏱️ ${esc(n.timestamp)}</span>`,
+    );
+  }
+  if (n.domain) {
+    metaParts.push(
+      `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;background:var(--bg);color:var(--mut);border:1px solid var(--bdr);padding:3px 8px;border-radius:20px;">🌐 ${esc(n.domain)}</span>`,
+    );
+  }
+  $("vMeta").innerHTML = metaParts.join("");
+
+  const selEl = $("vSelection");
+  if (n.selection || n.text_selection) {
+    selEl.textContent = `"${n.selection || n.text_selection}"`;
+    selEl.style.display = "block";
+  } else {
+    selEl.style.display = "none";
+  }
+
+  const contentEl = $("vContent");
+  if (n.content) {
+    contentEl.textContent = n.content;
+    contentEl.style.display = "block";
+  } else {
+    contentEl.style.display = "none";
+  }
+
+  const imgWrap = $("vImageWrap");
+  const img = $("vImage");
+  if (n.image_data) {
+    img.src = n.image_data;
+    imgWrap.style.display = "block";
+  } else {
+    imgWrap.style.display = "none";
+    img.src = "";
+  }
+
+  if (n.url) {
+    $("vMeta").innerHTML +=
+      `<a href="${esc(n.url)}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;background:var(--bg);color:var(--acc);border:1px solid var(--bdr);padding:3px 8px;border-radius:20px;text-decoration:none;">↗ Visit Source</a>`;
+  }
+
+  $("viewModal").classList.add("on");
+}
+
+E($("closeView"), "click", () => $("viewModal").classList.remove("on"));
+E($("viewModal"), "click", (e) => {
+  if (e.target === $("viewModal")) $("viewModal").classList.remove("on");
+});
+
+// --- RENAME SOURCE ---
+// Opens an inline prompt to rename a URL source or folder
+function renameSource(url, currentName) {
+  const newName = prompt(`Rename "${currentName}" to:`, currentName);
+  if (!newName || !newName.trim() || newName.trim() === currentName) return;
+  sourceNames[url] = newName.trim();
+  chrome.storage.local.set({ [NAMES_KEY]: sourceNames }, () => {
+    toast(`Renamed to "${newName.trim()}"`);
+    loadLocalUI();
+  });
+}
+
+// Get the display name for a URL group — custom name if set, else cleaned URL
+function getDisplayName(url) {
+  if (sourceNames[url]) return sourceNames[url];
+  let name = url.replace(/^https?:\/\/(www\.)?/, "");
+  return name.length > 50 ? name.substring(0, 50) + "…" : name;
+}
+
 // --- CARD GENERATOR ---
 const card = (n, dom) => {
   const title = n.title || "Untitled";
@@ -103,15 +193,15 @@ const card = (n, dom) => {
 
   let mediaHtml = "";
   if (n.timestamp) {
-    mediaHtml += `<div style="font-size:11px; background:#eef2ff; color:#4f46e5; padding:2px 6px; border-radius:4px; display:inline-block; margin-bottom:6px; margin-right:4px; border:1px solid #c7d2fe;">⏱️ ${n.timestamp}</div>`;
+    mediaHtml += `<div style="font-size:11px;background:#eef2ff;color:#4f46e5;padding:2px 6px;border-radius:4px;display:inline-block;margin-bottom:6px;margin-right:4px;border:1px solid #c7d2fe;">⏱️ ${n.timestamp}</div>`;
   }
   if (n.image_data) {
-    mediaHtml += `<div style="margin-top:8px; border-radius:6px; overflow:hidden; border:1px solid #e2e8f0; cursor:pointer;" onclick="window.open('${n.image_data}')">
-      <img src="${n.image_data}" style="width:100%; height:auto; display:block;" title="Click to view full size">
+    mediaHtml += `<div style="margin-top:8px;border-radius:6px;overflow:hidden;border:1px solid #e2e8f0;">
+      <img src="${n.image_data}" style="width:100%;height:auto;display:block;pointer-events:none;">
     </div>`;
   }
 
-  return `<div class="card" data-id="${n.id}" data-t="${esc(searchStr)}">
+  return `<div class="card card-clickable" data-id="${n.id}" data-t="${esc(searchStr)}" data-open-note="${n.id}" title="Click to view note">
     <div class="ct">${esc(title)}</div>
     ${mediaHtml}
     ${sel ? `<div class="chi">"${esc(sel)}"</div>` : ""}
@@ -144,11 +234,18 @@ function render(urlGroups, folderGroups) {
   $("smeta").textContent =
     `${urlGroups.length} page${urlGroups.length !== 1 ? "s" : ""} · ${total} notes`;
 
+  // Sidebar nav uses custom names too
   $("snav").innerHTML = urlGroups.length
     ? urlGroups
         .map((s, i) => {
-          const shortName = s.domain.replace(/^www\./, "");
-          return `<a class="na${i === 0 ? " on" : ""}" href="#s${i}" data-t="s${i}" title="${esc(s.url)}"><div class="dot"></div><span class="nd">${esc(shortName)}</span><span class="bdg">${s.notes.length}</span></a>`;
+          const displayName = sourceNames[s.url]
+            ? sourceNames[s.url]
+            : s.domain.replace(/^www\./, "");
+          return `<a class="na${i === 0 ? " on" : ""}" href="#s${i}" data-t="s${i}" title="${esc(s.url)}">
+          <div class="dot"></div>
+          <span class="nd">${esc(displayName)}</span>
+          <span class="bdg">${s.notes.length}</span>
+        </a>`;
         })
         .join("")
     : '<p style="padding:12px;font-size:13px;color:var(--mut)">No sources yet.</p>';
@@ -162,15 +259,15 @@ function render(urlGroups, folderGroups) {
   }
 
   $("main").innerHTML =
-    `<div class="mh">Your Notes</div><div class="ms"><strong id="nc">${total}</strong> notes found</div><div class="nores" id="nores"><h3>No notes match "<span id="noresq"></span>"</h3></div>` +
+    `<div class="mh">Your Notes</div>
+     <div class="ms"><strong id="nc">${total}</strong> notes found</div>
+     <div class="nores" id="nores"><h3>No notes match "<span id="noresq"></span>"</h3></div>` +
     allGroups
       .map((group, i) => {
         const isFolderGroup = group.type === "folder";
 
-        // Show max 3 notes as preview on dashboard
         const pinnedNotes = group.notes.filter((n) => n.pinned);
         const unpinnedNotes = group.notes.filter((n) => !n.pinned);
-
         let displayNotes = [];
         let hiddenCount = 0;
         if (pinnedNotes.length > 0) {
@@ -185,18 +282,19 @@ function render(urlGroups, folderGroups) {
           .map((n) => card(n, group.domain))
           .join("");
 
-        // "View All" label — always shown, shows count context
         const viewAllLabel =
           hiddenCount > 0
             ? `View All ${group.notes.length} Notes ➔`
             : `View Notes & Export ➔`;
-
-        // target for the button
         const viewAllTarget = isFolderGroup
           ? `folder:${group.domain}`
           : group.url;
 
-        // Build section header
+        // Display name — custom if set, else cleaned URL
+        const displayName = isFolderGroup
+          ? group.domain
+          : getDisplayName(group.url);
+
         let headerHtml = "";
         if (isFolderGroup) {
           headerHtml = `
@@ -206,13 +304,10 @@ function render(urlGroups, folderGroups) {
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
               </svg>
             </div>
-            <span class="sdom">${esc(group.domain)}</span>
+            <span class="sdom">${esc(displayName)}</span>
             <span class="scnt">${group.notes.length} note${group.notes.length !== 1 ? "s" : ""}</span>
           </div>`;
         } else {
-          let niceUrl = group.url.replace(/^https?:\/\/(www\.)?/, "");
-          niceUrl =
-            niceUrl.length > 50 ? niceUrl.substring(0, 50) + "..." : niceUrl;
           headerHtml = `
           <div class="sech">
             <div class="globe">
@@ -221,14 +316,22 @@ function render(urlGroups, folderGroups) {
                 <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
               </svg>
             </div>
-            <span class="sdom" style="max-width:300px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(niceUrl)}</span>
+            <span class="sdom sdom-name" data-custom="${sourceNames[group.url] ? "true" : "false"}" style="max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${esc(group.url)}">${esc(displayName)}</span>
+            <button class="btn-rename" data-url="${esc(group.url)}" data-name="${esc(displayName)}" title="Rename this source">
+              <svg viewBox="0 0 24 24" style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none;">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
             <a href="${esc(group.url)}" target="_blank" rel="noopener" class="slink">Visit ↗</a>
             <span class="scnt">${group.notes.length} note${group.notes.length !== 1 ? "s" : ""}</span>
           </div>`;
         }
 
+        const sectionId = isFolderGroup ? `f-${esc(group.domain)}` : `s${i}`;
+
         return `
-        <div class="sec" id="${isFolderGroup ? `f-${esc(group.domain)}` : `s${i}`}">
+        <div class="sec" id="${sectionId}">
           ${headerHtml}
           <div class="grid">${gridHTML}</div>
           <div style="margin-top:12px;">
@@ -242,6 +345,48 @@ function render(urlGroups, folderGroups) {
   bindNav();
 }
 
+// --- SCROLL FIX ---
+// scrollIntoView() scrolls the viewport, but #main is the scrollable container.
+// We must manually scroll #main to bring the target section into view.
+function scrollMainToSection(sectionId) {
+  const mainEl = $("main");
+  const target = $(sectionId);
+  if (!mainEl || !target) return;
+  // target.offsetTop is the distance from target to its offsetParent.
+  // Walk up the tree summing offsetTops until we hit #main (the scroll container).
+  let offsetSum = 0;
+  let el = target;
+  while (el && el !== mainEl) {
+    offsetSum += el.offsetTop;
+    el = el.offsetParent;
+  }
+  // Subtract main's padding-top (28px from CSS) so we don't cut off the section header
+  mainEl.scrollTo({ top: offsetSum - 28, behavior: "smooth" });
+}
+
+// --- BIND NAV ---
+function bindNav() {
+  const nas = document.querySelectorAll(".na[data-t]");
+  nas.forEach((a) => {
+    // Remove old listeners by cloning
+    const fresh = a.cloneNode(true);
+    a.parentNode.replaceChild(fresh, a);
+    fresh.addEventListener("click", (e) => {
+      e.preventDefault();
+      // If singlePageView is open, close it first
+      if ($("singlePageView").style.display === "block") {
+        $("singlePageView").style.display = "none";
+        $("main").style.display = "block";
+      }
+      // Use our fixed scroll function instead of scrollIntoView
+      scrollMainToSection(fresh.dataset.t);
+      document.querySelectorAll(".na").forEach((n) => n.classList.remove("on"));
+      fresh.classList.add("on");
+      if (mob()) closeS();
+    });
+  });
+}
+
 // --- GLOBAL EVENT DELEGATION ---
 document.addEventListener("click", (e) => {
   const editBtn = e.target.closest(".btn-edit");
@@ -250,6 +395,20 @@ document.addEventListener("click", (e) => {
   const moveBtn = e.target.closest(".btn-move");
   const viewMoreBtn = e.target.closest(".btn-view-more");
   const logoutBtn = e.target.closest("#logoutBtn");
+  const renameBtn = e.target.closest(".btn-rename");
+
+  // Note card click → open detail modal
+  const noteCard = e.target.closest("[data-open-note]");
+  if (noteCard && !editBtn && !delBtn && !pinBtn && !moveBtn) {
+    openNoteModal(noteCard.dataset.openNote);
+    return;
+  }
+
+  // Rename source
+  if (renameBtn) {
+    renameSource(renameBtn.dataset.url, renameBtn.dataset.name);
+    return;
+  }
 
   if (viewMoreBtn) {
     const url = viewMoreBtn.dataset.url;
@@ -432,24 +591,6 @@ E($("saveEdit"), "click", async () => {
   }
 });
 
-// Search and Nav
-function bindNav() {
-  const nas = document.querySelectorAll(".na[data-t]");
-  nas.forEach((a) =>
-    E(a, "click", (e) => {
-      e.preventDefault();
-      if ($("singlePageView").style.display === "block") {
-        $("singlePageView").style.display = "none";
-        $("main").style.display = "block";
-      }
-      $(a.dataset.t)?.scrollIntoView({ behavior: "smooth", block: "start" });
-      nas.forEach((n) => n.classList.remove("on"));
-      a.classList.add("on");
-      if (mob()) closeS();
-    }),
-  );
-}
-
 E($("search"), "input", () => {
   if ($("singlePageView").style.display === "block") {
     $("singlePageView").style.display = "none";
@@ -472,8 +613,9 @@ E($("search"), "input", () => {
 
 // --- LOAD & GROUP DATA ---
 function loadLocalUI() {
-  chrome.storage.local.get([STORAGE_KEY, FOLDERS_KEY], (res) => {
+  chrome.storage.local.get([STORAGE_KEY, FOLDERS_KEY, NAMES_KEY], (res) => {
     allNotesFlat = res[STORAGE_KEY] ? JSON.parse(res[STORAGE_KEY]) : [];
+    sourceNames = res[NAMES_KEY] || {};
 
     const persistedFolders = res[FOLDERS_KEY] || [];
     const foldersFromNotes = allNotesFlat.map((n) => n.folder).filter(Boolean);
@@ -533,7 +675,7 @@ function renderFoldersSidebar() {
     ? userFolders
         .map((f) => {
           const count = allNotesFlat.filter((n) => n.folder === f).length;
-          return `<a class="na" href="#f-${esc(f)}" data-t="f-${esc(f)}"><div class="dot" style="border-radius:2px; background:var(--mut2);"></div><span class="nd">${esc(f)}</span><span class="bdg">${count}</span></a>`;
+          return `<a class="na" href="#f-${esc(f)}" data-t="f-${esc(f)}"><div class="dot" style="border-radius:2px;background:var(--mut2);"></div><span class="nd">${esc(f)}</span><span class="bdg">${count}</span></a>`;
         })
         .join("")
     : '<p style="padding:12px;font-size:12px;color:var(--mut)">No folders yet.</p>';
@@ -584,23 +726,10 @@ E($("paywallLogoutBtn"), "click", async () => {
 E($("upgradeBtn"), "click", async () => {
   const btn = $("upgradeBtn");
   btn.textContent = "Opening Secure Checkout...";
-  
   window.open(`${API_BASE}/pricing`, "_blank");
   setTimeout(() => {
     btn.textContent = "Upgrade Now ($5/mo)";
   }, 2000);
-  // try {
-  //   const res = await fetch(`${API_BASE}/api/upgrade`, {
-  //     method: "POST",
-  //     credentials: "include",
-  //   });
-  //   if (res.ok) {
-  //     btn.textContent = "Success! Reloading...";
-  //     setTimeout(() => window.location.reload(), 1500);
-  //   }
-  // } catch (e) {
-  //   btn.textContent = "Payment Failed";
-  // }
 });
 
 // SYNC ENGINE
@@ -622,7 +751,7 @@ async function checkAuthAndSync() {
       const planName = user.is_pro ? "Pro Plan" : "Free Plan";
       const statusColor = user.is_pro ? "#4f46e5" : "#64748b";
       $("uStatus").innerHTML =
-        `<span style="color:${statusColor}; font-weight:bold;">${planName}</span> • ${user.email}`;
+        `<span style="color:${statusColor};font-weight:bold;">${planName}</span> • ${user.email}`;
       if ($("loginBtn"))
         $("loginBtn").outerHTML =
           `<div class="sitem danger" id="logoutBtn">🚪 Logout</div>`;
@@ -711,13 +840,13 @@ function openSpecificPage(targetUrl) {
   const siteNotes = allNotesFlat.filter((n) => n.url === targetUrl);
   siteNotes.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
 
-  const cleanUrl = targetUrl.replace(/^https?:\/\/(www\.)?/, "");
+  const displayName = getDisplayName(targetUrl);
 
   $("singlePageView").innerHTML = `
     <button class="back-btn" id="backToDash">← Back to Dashboard</button>
-    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:24px;">
-      <div class="mh" style="word-break:break-all;">${esc(cleanUrl)}</div>
-      <div style="display:flex; gap:8px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:24px;">
+      <div class="mh" style="word-break:break-all;">${esc(displayName)}</div>
+      <div style="display:flex;gap:8px;">
         <button class="btn" id="downloadMdBtn" title="Download notes as Markdown">⬇ .md</button>
         <button class="btn pri" id="chatWithAiBtn">💬 Chat with AI</button>
       </div>
@@ -742,7 +871,7 @@ function openSpecificPage(targetUrl) {
   });
   E($("downloadMdBtn"), "click", () => {
     const lines = [];
-    lines.push(`# Notes — ${cleanUrl}`);
+    lines.push(`# Notes — ${displayName}`);
     lines.push(
       `*Exported from ContextNote on ${new Date().toLocaleDateString()}*`,
     );
@@ -769,7 +898,7 @@ function openSpecificPage(targetUrl) {
     });
     const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
     const a = document.createElement("a");
-    const filename = cleanUrl.replace(/[^a-z0-9]/gi, "_").slice(0, 60);
+    const filename = displayName.replace(/[^a-z0-9]/gi, "_").slice(0, 60);
     a.href = URL.createObjectURL(blob);
     a.download = `contextnote_${filename}.md`;
     a.click();
@@ -787,9 +916,9 @@ function openSpecificFolder(folderName) {
 
   $("singlePageView").innerHTML = `
     <button class="back-btn" id="backToDash">← Back to Dashboard</button>
-    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:24px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:24px;">
       <div class="mh">📁 ${esc(folderName)}</div>
-      <div style="display:flex; gap:8px;">
+      <div style="display:flex;gap:8px;">
         <button class="btn" id="downloadMdBtn" title="Download notes as Markdown">⬇ .md</button>
         <button class="btn pri" id="chatWithAiBtn">💬 Chat with AI</button>
       </div>
@@ -798,7 +927,7 @@ function openSpecificFolder(folderName) {
       ${
         folderNotes.length
           ? folderNotes.map((n) => card(n, n.domain || folderName)).join("")
-          : `<p style="color:var(--mut);font-size:13px;">No notes in this folder yet. Move notes here using the folder icon on any card.</p>`
+          : `<p style="color:var(--mut);font-size:13px;">No notes in this folder yet.</p>`
       }
     </div>
   `;
@@ -891,7 +1020,7 @@ async function handleAiSubmit() {
     const answer = await AIService.chat(q, contextNotes);
     chatBox.innerHTML += `<div class="chat-msg chat-ai">${esc(answer).replace(/\n/g, "<br>")}</div>`;
   } catch (e) {
-    chatBox.innerHTML += `<div class="chat-msg chat-ai">Error: Could not connect to AI. Please check your network or API key.</div>`;
+    chatBox.innerHTML += `<div class="chat-msg chat-ai">Error: Could not connect to AI.</div>`;
   }
 
   input.value = "";
@@ -930,7 +1059,6 @@ E($("saveApiKey"), "click", () => {
 
 // Theme Engine
 const THEME_KEY = "cn_theme";
-
 function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
   document.querySelectorAll(".palette-swatch").forEach((s) => {
@@ -940,7 +1068,6 @@ function applyTheme(theme) {
     chrome.storage.local.set({ [THEME_KEY]: theme });
   }
 }
-
 if (typeof chrome !== "undefined" && chrome.storage) {
   chrome.storage.local.get([THEME_KEY], (res) => {
     applyTheme(res[THEME_KEY] || "indigo");
@@ -948,7 +1075,6 @@ if (typeof chrome !== "undefined" && chrome.storage) {
 } else {
   applyTheme("indigo");
 }
-
 E($("themeBtn"), "click", (e) => {
   e.stopPropagation();
   $("themePanel").classList.toggle("on");

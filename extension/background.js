@@ -28,9 +28,9 @@ function getPageMediaData() {
 
 // --- MAIN LOGIC ---
 async function executeContextNoteFlow(tab, explicitSelection = null) {
-  const API_BASE = "http://127.0.0.1:5000";
+  const API_BASE = "http://127.0.0.1:5000"; // Change to production URL later
 
-  // 1. Check Auth Status
+  // 1. Check Auth Status from Server
   let isPro = false;
   try {
     const authRes = await fetch(`${API_BASE}/api/me`, {
@@ -41,7 +41,7 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
       isPro = user.is_pro === true;
     }
   } catch (e) {
-    console.warn("Server unreachable, defaulting to Free tier.");
+    console.warn("Server offline, assuming Free tier.");
   }
 
   // 2. Get Video Data
@@ -54,20 +54,20 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
     if (results && results[0]) mediaData = results[0].result;
   } catch (e) {}
 
-  // Strip timestamps for free users
-  if (!isPro) mediaData.timestamp = null;
-
-  // 3. Load folders from storage to pass into the dialog
+  // 3. Get User Folders from storage (Pro only feature)
   const storageRes = await chrome.storage.local.get([FOLDERS_KEY]);
   const userFolders = storageRes[FOLDERS_KEY] || [];
 
-  // 4. Inject Dialog — now passes userFolders as well
+  // 4. Inject Dialog
   chrome.scripting.executeScript({
     target: { tabId: tab.id },
     args: [explicitSelection, mediaData, isPro, userFolders],
     func: (passedSelection, media, isProUser, folders) => {
       let selectionText =
         passedSelection || window.getSelection().toString().trim();
+
+      // Logic: If user is Free, we wipe the timestamp data immediately
+      if (!isProUser) media.timestamp = null;
 
       if (!selectionText && media.timestamp) {
         selectionText = `Saved at timestamp ${media.timestamp}`;
@@ -81,44 +81,37 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
       dialog.id = "cn-ext-dialog";
       dialog.style.cssText = `
         padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; 
-        font-family: system-ui, sans-serif; width: 340px; 
+        font-family: system-ui, -apple-system, sans-serif; width: 340px; 
         box-shadow: 0 20px 40px rgba(0,0,0,0.25); backdrop-filter: blur(4px);
         background: #ffffff; color: #1e293b; z-index: 2147483647;
         position: fixed; top: 20px; right: 20px; margin: 0;
       `;
 
-      // Timestamp badge
+      // --- Meta HTML (Timestamps - Pro Only) ---
       let metaHtml = "";
       if (media.hasVideo) {
         if (isProUser && media.timestamp) {
           metaHtml = `<span style="background:#eef2ff; color:#4f46e5; padding:4px 8px; border-radius:4px; font-size:12px; font-weight:bold; display:inline-flex; align-items:center; gap:4px; border:1px solid #c7d2fe;">⏱️ ${media.timestamp}</span>`;
         } else {
-          metaHtml = `<span onclick="alert('👑 Unlock YouTube Timestamps with ContextNote Pro! Open your Dashboard to upgrade.')" title="Upgrade to Pro to save YouTube timestamps" style="background:#fff1f2; color:#e11d48; padding:4px 8px; border-radius:4px; font-size:12px; font-weight:bold; display:inline-flex; align-items:center; gap:4px; border:1px solid #fecdd3; cursor:pointer;">👑 Pro Timestamp</span>`;
+          metaHtml = `<span onclick="alert('👑 Unlock YouTube Timestamps with ContextNote Pro!')" style="background:#fff1f2; color:#e11d48; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:bold; display:inline-flex; align-items:center; border:1px solid #fecdd3; cursor:pointer;">👑 Pro Timestamp</span>`;
         }
       }
 
-      // Screenshot button
-      let snapButtonHtml = isProUser
-        ? `<button id="cn-snap" style="background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; padding:8px 10px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px;">📸 <span id="cn-snap-text">Screenshot</span></button>`
-        : `<button id="cn-snap-upsell" style="background:#fff1f2; color:#e11d48; border:1px solid #fecdd3; padding:8px 10px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px;" title="Pro Feature">👑 Screenshot</button>`;
-
-      // Folder dropdown — only rendered if folders exist
-      const folderHtml =
-        folders.length > 0
-          ? `<div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
-            <label for="cn-folder" style="font-size:12px; font-weight:600; color:#64748b; white-space:nowrap; display:flex; align-items:center; gap:4px;">
-              <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:#64748b;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-              Folder
-            </label>
-            <select id="cn-folder" style="flex:1; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:12.5px; font-family:inherit; background:#fff; color:#1e293b; cursor:pointer; outline:none;">
-              <option value="">No folder</option>
-              ${folders.map((f) => `<option value="${f.replace(/"/g, "&quot;")}">${f.replace(/</g, "&lt;")}</option>`).join("")}
-            </select>
-           </div>`
-          : "";
+      // --- Folder HTML (Pro Only) ---
+      let folderHtml = "";
+      if (isProUser && folders.length > 0) {
+        folderHtml = `
+          <select id="cn-folder" style="width: 100%; padding: 8px; margin-bottom: 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; background: #f8fafc; outline:none;">
+            <option value="">No Folder (Default)</option>
+            ${folders.map((f) => `<option value="${f}">${f}</option>`).join("")}
+          </select>
+        `;
+      } else if (!isProUser) {
+        folderHtml = `<div style="font-size:11px; color:#94a3b8; margin-bottom:12px; text-align:right;">👑 Pro: Save to Folders</div>`;
+      }
 
       const content = `
-        <h3 style="margin: 0 0 12px 0; font-size: 16px; color: #2563eb; display:flex; justify-content:space-between; align-items:center;">
+        <h3 style="margin: 0 0 12px 0; font-size: 16px; color: #4f46e5; display:flex; justify-content:space-between; align-items:center;">
           <span>New Note</span>
           ${metaHtml}
         </h3>
@@ -128,7 +121,7 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
         </div>
         
         <input type="text" id="cn-title" placeholder="Note Heading..." style="width: 100%; box-sizing: border-box; padding: 10px; margin-bottom: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline:none;" />
-        <textarea id="cn-desc" placeholder="Add a description..." style="width: 100%; box-sizing: border-box; padding: 10px; height: 70px; margin-bottom: 12px; border: 1px solid #cbd5e1; border-radius: 6px; resize: none; font-size: 13px; font-family: inherit; outline:none;"></textarea>
+        <textarea id="cn-desc" placeholder="Add a description..." style="width: 100%; box-sizing: border-box; padding: 10px; height: 70px; margin-bottom: 8px; border: 1px solid #cbd5e1; border-radius: 6px; resize: none; font-size: 13px; font-family: inherit; outline:none;"></textarea>
         
         ${folderHtml}
 
@@ -138,10 +131,12 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-          ${snapButtonHtml}
+          <button id="cn-snap" style="background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; padding:8px 10px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px;">
+            📸 <span id="cn-snap-text">Screenshot</span>
+          </button>
           <div style="display:flex; gap:8px;">
             <button id="cn-cancel" style="padding: 8px 12px; border: none; background: #f1f5f9; color: #475569; border-radius: 6px; cursor: pointer; font-weight: 600; font-size:12px;">Cancel</button>
-            <button id="cn-save" style="padding: 8px 14px; border: none; background: #2563eb; color: white; border-radius: 6px; cursor: pointer; font-weight: 600; font-size:12px;">Save</button>
+            <button id="cn-save" style="padding: 8px 14px; border: none; background: #4f46e5; color: white; border-radius: 6px; cursor: pointer; font-weight: 600; font-size:12px;">Save</button>
           </div>
         </div>
       `;
@@ -154,58 +149,46 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
 
       document.getElementById("cn-cancel").onclick = () => dialog.remove();
 
-      if (isProUser) {
-        document.getElementById("cn-snap").onclick = () => {
-          const snapBtn = document.getElementById("cn-snap");
-          snapBtn.disabled = true;
-          document.getElementById("cn-snap-text").innerText = "...";
-          dialog.style.opacity = "0";
+      // --- Screenshot Logic (FREE FOR ALL) ---
+      document.getElementById("cn-snap").onclick = () => {
+        const snapBtn = document.getElementById("cn-snap");
+        const prevText = document.getElementById("cn-snap-text").innerText;
+        snapBtn.disabled = true;
+        document.getElementById("cn-snap-text").innerText = "...";
+        dialog.style.opacity = "0";
 
-          setTimeout(() => {
-            chrome.runtime.sendMessage(
-              { action: "capture_screenshot" },
-              (response) => {
-                dialog.style.opacity = "1";
-                snapBtn.disabled = false;
-                document.getElementById("cn-snap-text").innerText =
-                  "Screenshot";
-
-                if (response && response.data) {
-                  currentImage = response.data;
-                  document.getElementById("cn-img-tag").src = currentImage;
-                  document.getElementById("cn-img-preview").style.display =
-                    "block";
-                  document.getElementById("cn-snap").style.display = "none";
-                }
-              },
-            );
-          }, 200);
-        };
-      } else {
-        document.getElementById("cn-snap-upsell").onclick = () => {
-          alert(
-            "👑 Unlock Screenshots with ContextNote Pro! Open your Dashboard to upgrade.",
+        setTimeout(() => {
+          chrome.runtime.sendMessage(
+            { action: "capture_screenshot" },
+            (response) => {
+              dialog.style.opacity = "1";
+              snapBtn.disabled = false;
+              document.getElementById("cn-snap-text").innerText = prevText;
+              if (response && response.data) {
+                currentImage = response.data;
+                document.getElementById("cn-img-tag").src = currentImage;
+                document.getElementById("cn-img-preview").style.display =
+                  "block";
+                document.getElementById("cn-snap").style.display = "none";
+              }
+            },
           );
-        };
-      }
+        }, 200);
+      };
 
-      const removeImgBtn = document.getElementById("cn-remove-img");
-      if (removeImgBtn) {
-        removeImgBtn.onclick = () => {
-          currentImage = null;
-          document.getElementById("cn-img-preview").style.display = "none";
-          if (isProUser)
-            document.getElementById("cn-snap").style.display = "flex";
-        };
-      }
+      document.getElementById("cn-remove-img").onclick = () => {
+        currentImage = null;
+        document.getElementById("cn-img-preview").style.display = "none";
+        document.getElementById("cn-snap").style.display = "flex";
+      };
 
-      // Save — reads folder dropdown if it exists
+      // --- Save Logic ---
       document.getElementById("cn-save").onclick = () => {
         const title =
-          document.getElementById("cn-title").value.trim() || "Note";
+          document.getElementById("cn-title").value.trim() || "Untitled Note";
         const desc = document.getElementById("cn-desc").value.trim();
         const folderEl = document.getElementById("cn-folder");
-        const selectedFolder = folderEl ? folderEl.value : "";
+        const selectedFolder = folderEl ? folderEl.value : null;
 
         chrome.runtime.sendMessage({
           action: "save_highlight_data",
@@ -213,13 +196,13 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
             id: Date.now().toString(),
             url: window.location.href,
             domain: window.location.hostname,
-            title,
+            title: title,
             content: desc,
             selection: selectionText,
-            timestamp: media.timestamp,
+            timestamp: media.timestamp, // Will be null for Free users
             image_data: currentImage || null,
             pinned: false,
-            folder: selectedFolder || null,
+            folder: selectedFolder,
           },
         });
         dialog.remove();
