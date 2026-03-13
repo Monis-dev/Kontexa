@@ -24,6 +24,8 @@ let eId = null,
   allNotesFlat = [];
 let isLoggedIn = false;
 
+const getSafeId = (str) => "sec_" + str.replace(/[^a-zA-Z0-9]/g, "_");
+
 const toast = (m, ms = 2600) => {
   const t = $("toast");
   t.textContent = m;
@@ -162,15 +164,31 @@ E($("viewModal"), "click", (e) => {
   if (e.target === $("viewModal")) $("viewModal").classList.remove("on");
 });
 
-// --- RENAME SOURCE ---
 // Opens an inline prompt to rename a URL source or folder
+// --- RENAME SOURCE ---
 function renameSource(url, currentName) {
   const newName = prompt(`Rename "${currentName}" to:`, currentName);
   if (!newName || !newName.trim() || newName.trim() === currentName) return;
+  
   sourceNames[url] = newName.trim();
-  chrome.storage.local.set({ [NAMES_KEY]: sourceNames }, () => {
+  
+  chrome.storage.local.set({ [NAMES_KEY]: sourceNames }, async () => {
     toast(`Renamed to "${newName.trim()}"`);
     loadLocalUI();
+
+    // NEW: Sync the custom name to the server if logged in
+    if (isLoggedIn) {
+      try {
+        await fetch(`${API_BASE}/api/websites/rename`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: url, custom_name: newName.trim() }),
+          credentials: "include"
+        });
+      } catch (err) {
+        console.error("Failed to sync rename to server", err);
+      }
+    }
   });
 }
 
@@ -227,6 +245,7 @@ const card = (n, dom) => {
 };
 
 // --- RENDER MAIN DASHBOARD ---
+// --- RENDER MAIN DASHBOARD ---
 function render(urlGroups, folderGroups) {
   $("skel")?.remove();
   const total = allNotesFlat.length;
@@ -234,14 +253,14 @@ function render(urlGroups, folderGroups) {
   $("smeta").textContent =
     `${urlGroups.length} page${urlGroups.length !== 1 ? "s" : ""} · ${total} notes`;
 
-  // Sidebar nav uses custom names too
+  // Sidebar nav uses the Safe ID (s.id)
   $("snav").innerHTML = urlGroups.length
     ? urlGroups
         .map((s, i) => {
           const displayName = sourceNames[s.url]
             ? sourceNames[s.url]
             : s.domain.replace(/^www\./, "");
-          return `<a class="na${i === 0 ? " on" : ""}" href="#s${i}" data-t="s${i}" title="${esc(s.url)}">
+          return `<a class="na${i === 0 ? " on" : ""}" href="#${s.id}" data-t="${s.id}" title="${esc(s.url)}">
           <div class="dot"></div>
           <span class="nd">${esc(displayName)}</span>
           <span class="bdg">${s.notes.length}</span>
@@ -290,7 +309,6 @@ function render(urlGroups, folderGroups) {
           ? `folder:${group.domain}`
           : group.url;
 
-        // Display name — custom if set, else cleaned URL
         const displayName = isFolderGroup
           ? group.domain
           : getDisplayName(group.url);
@@ -328,10 +346,9 @@ function render(urlGroups, folderGroups) {
           </div>`;
         }
 
-        const sectionId = isFolderGroup ? `f-${esc(group.domain)}` : `s${i}`;
-
+        // USE THE SAFE ID HERE!
         return `
-        <div class="sec" id="${sectionId}">
+        <div class="sec" id="${group.id}">
           ${headerHtml}
           <div class="grid">${gridHTML}</div>
           <div style="margin-top:12px;">
@@ -346,24 +363,17 @@ function render(urlGroups, folderGroups) {
 }
 
 // --- SCROLL FIX ---
-// scrollIntoView() scrolls the viewport, but #main is the scrollable container.
-// We must manually scroll #main to bring the target section into view.
 function scrollMainToSection(sectionId) {
   const mainEl = $("main");
   const target = $(sectionId);
   if (!mainEl || !target) return;
-  // target.offsetTop is the distance from target to its offsetParent.
-  // Walk up the tree summing offsetTops until we hit #main (the scroll container).
-  let offsetSum = 0;
-  let el = target;
-  while (el && el !== mainEl) {
-    offsetSum += el.offsetTop;
-    el = el.offsetParent;
-  }
-  // Subtract main's padding-top (28px from CSS) so we don't cut off the section header
-  mainEl.scrollTo({ top: offsetSum - 28, behavior: "smooth" });
+  
+  // Force main to be relative so offsetTop calculates perfectly
+  mainEl.style.position = "relative"; 
+  
+  // Scroll exactly to the target, minus 28px for the top padding
+  mainEl.scrollTo({ top: target.offsetTop - 28, behavior: "smooth" });
 }
-
 // --- BIND NAV ---
 function bindNav() {
   const nas = document.querySelectorAll(".na[data-t]");
@@ -628,6 +638,7 @@ function loadLocalUI() {
     allNotesFlat.forEach((n) => {
       if (!groupedUrls[n.url]) {
         groupedUrls[n.url] = {
+          id: getSafeId(n.url),
           domain: n.domain,
           url: n.url,
           notes: [],
@@ -639,6 +650,7 @@ function loadLocalUI() {
       if (n.folder) {
         if (!groupedFolders[n.folder]) {
           groupedFolders[n.folder] = {
+            id: getSafeId("folder_" + n.folder),
             domain: n.folder,
             url: `folder-${n.folder}`,
             notes: [],
@@ -652,6 +664,7 @@ function loadLocalUI() {
     userFolders.forEach((f) => {
       if (!groupedFolders[f]) {
         groupedFolders[f] = {
+          id: getSafeId("folder_" + f),
           domain: f,
           url: `folder-${f}`,
           notes: [],
@@ -675,7 +688,8 @@ function renderFoldersSidebar() {
     ? userFolders
         .map((f) => {
           const count = allNotesFlat.filter((n) => n.folder === f).length;
-          return `<a class="na" href="#f-${esc(f)}" data-t="f-${esc(f)}"><div class="dot" style="border-radius:2px;background:var(--mut2);"></div><span class="nd">${esc(f)}</span><span class="bdg">${count}</span></a>`;
+          const fid = getSafeId("folder_" + f); // <--- Safe ID
+          return `<a class="na" href="#${fid}" data-t="${fid}"><div class="dot" style="border-radius:2px;background:var(--mut2);"></div><span class="nd">${esc(f)}</span><span class="bdg">${count}</span></a>`;
         })
         .join("")
     : '<p style="padding:12px;font-size:12px;color:var(--mut)">No folders yet.</p>';
@@ -781,6 +795,12 @@ async function checkAuthAndSync() {
         });
         if (cloudRes.ok) {
           const cloudData = await cloudRes.json();
+          cloudData.forEach((site) => {
+            if (site.custom_name) {
+              sourceNames[site.url] = site.custom_name;
+            }
+          });
+          chrome.storage.local.set({ [NAMES_KEY]: sourceNames });
           const localForFolderLookup = localNotes.reduce((acc, n) => {
             if (n.folder) acc[n.id] = n.folder;
             return acc;

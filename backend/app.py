@@ -41,6 +41,7 @@ class Website(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     url = db.Column(db.String(500), nullable=False)
     domain = db.Column(db.String(200))
+    custom_name = db.Column(db.String(255), nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     notes = db.relationship('Note', backref='website', lazy=True, cascade="all, delete-orphan")
 
@@ -120,6 +121,29 @@ def revoke():
             <body style="font-family:sans-serif; text-align:center; margin-top:50px;">
                 <h2 style="color:#e11d48;">Access Revoked ❌</h2>
                 <p>Your account (<b>{}</b>) is now on the Free Tier.</p>
+                <p>Close this tab and reload your extension dashboard to test.</p>
+                <script>setTimeout(()=>window.close(), 3000);</script>
+            </body>
+        </html>
+        """.format(user.email)
+        
+    return jsonify({"error": "User not found"}), 404
+
+@app.route("/grant")
+def grant():
+    if 'user_id' not in session: 
+        return jsonify({"error": "Login required. Please open your extension dashboard first."}), 401
+        
+    user = db.session.get(User, session['user_id'])
+    
+    if user:
+        user.is_pro = True
+        db.session.commit()
+        return """
+        <html>
+            <body style="font-family:sans-serif; text-align:center; margin-top:50px;">
+                <h2 style="color:#e11d48;">Access Granted</h2>
+                <p>Your account (<b>{}</b>) is now on the Pro Tier.</p>
                 <p>Close this tab and reload your extension dashboard to test.</p>
                 <script>setTimeout(()=>window.close(), 3000);</script>
             </body>
@@ -280,7 +304,7 @@ def get_notes():
     result = []
     for s in websites:
         result.append({
-            "domain": s.domain, "url": s.url,
+            "domain": s.domain, "url": s.url, "custom_name": s.custom_name,
             "notes": [{
                 "id": n.local_id, "title": n.title, "content": n.content, 
                 "selection": n.selection, "pinned": n.pinned,
@@ -336,22 +360,22 @@ def delete_note(local_id):
         
     return jsonify({"error": "Note not found or Unauthorized"}), 404
 
-
-# @app.route('/api/ai/chat', methods=['POST'])
-# def ai_chat():
-#     user = db.session.get(User, session.get('user_id'))
-#     if not user or not user.is_pro: return jsonify({"error": "Pro only"}), 403
+@app.route('/api/websites/rename', methods=['PUT'])
+def rename_website():
+    if 'user_id' not in session: return jsonify({"error": "Login required"}), 401
     
-#     data = request.json
-#     answer = get_ai_answer(data['question'], data.get('context', []))
-#     return jsonify({"answer": answer})
-
-# @app.route('/api/ai/summarize', methods=['POST'])
-# def ai_summarize():
-#     user = db.session.get(User, session.get('user_id'))
-#     if not user or not user.is_pro: return jsonify({"error": "Pro only"}), 403
+    data = request.json
+    url = data.get('url')
+    custom_name = data.get('custom_name')
     
-#     summary = get_ai_summary(request.json.get('content', ''))
-#     return jsonify({"summary": summary})
+    # Find the website associated with this user and URL
+    site = Website.query.filter_by(url=url, user_id=session['user_id']).first()
+    
+    if site:
+        site.custom_name = custom_name
+        db.session.commit()
+        return jsonify({"message": "Renamed successfully"})
+        
+    return jsonify({"error": "Website not found"}), 404
 
 if __name__ == '__main__': app.run(debug=True, port=5000)
