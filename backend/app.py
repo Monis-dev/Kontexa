@@ -90,7 +90,7 @@ google = oauth.register(
 
 @app.route("/")
 def home():
-    return "ContextNote backend running"
+    return render_template("index.html")
 
 @app.route("/login")
 def login(): return google.authorize_redirect(url_for('authorize', _external=True))
