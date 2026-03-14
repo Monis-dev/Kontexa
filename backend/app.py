@@ -1,5 +1,6 @@
 import os
 import stripe
+from urllib.parse import unquote
 from flask import Flask, request, jsonify, session, redirect, url_for, render_template
 from flask_sqlalchemy import SQLAlchemy
 from urllib.parse import urlparse
@@ -16,13 +17,13 @@ app.secret_key = os.getenv("SECRET_KEY", "prod_secret_123")
 uri = os.getenv("DATABASE_URL")
 
 if uri:
+    # 1. Standardize prefix
     if uri.startswith("postgres://"):
         uri = uri.replace("postgres://", "postgresql://", 1)
     
-    # Supabase Connection Pooling & SSL Requirements
-    if "sslmode" not in uri:
-        separator = "&" if "?" in uri else "?"
-        uri += f"{separator}sslmode=require"
+    # 2. Decode the URL to handle the %2E correctly
+    # This ensures the driver sees the '.' in the username
+    uri = unquote(uri)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
