@@ -11,6 +11,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 app = Flask(__name__)
+app.config.update(
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_SAMESITE="None"
+)
 app.secret_key = os.getenv("SECRET_KEY", "prod_secret_123")
 
 # --- Production-Ready Database Config ---
@@ -399,5 +403,3 @@ def rename_website():
         return jsonify({"message": "Renamed successfully"})
         
     return jsonify({"error": "Website not found"}), 404
-
-if __name__ == '__main__': app.run(debug=True, port=5000)
