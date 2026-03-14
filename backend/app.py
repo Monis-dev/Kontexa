@@ -13,10 +13,21 @@ app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "prod_secret_123")
 
 # DataBase
-uri = os.getenv("DATABASE_URL", "sqlite:///local.db")
-if uri.startswith("postgres://"): uri = uri.replace("postgres://", "postgresql://", 1)
+# Database Configuration
+uri = os.getenv("DATABASE_URL")
+
+# Render/Heroku often use 'postgres://', but SQLAlchemy requires 'postgresql://'
+if uri and uri.startswith("postgres://"):
+    uri = uri.replace("postgres://", "postgresql://", 1)
+
+# Ensure SSL for Supabase
+if uri and "sslmode=" not in uri:
+    if "?" in uri:
+        uri += "&sslmode=require"
+    else:
+        uri += "?sslmode=require"
+
 app.config['SQLALCHEMY_DATABASE_URI'] = uri
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Stripe
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "sk_test_123...")
