@@ -169,9 +169,9 @@ E($("viewModal"), "click", (e) => {
 function renameSource(url, currentName) {
   const newName = prompt(`Rename "${currentName}" to:`, currentName);
   if (!newName || !newName.trim() || newName.trim() === currentName) return;
-  
+
   sourceNames[url] = newName.trim();
-  
+
   chrome.storage.local.set({ [NAMES_KEY]: sourceNames }, async () => {
     toast(`Renamed to "${newName.trim()}"`);
     loadLocalUI();
@@ -183,7 +183,7 @@ function renameSource(url, currentName) {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ url: url, custom_name: newName.trim() }),
-          credentials: "include"
+          credentials: "include",
         });
       } catch (err) {
         console.error("Failed to sync rename to server", err);
@@ -367,10 +367,10 @@ function scrollMainToSection(sectionId) {
   const mainEl = $("main");
   const target = $(sectionId);
   if (!mainEl || !target) return;
-  
+
   // Force main to be relative so offsetTop calculates perfectly
-  mainEl.style.position = "relative"; 
-  
+  mainEl.style.position = "relative";
+
   // Scroll exactly to the target, minus 28px for the top padding
   mainEl.scrollTo({ top: target.offsetTop - 28, behavior: "smooth" });
 }
@@ -852,6 +852,120 @@ window.addEventListener("focus", () => {
 });
 window.onload = checkAuthAndSync;
 
+// --- ADD NOTE MODAL ---
+// Opens the add-note modal pre-filled with context (url/folder).
+// context = { type: "page", url, domain, displayName }
+//         | { type: "folder", folderName }
+function openAddNoteModal(context) {
+  const modal = $("addNoteModal");
+
+  // Reset fields
+  $("anTitle").value = "";
+  $("anContent").value = "";
+  $("anUrl").value = context.type === "page" ? context.url || "" : "";
+
+  // Show/hide the URL field depending on context
+  const urlRow = $("anUrlRow");
+  if (context.type === "folder") {
+    // Folder notes don't have a forced URL — show the field so user can optionally add one
+    urlRow.style.display = "block";
+    $("anUrlLabel").textContent = "Source URL (optional)";
+  } else {
+    // Page notes already know their URL — show it but let user edit
+    urlRow.style.display = "block";
+    $("anUrlLabel").textContent = "Source URL";
+  }
+
+  // Store context on the modal for use when saving
+  modal.dataset.context = JSON.stringify(context);
+  modal.classList.add("on");
+  setTimeout(() => $("anTitle").focus(), 80);
+}
+
+function closeAddNoteModal() {
+  $("addNoteModal").classList.remove("on");
+}
+
+async function saveNewNote() {
+  const titleVal = $("anTitle").value.trim();
+  const contentVal = $("anContent").value.trim();
+  const urlVal = $("anUrl").value.trim();
+
+  if (!titleVal) {
+    $("anTitle").focus();
+    $("anTitle").style.borderColor = "#ef4444";
+    setTimeout(() => ($("anTitle").style.borderColor = ""), 1200);
+    return;
+  }
+
+  const context = JSON.parse($("addNoteModal").dataset.context || "{}");
+
+  // Build the note object — mirrors the shape used by the extension
+  const newNote = {
+    id: "dash_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+    title: titleVal,
+    content: contentVal,
+    selection: "",
+    url:
+      urlVal || (context.type === "page" ? context.url : "dashboard://manual"),
+    domain:
+      context.type === "page"
+        ? context.domain ||
+          urlVal.replace(/^https?:\/\/(www\.)?/, "").split("/")[0] ||
+          "manual"
+        : urlVal
+          ? urlVal.replace(/^https?:\/\/(www\.)?/, "").split("/")[0]
+          : "manual",
+    folder: context.type === "folder" ? context.folderName : null,
+    pinned: false,
+    timestamp: null,
+    image_data: null,
+    createdAt: new Date().toISOString(),
+  };
+
+  allNotesFlat.push(newNote);
+
+  chrome.storage.local.set(
+    { [STORAGE_KEY]: JSON.stringify(allNotesFlat) },
+    async () => {
+      closeAddNoteModal();
+      toast("Note added ✓");
+
+      // Refresh the current view
+      if (context.type === "page") {
+        openSpecificPage(newNote.url);
+      } else {
+        openSpecificFolder(context.folderName);
+      }
+
+      // Sync to server if logged in
+      if (isLoggedIn) {
+        try {
+          await fetch(`${API_BASE}/api/sync`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify([newNote]),
+            credentials: "include",
+          });
+        } catch (err) {}
+      }
+    },
+  );
+}
+
+E($("cancelAddNote"), "click", closeAddNoteModal);
+E($("addNoteModal"), "click", (e) => {
+  if (e.target === $("addNoteModal")) closeAddNoteModal();
+});
+E($("saveAddNote"), "click", saveNewNote);
+// Allow Ctrl/Cmd+Enter to save from the textarea
+E($("anContent"), "keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+    e.preventDefault();
+    saveNewNote();
+  }
+});
+
 // --- PAGE / FOLDER DETAIL VIEWS ---
 function openSpecificPage(targetUrl) {
   $("main").style.display = "none";
@@ -861,21 +975,28 @@ function openSpecificPage(targetUrl) {
   siteNotes.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
 
   const displayName = getDisplayName(targetUrl);
+  // Extract domain from the URL for use in new notes
+  const pageDomain = targetUrl
+    .replace(/^https?:\/\/(www\.)?/, "")
+    .split("/")[0];
 
   $("singlePageView").innerHTML = `
     <button class="back-btn" id="backToDash">← Back to Dashboard</button>
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:24px;">
       <div class="mh" style="word-break:break-all;">${esc(displayName)}</div>
-      <div style="display:flex;gap:8px;">
+      <div style="display:flex;gap:8px;align-items:center;">
         <button class="btn" id="downloadMdBtn" title="Download notes as Markdown">⬇ .md</button>
+        <button class="btn" id="addNoteBtn">
+          <svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle;margin-right:4px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Note
+        </button>
         <button class="btn pri" id="chatWithAiBtn">💬 Chat with AI</button>
       </div>
     </div>
-    <div class="grid wrap">
+    <div class="grid wrap" id="pageNoteGrid">
       ${
         siteNotes.length
-          ? siteNotes.map((n) => card(n, siteNotes[0]?.domain || "")).join("")
-          : `<p style="color:var(--mut);font-size:13px;">No notes for this page yet.</p>`
+          ? siteNotes.map((n) => card(n, pageDomain)).join("")
+          : `<p style="color:var(--mut);font-size:13px;" id="emptyMsg">No notes for this page yet.</p>`
       }
     </div>
   `;
@@ -884,6 +1005,14 @@ function openSpecificPage(targetUrl) {
     $("singlePageView").style.display = "none";
     $("main").style.display = "block";
     loadLocalUI();
+  });
+  E($("addNoteBtn"), "click", () => {
+    openAddNoteModal({
+      type: "page",
+      url: targetUrl,
+      domain: pageDomain,
+      displayName,
+    });
   });
   E($("chatWithAiBtn"), "click", () => {
     $("aiModal").dataset.context = JSON.stringify(siteNotes);
@@ -938,16 +1067,19 @@ function openSpecificFolder(folderName) {
     <button class="back-btn" id="backToDash">← Back to Dashboard</button>
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:24px;">
       <div class="mh">📁 ${esc(folderName)}</div>
-      <div style="display:flex;gap:8px;">
+      <div style="display:flex;gap:8px;align-items:center;">
         <button class="btn" id="downloadMdBtn" title="Download notes as Markdown">⬇ .md</button>
+        <button class="btn" id="addNoteBtn">
+          <svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle;margin-right:4px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Note
+        </button>
         <button class="btn pri" id="chatWithAiBtn">💬 Chat with AI</button>
       </div>
     </div>
-    <div class="grid wrap">
+    <div class="grid wrap" id="pageNoteGrid">
       ${
         folderNotes.length
           ? folderNotes.map((n) => card(n, n.domain || folderName)).join("")
-          : `<p style="color:var(--mut);font-size:13px;">No notes in this folder yet.</p>`
+          : `<p style="color:var(--mut);font-size:13px;" id="emptyMsg">No notes in this folder yet.</p>`
       }
     </div>
   `;
@@ -956,6 +1088,9 @@ function openSpecificFolder(folderName) {
     $("singlePageView").style.display = "none";
     $("main").style.display = "block";
     loadLocalUI();
+  });
+  E($("addNoteBtn"), "click", () => {
+    openAddNoteModal({ type: "folder", folderName });
   });
   E($("chatWithAiBtn"), "click", () => {
     $("aiModal").dataset.context = JSON.stringify(folderNotes);
@@ -998,6 +1133,71 @@ function openSpecificFolder(folderName) {
   });
 }
 
+// --- MARKDOWN RENDERER ---
+// Converts AI markdown responses to clean HTML for display in the chat box.
+function renderMarkdown(text) {
+  return (
+    text
+      // Escape HTML first for safety
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      // Bold + italic combo (must come before bold and italic individually)
+      .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
+      // Bold
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      // Italic
+      .replace(/\*(.+?)\*/g, "<em>$1</em>")
+      // Inline code
+      .replace(
+        /`([^`]+)`/g,
+        '<code style="background:var(--bg);border:1px solid var(--bdr);padding:1px 5px;border-radius:4px;font-size:12px;font-family:monospace">$1</code>',
+      )
+      // H3
+      .replace(
+        /^### (.+)$/gm,
+        '<h4 style="margin:10px 0 4px;font-size:13px;font-weight:600;color:var(--ink)">$1</h4>',
+      )
+      // H2
+      .replace(
+        /^## (.+)$/gm,
+        '<h3 style="margin:12px 0 4px;font-size:14px;font-weight:600;color:var(--ink)">$1</h3>',
+      )
+      // H1
+      .replace(
+        /^# (.+)$/gm,
+        '<h2 style="margin:14px 0 6px;font-size:15px;font-weight:700;color:var(--ink)">$1</h2>',
+      )
+      // Unordered list items
+      .replace(
+        /^\s*[-*•] (.+)$/gm,
+        '<li style="margin:3px 0;padding-left:4px">$1</li>',
+      )
+      // Numbered list items
+      .replace(
+        /^\s*\d+\. (.+)$/gm,
+        '<li style="margin:3px 0;padding-left:4px;list-style-type:decimal">$1</li>',
+      )
+      // Wrap consecutive <li> elements in a <ul>
+      .replace(
+        /((?:<li[^>]*>[\s\S]*?<\/li>\s*)+)/g,
+        '<ul style="margin:6px 0;padding-left:18px">$1</ul>',
+      )
+      // Horizontal rule
+      .replace(
+        /^---$/gm,
+        '<hr style="border:none;border-top:1px solid var(--bdr);margin:10px 0">',
+      )
+      // Double newline → paragraph break
+      .replace(/\n\n/g, '</p><p style="margin:6px 0">')
+      // Single newline → line break
+      .replace(/\n/g, "<br>")
+      // Wrap entire output in a paragraph
+      .replace(/^/, '<p style="margin:0">')
+      .replace(/$/, "</p>")
+  );
+}
+
 // AI logic
 E($("aiBtn"), "click", () => {
   $("aiModal").dataset.context = JSON.stringify(allNotesFlat);
@@ -1038,7 +1238,8 @@ async function handleAiSubmit() {
   try {
     const contextNotes = JSON.parse($("aiModal").dataset.context || "[]");
     const answer = await AIService.chat(q, contextNotes);
-    chatBox.innerHTML += `<div class="chat-msg chat-ai">${esc(answer).replace(/\n/g, "<br>")}</div>`;
+    // Use renderMarkdown instead of esc() + plain newline replacement
+    chatBox.innerHTML += `<div class="chat-msg chat-ai" style="line-height:1.6">${renderMarkdown(answer)}</div>`;
   } catch (e) {
     chatBox.innerHTML += `<div class="chat-msg chat-ai">Error: Could not connect to AI.</div>`;
   }

@@ -779,7 +779,6 @@ body {
 }
 
 /* ── RENAME SOURCE BUTTON ── */
-/* Small pencil icon that appears next to the source name on hover */
 .btn-rename {
   width: 22px;
   height: 22px;
@@ -790,7 +789,6 @@ body {
   place-items: center;
   cursor: pointer;
   color: var(--mut2);
-  /* Hidden by default, revealed on .sech hover */
   opacity: 0;
   pointer-events: none;
   transition:
@@ -810,7 +808,6 @@ body {
   background: var(--acc-bg);
 }
 
-/* Source name that has been customised gets a subtle indicator */
 .sdom-name[data-custom="true"] {
   color: var(--acc);
 }
@@ -1205,6 +1202,7 @@ body {
   flex-direction: column;
   padding: 24px;
 }
+
 #aiChatBox {
   flex: 1;
   display: flex;
@@ -1218,6 +1216,57 @@ body {
   margin-top: 10px;
   margin-bottom: 12px;
 }
+
+/* ── AI MODAL BOTTOM BAR ── */
+/* Input + Send + Close all sit on one horizontal row */
+#aiModal .ai-bottom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+#aiModal .ai-bottom #aiInput {
+  flex: 1;
+  height: 40px;
+  padding: 0 12px;
+  border: 1.5px solid var(--bdr);
+  border-radius: 9px;
+  font-family: inherit;
+  font-size: 13.5px;
+  color: var(--ink);
+  background: var(--bg);
+  outline: none;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+  margin-bottom: 0;
+}
+
+#aiModal .ai-bottom #aiInput:focus {
+  border-color: var(--acc);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 15%, transparent);
+}
+
+#aiModal .ai-bottom #aiSendBtn {
+  flex-shrink: 0;
+  height: 40px;
+  padding: 0 18px;
+  white-space: nowrap;
+}
+
+#aiModal .ai-bottom #closeAiBtn {
+  flex-shrink: 0;
+  height: 40px;
+  padding: 0 16px;
+  white-space: nowrap;
+}
+
+/* Override: remove the old separate macts block inside aiModal */
+#aiModal .macts {
+  display: none;
+}
+
 .chat-msg {
   padding: 12px 16px;
   border-radius: 12px;
@@ -1240,9 +1289,6 @@ body {
   color: var(--ink);
   border-bottom-left-radius: 2px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-#aiModal .macts {
-  margin-top: 0;
 }
 
 /* Skeleton loader */
