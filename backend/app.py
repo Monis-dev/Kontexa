@@ -84,6 +84,10 @@ google = oauth.register(
     client_kwargs={'scope': 'openid email profile'}
 )
 
+@app.route("/")
+def home():
+    return "ContextNote backend running"
+
 @app.route("/login")
 def login(): return google.authorize_redirect(url_for('authorize', _external=True))
 
