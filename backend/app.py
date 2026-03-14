@@ -12,22 +12,25 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "prod_secret_123")
 
-# DataBase
-# Database Configuration
+# --- Database Configuration ---
 uri = os.getenv("DATABASE_URL")
 
-# Render/Heroku often use 'postgres://', but SQLAlchemy requires 'postgresql://'
-if uri and uri.startswith("postgres://"):
-    uri = uri.replace("postgres://", "postgresql://", 1)
-
-# Ensure SSL for Supabase
-if uri and "sslmode=" not in uri:
-    if "?" in uri:
-        uri += "&sslmode=require"
-    else:
-        uri += "?sslmode=require"
+if uri:
+    # Fix the postgres -> postgresql prefix
+    if uri.startswith("postgres://"):
+        uri = uri.replace("postgres://", "postgresql://", 1)
+    
+    # Ensure SSL is required for production
+    if "sslmode" not in uri:
+        if "?" in uri:
+            uri += "&sslmode=require"
+        else:
+            uri += "?sslmode=require"
 
 app.config['SQLALCHEMY_DATABASE_URI'] = uri
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
 
 # Stripe
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "sk_test_123...")
@@ -35,10 +38,8 @@ STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "whsec_123...")
 PRICE_MONTHLY_ID = os.getenv("STRIPE_PRICE_MONTHLY", "price_123...")
 PRICE_LIFETIME_ID = os.getenv("STRIPE_PRICE_LIFETIME", "price_456...")
 
-
 CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
 
-db = SQLAlchemy(app)
 oauth = OAuth(app)
 
 # --- Models ---
