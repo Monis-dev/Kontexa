@@ -16,18 +16,17 @@ app.secret_key = os.getenv("SECRET_KEY", "prod_secret_123")
 # --- Production-Ready Database Config ---
 uri = os.getenv("DATABASE_URL")
 
-if uri:
-    # 1. Standardize prefix
-    if uri.startswith("postgres://"):
-        uri = uri.replace("postgres://", "postgresql://", 1)
-    
-    # 2. Decode the URL to handle the %2E correctly
-    # This ensures the driver sees the '.' in the username
-    uri = unquote(uri)
+if uri and uri.startswith("postgres://"):
+    uri = uri.replace("postgres://", "postgresql://", 1)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = uri
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config["SQLALCHEMY_DATABASE_URI"] = uri
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_pre_ping": True,
+    "pool_recycle": 300,
+    "connect_args": {"sslmode": "require"}
+}
 db = SQLAlchemy(app)
 
 # Wrap table creation in a try/except so the server doesn't 
@@ -77,7 +76,6 @@ class Note(db.Model):
     folder = db.Column(db.String(100), nullable=True)
     website_id = db.Column(db.Integer, db.ForeignKey('website.id'), nullable=False)
 
-with app.app_context(): db.create_all()
 
 # --- Auth ---
 google = oauth.register(
