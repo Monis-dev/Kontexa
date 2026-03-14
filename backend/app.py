@@ -12,25 +12,32 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "prod_secret_123")
 
-# --- Database Configuration ---
+# --- Production-Ready Database Config ---
 uri = os.getenv("DATABASE_URL")
 
 if uri:
-    # Fix the postgres -> postgresql prefix
     if uri.startswith("postgres://"):
         uri = uri.replace("postgres://", "postgresql://", 1)
     
-    # Ensure SSL is required for production
+    # Supabase Connection Pooling & SSL Requirements
     if "sslmode" not in uri:
-        if "?" in uri:
-            uri += "&sslmode=require"
-        else:
-            uri += "?sslmode=require"
+        separator = "&" if "?" in uri else "?"
+        uri += f"{separator}sslmode=require"
 
 app.config['SQLALCHEMY_DATABASE_URI'] = uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+
+# Wrap table creation in a try/except so the server doesn't 
+# just crash silently if the DB is unreachable
+try:
+    with app.app_context():
+        print("Connecting to database...")
+        db.create_all()
+        print("Database connected and tables verified!")
+except Exception as e:
+    print(f"CRITICAL ERROR: Could not connect to database. Reason: {e}")
 
 # Stripe
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "sk_test_123...")
