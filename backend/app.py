@@ -3,6 +3,7 @@ import stripe
 from urllib.parse import unquote
 from flask import Flask, request, jsonify, session, redirect, url_for, render_template
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm import joinedload
 from urllib.parse import urlparse
 from authlib.integrations.flask_client import OAuth
 from flask_cors import CORS
@@ -28,6 +29,8 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_pre_ping": True,
+    "pool_size": 10,
+    "max_overflow": 20,
     "pool_recycle": 300,
     "connect_args": {"sslmode": "require"}
 }
@@ -62,15 +65,15 @@ class User(db.Model):
 
 class Website(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    url = db.Column(db.String(500), nullable=False)
+    url = db.Column(db.String(500), nullable=False, index=True)
     domain = db.Column(db.String(200))
     custom_name = db.Column(db.String(255), nullable=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
     notes = db.relationship('Note', backref='website', lazy=True, cascade="all, delete-orphan")
 
 class Note(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    local_id = db.Column(db.String(50), nullable=False)
+    local_id = db.Column(db.String(50), nullable=False, index=True)
     title = db.Column(db.String(255), nullable=False, default="Untitled")
     content = db.Column(db.Text, nullable=True)
     selection = db.Column(db.Text)
@@ -193,7 +196,7 @@ def pricing():
     
     # If they are already Pro, don't let them buy it again!
     if user.is_pro:
-        return "<h2>You are already a Pro user! 🎉 Close this tab and enjoy the extension.</h2>"
+        return "<h2>You are already a Pro user! Close this tab and enjoy the extension.</h2>"
         
     # DO NOT set is_pro = True here! That is what the webhook is for!
     return render_template('pricing.html', email=user.email)
@@ -297,28 +300,53 @@ def sync_notes():
     user = db.session.get(User, session['user_id'])
     if not user.is_pro: return jsonify({"error": "Pro upgrade required"}), 403
 
-    for note in request.json:
-        local_id = str(note.get('id'))
-        existing = Note.query.join(Website).filter(Website.user_id == user.id, Note.local_id == local_id).first()
-        if existing: continue
-        
-        site = Website.query.filter_by(url=note['url'], user_id=user.id).first()
+    notes = request.json
+
+    existing_ids = {
+        n.local_id for n in Note.query.join(Website)
+        .filter(Website.user_id == user.id)
+        .all()
+    }
+
+    sites_cache = {
+        s.url: s for s in Website.query.filter_by(user_id=user.id).all()
+    }
+
+    new_notes = []
+
+    for note in notes:
+        local_id = str(note.get("id"))
+
+        if local_id in existing_ids:
+            continue
+
+        site = sites_cache.get(note["url"])
+
         if not site:
-            site = Website(url=note['url'], domain=note.get('domain', urlparse(note['url']).netloc), user_id=user.id)
+            site = Website(
+                url=note["url"],
+                domain=note.get("domain", urlparse(note["url"]).netloc),
+                user_id=user.id
+            )
             db.session.add(site)
-            db.session.commit()
-            
-        db.session.add(Note(
-            local_id=local_id, 
-            title=note.get('title', 'Untitled'), 
-            content=note.get('content', ''), 
-            selection=note.get('selection', ''), 
-            pinned=note.get('pinned', False),
-            timestamp=note.get('timestamp', ''),
-            image_data=note.get('image_data', ''),
-            folder=note.get('folder', ''),
-            website_id=site.id
-        ))
+            db.session.flush()
+            sites_cache[note["url"]] = site
+
+        new_notes.append(
+            Note(
+                local_id=local_id,
+                title=note.get("title", "Untitled"),
+                content=note.get("content", ""),
+                selection=note.get("selection", ""),
+                pinned=note.get("pinned", False),
+                timestamp=note.get("timestamp", ""),
+                image_data=note.get("image_data", ""),
+                folder=note.get("folder", ""),
+                website_id=site.id
+            )
+        )
+
+    db.session.add_all(new_notes)
     db.session.commit()
     return jsonify({"message": "Sync complete"}), 200
 
@@ -330,7 +358,7 @@ def get_notes():
     # If they aren't pro, we shouldn't even send them data (Double security)
     if not user.is_pro: return jsonify([]), 403 
 
-    websites = Website.query.filter_by(user_id=user.id).all()
+    websites = Website.query.options(joinedload(Website.notes)).filter_by(user_id=user.id).all()
     result = []
     for s in websites:
         result.append({
@@ -408,5 +436,5 @@ def rename_website():
         
     return jsonify({"error": "Website not found"}), 404
 
-# if __name__ == "__main__":
-#     app.run(port=5000, debug=True)
+if __name__ == "__main__":
+    app.run(port=5000, debug=True)
