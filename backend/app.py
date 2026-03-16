@@ -88,6 +88,10 @@ google = oauth.register(
     client_kwargs={'scope': 'openid email profile'}
 )
 
+@app.route("/weakUp")
+def weakUp():
+    return jsonify({"message": "Wake UP!!"}), 200
+
 @app.route("/")
 def home():
     return render_template("index.html")
@@ -403,3 +407,6 @@ def rename_website():
         return jsonify({"message": "Renamed successfully"})
         
     return jsonify({"error": "Website not found"}), 404
+
+if __name__ == "__main__":
+    app.run(port=5000, debug=True)
