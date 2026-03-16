@@ -1,12 +1,13 @@
 const STORAGE_KEY = "context_notes_data";
 const FOLDERS_KEY = "cn_user_folders";
 const NAMES_KEY = "cn_source_names"; // custom display names for URLs
-const API_BASE = "http://127.0.0.1:5000";
+const API_BASE = "https://context-notes.onrender.com";
 
 let mId = null;
 let userFolders = [];
 let sourceNames = {}; // { [url]: "custom name" }
 let isProUserUI = false;
+let notesById = {};
 
 const $ = (id) => document.getElementById(id);
 const E = (el, ev, fn) => {
@@ -97,7 +98,7 @@ E($("logoutWipeBtn"), "click", async () => {
 
 // --- OPEN NOTE MODAL ---
 function openNoteModal(noteId) {
-  const n = allNotesFlat.find((note) => note.id === noteId);
+  const n = notesById[noteId];
   if (!n) return;
 
   $("vTitle").textContent = n.title || "Untitled";
@@ -215,7 +216,7 @@ const card = (n, dom) => {
   }
   if (n.image_data) {
     mediaHtml += `<div style="margin-top:8px;border-radius:6px;overflow:hidden;border:1px solid #e2e8f0;">
-      <img src="${n.image_data}" style="width:100%;height:auto;display:block;pointer-events:none;">
+      <img loading="lazy" src="${n.image_data}" style="width:100%;height:auto;display:block;pointer-events:none;">
     </div>`;
   }
 
@@ -474,24 +475,21 @@ document.addEventListener("click", (e) => {
     const idx = allNotesFlat.findIndex((n) => n.id === id);
     if (idx > -1) {
       allNotesFlat[idx].pinned = !allNotesFlat[idx].pinned;
-      chrome.storage.local.set(
-        { [STORAGE_KEY]: JSON.stringify(allNotesFlat) },
-        async () => {
-          if ($("singlePageView").style.display === "block")
-            openSpecificPage(allNotesFlat[idx].url);
-          else loadLocalUI();
-          if (isLoggedIn) {
-            try {
-              await fetch(`${API_BASE}/api/notes/${id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ pinned: allNotesFlat[idx].pinned }),
-                credentials: "include",
-              });
-            } catch (err) {}
-          }
-        },
-      );
+      chrome.storage.local.set({ [STORAGE_KEY]: allNotesFlat }, async () => {
+        if ($("singlePageView").style.display === "block")
+          openSpecificPage(allNotesFlat[idx].url);
+        else loadLocalUI();
+        if (isLoggedIn) {
+          try {
+            await fetch(`${API_BASE}/api/notes/${id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ pinned: allNotesFlat[idx].pinned }),
+              credentials: "include",
+            });
+          } catch (err) {}
+        }
+      });
     }
   }
 
@@ -508,23 +506,20 @@ document.addEventListener("click", (e) => {
     if (!confirm("Delete this note?")) return;
     const url = allNotesFlat.find((n) => n.id === id)?.url;
     allNotesFlat = allNotesFlat.filter((n) => n.id !== id);
-    chrome.storage.local.set(
-      { [STORAGE_KEY]: JSON.stringify(allNotesFlat) },
-      async () => {
-        toast("Note deleted");
-        if ($("singlePageView").style.display === "block" && url)
-          openSpecificPage(url);
-        else loadLocalUI();
-        if (isLoggedIn) {
-          try {
-            await fetch(`${API_BASE}/api/notes/${id}`, {
-              method: "DELETE",
-              credentials: "include",
-            });
-          } catch (err) {}
-        }
-      },
-    );
+    chrome.storage.local.set({ [STORAGE_KEY]: allNotesFlat }, async () => {
+      toast("Note deleted");
+      if ($("singlePageView").style.display === "block" && url)
+        openSpecificPage(url);
+      else loadLocalUI();
+      if (isLoggedIn) {
+        try {
+          await fetch(`${API_BASE}/api/notes/${id}`, {
+            method: "DELETE",
+            credentials: "include",
+          });
+        } catch (err) {}
+      }
+    });
   }
 });
 
@@ -538,25 +533,22 @@ E($("saveMove"), "click", async () => {
   const idx = allNotesFlat.findIndex((n) => n.id === mId);
   if (idx > -1) {
     allNotesFlat[idx].folder = selectedFolder || null;
-    chrome.storage.local.set(
-      { [STORAGE_KEY]: JSON.stringify(allNotesFlat) },
-      async () => {
-        $("moveModal").classList.remove("on");
-        mId = null;
-        toast("Note moved ✓");
-        loadLocalUI();
-        if (isLoggedIn) {
-          try {
-            await fetch(`${API_BASE}/api/notes/${allNotesFlat[idx].id}`, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ folder: allNotesFlat[idx].folder }),
-              credentials: "include",
-            });
-          } catch (err) {}
-        }
-      },
-    );
+    chrome.storage.local.set({ [STORAGE_KEY]: allNotesFlat }, async () => {
+      $("moveModal").classList.remove("on");
+      mId = null;
+      toast("Note moved ✓");
+      loadLocalUI();
+      if (isLoggedIn) {
+        try {
+          await fetch(`${API_BASE}/api/notes/${allNotesFlat[idx].id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ folder: allNotesFlat[idx].folder }),
+            credentials: "include",
+          });
+        } catch (err) {}
+      }
+    });
   }
 });
 
@@ -578,26 +570,22 @@ E($("saveEdit"), "click", async () => {
     allNotesFlat[idx].content = contentVal;
     const savedId = eId;
     const url = allNotesFlat[idx].url;
-    chrome.storage.local.set(
-      { [STORAGE_KEY]: JSON.stringify(allNotesFlat) },
-      async () => {
-        closeEdit();
-        toast("Saved ✓");
-        if ($("singlePageView").style.display === "block")
-          openSpecificPage(url);
-        else loadLocalUI();
-        if (isLoggedIn) {
-          try {
-            await fetch(`${API_BASE}/api/notes/${savedId}`, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ title: titleVal, content: contentVal }),
-              credentials: "include",
-            });
-          } catch (err) {}
-        }
-      },
-    );
+    chrome.storage.local.set({ [STORAGE_KEY]: allNotesFlat }, async () => {
+      closeEdit();
+      toast("Saved ✓");
+      if ($("singlePageView").style.display === "block") openSpecificPage(url);
+      else loadLocalUI();
+      if (isLoggedIn) {
+        try {
+          await fetch(`${API_BASE}/api/notes/${savedId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: titleVal, content: contentVal }),
+            credentials: "include",
+          });
+        } catch (err) {}
+      }
+    });
   }
 });
 
@@ -624,9 +612,28 @@ E($("search"), "input", () => {
 // --- LOAD & GROUP DATA ---
 function loadLocalUI() {
   chrome.storage.local.get([STORAGE_KEY, FOLDERS_KEY, NAMES_KEY], (res) => {
-    allNotesFlat = res[STORAGE_KEY] ? JSON.parse(res[STORAGE_KEY]) : [];
-    sourceNames = res[NAMES_KEY] || {};
+    let stored = res[STORAGE_KEY];
 
+    if (typeof stored === "string") {
+      try {
+        stored = JSON.parse(stored);
+      } catch (e) {
+        stored = [];
+      }
+    }
+
+    allNotesFlat = stored || [];
+    notesById = {};
+    for (let i = 0; i < allNotesFlat.length; i++) {
+      notesById[allNotesFlat[i].id] = allNotesFlat[i];
+    }
+    sourceNames = res[NAMES_KEY] || {};
+    notesByUrl = {};
+
+    for (const note of allNotesFlat) {
+      if (!notesByUrl[note.url]) notesByUrl[note.url] = [];
+      notesByUrl[note.url].push(note);
+    }
     const persistedFolders = res[FOLDERS_KEY] || [];
     const foldersFromNotes = allNotesFlat.map((n) => n.folder).filter(Boolean);
     userFolders = [...new Set([...persistedFolders, ...foldersFromNotes])];
@@ -697,13 +704,15 @@ function renderFoldersSidebar() {
 }
 
 if (typeof chrome !== "undefined" && chrome.storage) {
+  let reloadTimer = null;
   chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace === "local" && changes[STORAGE_KEY]) {
       if (
         !$("modal").classList.contains("on") &&
         $("singlePageView").style.display !== "block"
       ) {
-        loadLocalUI();
+        clearTimeout(reloadTimer);
+        reloadTimer = setTimeout(loadLocalUI, 120);
       }
     }
   });
@@ -777,9 +786,15 @@ async function checkAuthAndSync() {
       }
 
       chrome.storage.local.get(STORAGE_KEY, async (localRes) => {
-        const localNotes = localRes[STORAGE_KEY]
-          ? JSON.parse(localRes[STORAGE_KEY])
-          : [];
+        let localNotes = localRes[STORAGE_KEY] || [];
+
+        if (typeof localNotes === "string") {
+          try {
+            localNotes = JSON.parse(localNotes);
+          } catch (e) {
+            localNotes = [];
+          }
+        }
         if (localNotes.length > 0) {
           try {
             await fetch(`${API_BASE}/api/sync`, {
@@ -823,7 +838,7 @@ async function checkAuthAndSync() {
             }),
           );
           chrome.storage.local.set(
-            { [STORAGE_KEY]: JSON.stringify(flattenedCloudNotes) },
+            { [STORAGE_KEY]: flattenedCloudNotes },
             loadLocalUI,
           );
         }
@@ -850,7 +865,10 @@ E($("loginBtn"), "click", () => {
 window.addEventListener("focus", () => {
   if (!isLoggedIn) checkAuthAndSync();
 });
-window.onload = checkAuthAndSync;
+window.onload = () => {
+  loadLocalUI();
+  checkAuthAndSync();
+};
 
 // --- ADD NOTE MODAL ---
 // Opens the add-note modal pre-filled with context (url/folder).
@@ -925,32 +943,29 @@ async function saveNewNote() {
 
   allNotesFlat.push(newNote);
 
-  chrome.storage.local.set(
-    { [STORAGE_KEY]: JSON.stringify(allNotesFlat) },
-    async () => {
-      closeAddNoteModal();
-      toast("Note added ✓");
+  chrome.storage.local.set({ [STORAGE_KEY]: allNotesFlat }, async () => {
+    closeAddNoteModal();
+    toast("Note added ✓");
 
-      // Refresh the current view
-      if (context.type === "page") {
-        openSpecificPage(newNote.url);
-      } else {
-        openSpecificFolder(context.folderName);
-      }
+    // Refresh the current view
+    if (context.type === "page") {
+      openSpecificPage(newNote.url);
+    } else {
+      openSpecificFolder(context.folderName);
+    }
 
-      // Sync to server if logged in
-      if (isLoggedIn) {
-        try {
-          await fetch(`${API_BASE}/api/sync`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify([newNote]),
-            credentials: "include",
-          });
-        } catch (err) {}
-      }
-    },
-  );
+    // Sync to server if logged in
+    if (isLoggedIn) {
+      try {
+        await fetch(`${API_BASE}/api/sync`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify([newNote]),
+          credentials: "include",
+        });
+      } catch (err) {}
+    }
+  });
 }
 
 E($("cancelAddNote"), "click", closeAddNoteModal);
@@ -971,7 +986,7 @@ function openSpecificPage(targetUrl) {
   $("main").style.display = "none";
   $("singlePageView").style.display = "block";
 
-  const siteNotes = allNotesFlat.filter((n) => n.url === targetUrl);
+  const siteNotes = notesByUrl[targetUrl] || [];
   siteNotes.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
 
   const displayName = getDisplayName(targetUrl);

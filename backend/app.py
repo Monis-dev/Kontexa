@@ -408,5 +408,5 @@ def rename_website():
         
     return jsonify({"error": "Website not found"}), 404
 
-if __name__ == "__main__":
-    app.run(port=5000, debug=True)
+# if __name__ == "__main__":
+#     app.run(port=5000, debug=True)

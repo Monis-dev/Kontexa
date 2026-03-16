@@ -4,7 +4,9 @@ const STORAGE_KEY = "context_notes_data";
 const FOLDERS_KEY = "cn_user_folders";
 const SETTINGS_KEY = "cn_show_highlights";
 const THEME_KEY = "cn_theme";
-const API_BASE = "http://127.0.0.1:5000";
+const API_BASE = "https://context-notes.onrender.com";
+
+let cachedNotes = null;
 
 // ── THEME ENGINE ──
 function applyThemeToPopup(theme) {
@@ -137,16 +139,27 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const result = await chrome.storage.local.get(STORAGE_KEY);
-    const notes = result[STORAGE_KEY] ? JSON.parse(result[STORAGE_KEY]) : [];
+
+    let notes = result[STORAGE_KEY] || [];
+
+    if (typeof notes === "string") {
+      try {
+        notes = JSON.parse(notes);
+      } catch {
+        notes = [];
+      }
+    }
+
     notes.push(noteData);
-    await chrome.storage.local.set({ [STORAGE_KEY]: JSON.stringify(notes) });
+
+    await chrome.storage.local.set({ [STORAGE_KEY]: notes });
 
     // Reset inputs
     noteTitleInput.value = "";
     noteInput.value = "";
     if (folderSelect) folderSelect.value = "";
 
-    window.location.reload();
+    loadPageNotes();
   });
 
   // ── LOAD NOTES FOR CURRENT PAGE ──
@@ -163,9 +176,29 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const result = await chrome.storage.local.get(STORAGE_KEY);
-    let allNotes = result[STORAGE_KEY] ? JSON.parse(result[STORAGE_KEY]) : [];
-    const pageNotes = allNotes.filter((n) => n.url === tab.url);
+    let allNotes = cachedNotes;
+
+    if (!allNotes) {
+      const result = await chrome.storage.local.get(STORAGE_KEY);
+      allNotes = result[STORAGE_KEY] || [];
+      cachedNotes = allNotes;
+    }
+
+    if (typeof allNotes === "string") {
+      try {
+        allNotes = JSON.parse(allNotes);
+      } catch {
+        allNotes = [];
+      }
+    }
+    const notesByUrl = {};
+
+    for (const note of allNotes) {
+      if (!notesByUrl[note.url]) notesByUrl[note.url] = [];
+      notesByUrl[note.url].push(note);
+    }
+
+    const pageNotes = notesByUrl[tab.url] || [];
 
     if (pageNotes.length === 0) {
       notesList.innerHTML =
@@ -176,6 +209,7 @@ document.addEventListener("DOMContentLoaded", () => {
     notesList.innerHTML = "";
     pageNotes
       .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
+      .slice(0, 20)
       .forEach((n) => {
         const card = document.createElement("div");
         card.className = "note-card";
@@ -199,7 +233,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         allNotes = allNotes.filter((n) => n.id !== id);
         await chrome.storage.local.set({
-          [STORAGE_KEY]: JSON.stringify(allNotes),
+          [STORAGE_KEY]: allNotes,
         });
 
         try {
@@ -213,7 +247,7 @@ document.addEventListener("DOMContentLoaded", () => {
           console.log("Server offline, note deleted locally.");
         }
 
-        window.location.reload();
+        loadPageNotes();
       });
     });
 
@@ -238,7 +272,7 @@ document.addEventListener("DOMContentLoaded", () => {
           allNotes[idx].content = newContent;
 
           await chrome.storage.local.set({
-            [STORAGE_KEY]: JSON.stringify(allNotes),
+            [STORAGE_KEY]: allNotes,
           });
 
           try {
@@ -252,7 +286,7 @@ document.addEventListener("DOMContentLoaded", () => {
             console.error("Server is offline, update saved locally only.");
           }
 
-          window.location.reload();
+          loadPageNotes();
         }
       });
     });
@@ -428,16 +462,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (notesToSave.length > 0) {
           // Push to storage ONCE
-          const result = await chrome.storage.local.get(STORAGE_KEY);
-          const currentNotes = result[STORAGE_KEY] ? JSON.parse(result[STORAGE_KEY]) : [];
+          const storage = await chrome.storage.local.get(STORAGE_KEY);
+
+          let currentNotes = storage[STORAGE_KEY] || [];
+
+          if (typeof currentNotes === "string") {
+            try {
+              currentNotes = JSON.parse(currentNotes);
+            } catch {
+              currentNotes = [];
+            }
+          }
+
           const updatedNotes = [...currentNotes, ...notesToSave];
-          
-          await chrome.storage.local.set({ [STORAGE_KEY]: JSON.stringify(updatedNotes) });
+
+          await chrome.storage.local.set({ [STORAGE_KEY]: updatedNotes });
         }
 
         // Clean up UI and instantly reload the popup to show the new notes
         aiNotesContainer.style.display = "none";
-        window.location.reload(); 
+        loadPageNotes(); 
       });
 
       // --- LOGIC: CANCEL ---

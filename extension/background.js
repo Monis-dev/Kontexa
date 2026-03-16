@@ -28,7 +28,7 @@ function getPageMediaData() {
 
 // --- MAIN LOGIC ---
 async function executeContextNoteFlow(tab, explicitSelection = null) {
-  const API_BASE = "http://127.0.0.1:5000"; // Change to production URL later
+  const API_BASE = "https://context-notes.onrender.com"; // Change to production URL later
 
   // 1. Check Auth Status from Server
   let isPro = false;
@@ -198,7 +198,7 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
             domain: window.location.hostname,
             title: title,
             content: desc,
-            selection: selectionText,
+            selection: selectionText.replace(/\s+/g, " ").trim(),
             timestamp: media.timestamp, // Will be null for Free users
             image_data: currentImage || null,
             pinned: false,
@@ -231,9 +231,17 @@ chrome.commands.onCommand.addListener((command) => {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "save_highlight_data") {
     chrome.storage.local.get(STORAGE_KEY, (res) => {
-      const notes = res[STORAGE_KEY] ? JSON.parse(res[STORAGE_KEY]) : [];
+      let notes = res[STORAGE_KEY] || [];
+
+      if (typeof notes === "string") {
+        try {
+          notes = JSON.parse(notes);
+        } catch {
+          notes = [];
+        }
+      }
       notes.push(request.data);
-      chrome.storage.local.set({ [STORAGE_KEY]: JSON.stringify(notes) }, () => {
+      chrome.storage.local.set({ [STORAGE_KEY]: notes }, () => {
         if (sender.tab)
           chrome.tabs.sendMessage(sender.tab.id, {
             action: "refresh_highlights",

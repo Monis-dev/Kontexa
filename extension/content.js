@@ -19,72 +19,53 @@ function removeHighlights() {
 function highlightTextOnPage(searchText, noteTitle) {
   if (!searchText || searchText.length < 2) return;
 
-  const treeWalker = document.createTreeWalker(
+  const walker = document.createTreeWalker(
     document.body,
     NodeFilter.SHOW_TEXT,
     null,
-    false,
   );
-  const nodeList = [];
-  let currentNode = treeWalker.nextNode();
 
-  while (currentNode) {
-    const parentTag = currentNode.parentNode.tagName;
+  const nodes = [];
+  let node;
+
+  while ((node = walker.nextNode())) {
     if (
-      ["SCRIPT", "STYLE", "TEXTAREA", "INPUT", "NOSCRIPT"].indexOf(
-        parentTag,
-      ) === -1
+      node.parentNode &&
+      !["SCRIPT", "STYLE", "TEXTAREA", "INPUT", "NOSCRIPT"].includes(
+        node.parentNode.tagName,
+      )
     ) {
-      nodeList.push(currentNode);
+      nodes.push(node);
     }
-    currentNode = treeWalker.nextNode();
   }
 
-  let totalText = nodeList.map((n) => n.nodeValue).join("");
-  const cleanSearchText = searchText.replace(/\s+/g, " ").trim();
-  const cleanTotalText = totalText.replace(/\s+/g, " ");
+  const search = searchText.trim().toLowerCase();
 
-  let searchIndex = 0;
-  let startIndex = cleanTotalText.indexOf(cleanSearchText, searchIndex);
+  nodes.forEach((textNode) => {
+    const text = textNode.nodeValue.toLowerCase();
+    const index = text.indexOf(search);
 
-  while (startIndex !== -1) {
-    try {
-      if (window.find && window.getSelection) {
-        if (window.find(searchText, false, false, false, false, false, false)) {
-          const sel = window.getSelection();
-          if (sel.rangeCount > 0) {
-            const range = sel.getRangeAt(0);
-            const mark = document.createElement("mark");
-            mark.className = "cn-highlight";
-            mark.style.backgroundColor = "#fde047";
-            mark.style.color = "#92400e";
-            mark.style.borderBottom = "2px solid #f59e0b";
-            mark.title = `ContextNote: ${noteTitle}`;
+    if (index !== -1) {
+      const range = document.createRange();
+      range.setStart(textNode, index);
+      range.setEnd(textNode, index + search.length);
 
-            try {
-              range.surroundContents(mark);
-            } catch (e) {
-              const newNode = document.createElement("mark");
-              newNode.className = "cn-highlight";
-              newNode.style.backgroundColor = "#fde047";
-              newNode.style.color = "#92400e";
-              newNode.style.borderBottom = "2px solid #f59e0b";
-              newNode.title = `ContextNote: ${noteTitle}`;
-              newNode.appendChild(range.extractContents());
-              range.insertNode(newNode);
-            }
-            sel.removeAllRanges();
-          }
-        }
+      const mark = document.createElement("mark");
+      mark.className = "cn-highlight";
+      mark.style.backgroundColor = "#fde047";
+      mark.style.color = "#92400e";
+      mark.style.borderBottom = "2px solid #f59e0b";
+      mark.title = `ContextNote: ${noteTitle}`;
+
+      try {
+        range.surroundContents(mark);
+      } catch {
+        const frag = range.extractContents();
+        mark.appendChild(frag);
+        range.insertNode(mark);
       }
-    } catch (e) {
-      console.log("Highlighting error:", e);
     }
-
-    searchIndex = startIndex + 1;
-    startIndex = cleanTotalText.indexOf(cleanSearchText, searchIndex);
-    if (searchIndex > cleanTotalText.length) break;
-  }
+  });
 }
 
 function initHighlights() {
@@ -103,13 +84,23 @@ function initHighlights() {
         return;
       }
 
-      const allNotes = res[STORAGE_KEY] ? JSON.parse(res[STORAGE_KEY]) : [];
+      let allNotes = res[STORAGE_KEY] || [];
+
+      if (typeof allNotes === "string") {
+        try {
+          allNotes = JSON.parse(allNotes);
+        } catch {
+          allNotes = [];
+        }
+      }
       const currentUrlNotes = allNotes.filter(
-        (n) => n.url === window.location.href,
+        (n) => n.url.split("?")[0] === window.location.href.split("?")[0],
       );
 
       if (currentUrlNotes.length > 0) {
-        currentUrlNotes.sort((a, b) => b.selection.length - a.selection.length);
+        currentUrlNotes
+          .filter((n) => n.selection && n.selection.length > 1)
+          .sort((a, b) => b.selection.length - a.selection.length);
         removeHighlights();
         currentUrlNotes.forEach((note) => {
           highlightTextOnPage(note.selection, note.title);
@@ -189,7 +180,15 @@ function initVideoMarkers() {
 
       if (res["cn_show_highlights"] === false) return; // Already cleaned up above
 
-      const allNotes = res[STORAGE_KEY] ? JSON.parse(res[STORAGE_KEY]) : [];
+      let allNotes = res[STORAGE_KEY] || [];
+
+      if (typeof allNotes === "string") {
+        try {
+          allNotes = JSON.parse(allNotes);
+        } catch {
+          allNotes = [];
+        }
+      }
       const currentVideoId = getYouTubeVideoId(window.location.href);
       if (!currentVideoId) return;
 
