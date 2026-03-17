@@ -215,11 +215,6 @@ const card = (n, dom) => {
   const pinColor = n.pinned ? "#f59e0b" : "currentColor";
   const pinFill = n.pinned ? "#f59e0b" : "none";
 
-  const tagList = n.tags ? n.tags.split(",").map((t) => t.trim()) : [];
-  const tagsHtml = tagList
-    .map((t) => `<span class="tag tag-auto">#${esc(t)}</span>`)
-    .join("");
-
   let mediaHtml = "";
   if (n.timestamp) {
     mediaHtml += `<div style="font-size:11px;background:#eef2ff;color:#4f46e5;padding:2px 6px;border-radius:4px;display:inline-block;margin-bottom:6px;margin-right:4px;border:1px solid #c7d2fe;">⏱️ ${n.timestamp}</div>`;
@@ -236,7 +231,7 @@ const card = (n, dom) => {
     ${sel ? `<div class="chi">"${esc(sel)}"</div>` : ""}
     ${body ? `<div class="cb">${esc(body)}</div>` : ""}
     <div class="card-footer">
-      <div class="ctags"><span class="tag">${esc(dom.slice(0, 22))}</span>${tagsHtml}</div>
+      <div class="ctags"><span class="tag">${esc(dom.slice(0, 22))}</span></div>
       <div class="ca">
         <button class="act btn-pin" title="Pin Note" data-id="${n.id}">
           <svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:${pinColor};fill:${pinFill};stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
@@ -783,8 +778,6 @@ async function checkAuthAndSync() {
       if (isProUserUI) {
         $("createFolderBtn").style.display = "flex";
         $("proBadge").style.display = "inline";
-        console.log("Pro User detected. Starting Smart Tag engine...");
-        setTimeout(processSmartTags, 3000); 
       }
       const planName = user.is_pro ? "Pro Plan" : "Free Plan";
       const statusColor = user.is_pro ? "#4f46e5" : "#64748b";
@@ -943,12 +936,6 @@ async function saveNewNote() {
 
   const context = JSON.parse($("addNoteModal").dataset.context || "{}");
 
-  let autoTags = "";
-  if (isProUserUI) {
-    toast("Generating smart tags...");
-    autoTags = await AIService.generateAutoTags(titleVal, contentVal, "");
-  }
-
   // Build the note object — mirrors the shape used by the extension
   const newNote = {
     id: "dash_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
@@ -969,7 +956,6 @@ async function saveNewNote() {
     pinned: false,
     timestamp: null,
     image_data: null,
-    tags: autoTags,
     createdAt: new Date().toISOString(),
   };
 
@@ -1036,6 +1022,7 @@ function openSpecificPage(targetUrl) {
         <button class="btn" id="addNoteBtn">
           <svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle;margin-right:4px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Note
         </button>
+        <button class="btn pri" id="chatWithAiBtn">💬 Chat with AI</button>
       </div>
     </div>
     <div class="grid wrap" id="pageNoteGrid">
@@ -1059,6 +1046,10 @@ function openSpecificPage(targetUrl) {
       domain: pageDomain,
       displayName,
     });
+  });
+  E($("chatWithAiBtn"), "click", () => {
+    $("aiModal").dataset.context = JSON.stringify(siteNotes);
+    $("aiModal").classList.add("on");
   });
   E($("downloadMdBtn"), "click", () => {
     const lines = [];
@@ -1119,6 +1110,7 @@ function openSpecificFolder(folderName) {
         <button class="btn" id="addNoteBtn">
           <svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle;margin-right:4px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Note
         </button>
+        <button class="btn pri" id="chatWithAiBtn">💬 Chat with AI</button>
       </div>
     </div>
     <div class="grid wrap" id="pageNoteGrid">
@@ -1137,6 +1129,10 @@ function openSpecificFolder(folderName) {
   });
   E($("addNoteBtn"), "click", () => {
     openAddNoteModal({ type: "folder", folderName });
+  });
+  E($("chatWithAiBtn"), "click", () => {
+    $("aiModal").dataset.context = JSON.stringify(folderNotes);
+    $("aiModal").classList.add("on");
   });
   E($("downloadMdBtn"), "click", () => {
     const lines = [];
@@ -1249,14 +1245,11 @@ E($("closeAiBtn"), "click", () => $("aiModal").classList.remove("on"));
 
 let isAiProcessing = false;
 
-// ── CENTRALIZED AI CHAT LOGIC ──
-
 async function handleAiSubmit() {
   if (isAiProcessing) return;
   const input = $("aiInput");
   const sendBtn = $("aiSendBtn");
   const q = input.value.trim();
-  
   if (!q || q === "Thinking..." || q === "Checking permissions...") return;
 
   isAiProcessing = true;
@@ -1265,11 +1258,10 @@ async function handleAiSubmit() {
 
   const chatBox = $("aiChatBox");
   const tempMsgId = "msg-" + Date.now();
-  chatBox.insertAdjacentHTML("beforeend", `<div class="chat-msg chat-user" id="${tempMsgId}">${esc(q)}</div>`);
+  chatBox.insertAdjacentHTML("beforeend",`<div class="chat-msg chat-user" id="${tempMsgId}">${esc(q)}</div>`)
   chatBox.scrollTop = chatBox.scrollHeight;
   input.value = "Checking permissions...";
 
-  // 1. Check Permissions (Pro Tier + API Key)
   const hasAccess = await ProMode.canAccessAI();
   if (!hasAccess) {
     document.getElementById(tempMsgId)?.remove();
@@ -1280,59 +1272,16 @@ async function handleAiSubmit() {
     return;
   }
 
-  input.value = "Searching your notes...";
-
+  input.value = "Thinking...";
   try {
-    // 2. SMART FILTERING: Find top 15 notes based on the question
-    const query = q.toLowerCase();
-    const queryWords = query.split(" ").filter(w => w.length > 3);
-
-    const rankedNotes = allNotesFlat.map(note => {
-      let score = 0;
-      const tags = (note.tags || "").toLowerCase();
-      const title = (note.title || "").toLowerCase();
-      const content = (note.content || "").toLowerCase();
-      const selection = (note.selection || "").toLowerCase();
-
-      // Priority 1: Exact Query match in Tags or Title
-      if (tags.includes(query)) score += 10;
-      if (title.includes(query)) score += 5;
-
-      // Priority 2: Individual keyword matches
-      queryWords.forEach(word => {
-        if (tags.includes(word)) score += 3;
-        if (title.includes(word)) score += 2;
-        if (content.includes(word)) score += 1;
-        if (selection.includes(word)) score += 1;
-      });
-
-      return { note, score };
-    });
-
-    // Sort by score and take the best 15
-    let contextNotes = rankedNotes
-      .filter(rn => rn.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .map(rn => rn.note)
-      .slice(0, 15);
-
-    // Fallback: If no matches, just provide the 15 most recent notes
-    if (contextNotes.length === 0) {
-      contextNotes = allNotesFlat.slice(-15);
-    }
-
-    input.value = "Thinking...";
-
-    // 3. Call AI Service
+    const contextNotes = JSON.parse($("aiModal").dataset.context || "[]");
     const answer = await AIService.chat(q, contextNotes);
-    
-    chatBox.insertAdjacentHTML("beforeend", `<div class="chat-msg chat-ai" style="line-height:1.6">${renderMarkdown(answer)}</div>`);
+    // Use renderMarkdown instead of esc() + plain newline replacement
+    chatBox.insertAdjacentHTML("beforeend", `<div class="chat-msg chat-ai" style="line-height:1.6">${renderMarkdown(answer)}</div>`)
   } catch (e) {
-    console.error("AI Chat Error:", e);
-    chatBox.insertAdjacentHTML("beforeend", `<div class="chat-msg chat-ai">Error: Could not connect to AI.</div>`);
+    chatBox.insertAdjacentHTML("beforeend", `<div class="chat-msg chat-ai">Error: Could not connect to AI.</div>`)
   }
 
-  // 4. Reset UI
   input.value = "";
   input.disabled = false;
   sendBtn.disabled = false;
@@ -1341,14 +1290,6 @@ async function handleAiSubmit() {
   setTimeout(() => input.focus(), 10);
 }
 
-// Global Button Listener
-E($("globalAiBtn"), "click", () => {
-  // Clear the dataset context if you want it to be purely global
-  $("aiModal").dataset.context = ""; 
-  $("aiChatBox").innerHTML = `<div class="chat-msg chat-ai">I've indexed all your research. Ask me anything!</div>`;
-  $("aiModal").classList.add("on");
-});
-
 E($("aiSendBtn"), "click", handleAiSubmit);
 E($("aiInput"), "keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {
@@ -1356,6 +1297,7 @@ E($("aiInput"), "keydown", (e) => {
     handleAiSubmit();
   }
 });
+
 // API Key logic
 E($("closeApiSettingsBtn"), "click", () =>
   $("apiSettingsModal").classList.remove("on"),
@@ -1411,35 +1353,3 @@ document.addEventListener("click", (e) => {
     $("themePanel").classList.remove("on");
   }
 });
-
-// --- AI TAGGING HELPER ---
-async function generateTagsBackground(title, content, selection) {
-  const res = await chrome.storage.local.get(["gemini_key"]);
-  const apiKey = res.gemini_key;
-  if (!apiKey) return "";
-
-  const prompt = `Analyze this research note and provide 3 to 5 highly relevant one-word tags. 
-  Return ONLY the tags separated by commas.
-  Title: ${title}
-  Content: ${content}
-  Highlight: ${selection}`;
-
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.4 },
-        }),
-      }
-    );
-    const data = await response.json();
-    return data.candidates[0].content.parts[0].text.trim();
-  } catch (e) {
-    console.error("Background Tagging Error:", e);
-    return "";
-  }
-}
