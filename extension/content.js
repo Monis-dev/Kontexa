@@ -16,54 +16,73 @@ function removeHighlights() {
   });
 }
 
+// ✅ NEW ADVANCED HIGHLIGHTER (Handles links, spans, and bold text!)
 function highlightTextOnPage(searchText, noteTitle) {
   if (!searchText || searchText.length < 2) return;
 
+  // 1. Get every text node on the page
   const walker = document.createTreeWalker(
     document.body,
     NodeFilter.SHOW_TEXT,
-    null,
+    null
   );
 
-  const nodes = [];
+  const textNodes = [];
+  let fullText = "";
   let node;
 
+  // 2. Build one massive string of the page, keeping track of where each DOM node starts and ends
   while ((node = walker.nextNode())) {
-    if (
-      node.parentNode &&
-      !["SCRIPT", "STYLE", "TEXTAREA", "INPUT", "NOSCRIPT"].includes(
-        node.parentNode.tagName,
-      )
-    ) {
-      nodes.push(node);
+    const parentTag = node.parentNode ? node.parentNode.tagName : "";
+    if (!['SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT', 'NOSCRIPT', 'MARK'].includes(parentTag)) {
+      const start = fullText.length;
+      fullText += node.nodeValue;
+      textNodes.push({ node, start, end: fullText.length });
     }
   }
 
-  const search = searchText.trim().toLowerCase();
+  // 3. Search the massive string using Regex (ignoring HTML whitespace)
+  const search = searchText.trim();
+  const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regexStr = escapedSearch.replace(/\s+/g, '\\s+');
+  const regex = new RegExp(regexStr, 'i');
 
-  nodes.forEach((textNode) => {
-    const text = textNode.nodeValue.toLowerCase();
-    const index = text.indexOf(search);
+  const match = fullText.match(regex);
+  if (!match) return; // Text not found on screen
 
-    if (index !== -1) {
-      const range = document.createRange();
-      range.setStart(textNode, index);
-      range.setEnd(textNode, index + search.length);
+  const matchStart = match.index;
+  const matchEnd = matchStart + match[0].length;
 
-      const mark = document.createElement("mark");
-      mark.className = "cn-highlight";
-      mark.style.backgroundColor = "#fde047";
-      mark.style.color = "#92400e";
-      mark.style.borderBottom = "2px solid #f59e0b";
-      mark.title = `ContextNote: ${noteTitle}`;
+  // 4. Find all the individual DOM nodes that this text spans across
+  const overlappingNodes = textNodes.filter(n => n.end > matchStart && n.start < matchEnd);
 
-      try {
-        range.surroundContents(mark);
-      } catch {
-        const frag = range.extractContents();
-        mark.appendChild(frag);
-        range.insertNode(mark);
-      }
+  // 5. Wrap each overlapping piece in a <mark> tag. 
+  // We go backwards (.reverse) so we don't mess up the character positions of earlier nodes!
+  overlappingNodes.reverse().forEach(n => {
+    // Figure out exactly which part of THIS specific node needs highlighting
+    const relativeStart = Math.max(0, matchStart - n.start);
+    const relativeEnd = Math.min(n.node.nodeValue.length, matchEnd - n.start);
+
+    if (relativeStart >= relativeEnd) return;
+
+    const range = document.createRange();
+    range.setStart(n.node, relativeStart);
+    range.setEnd(n.node, relativeEnd);
+
+    const mark = document.createElement("mark");
+    mark.className = "cn-highlight";
+    mark.style.backgroundColor = "#fde047";
+    mark.style.color = "#92400e";
+    mark.style.borderBottom = "2px solid #f59e0b";
+    mark.title = `ContextNote: ${noteTitle}`;
+
+    try {
+      range.surroundContents(mark);
+    } catch (e) {
+      // If the HTML is incredibly broken, fallback to wrapping the text manually
+      const frag = range.extractContents();
+      mark.appendChild(frag);
+      range.insertNode(mark);
     }
   });
 }
@@ -94,7 +113,7 @@ function initHighlights() {
         }
       }
       const currentUrlNotes = allNotes.filter(
-        (n) => n.url.split("?")[0] === window.location.href.split("?")[0],
+        (n) => n.url.split("#")[0] === window.location.href.split("#")[0],
       );
 
       if (currentUrlNotes.length > 0) {
@@ -291,3 +310,14 @@ try {
     });
   }
 } catch (e) {}
+
+let currentHref = window.location.href;
+setInterval(() => {
+  if (window.location.href !== currentHref) {
+    currentHref = window.location.href;
+    setTimeout(() => {
+      initHighlights();
+      initVideoMarkers();
+    }, 1000); // Give the new page a second to load text
+  }
+}, 1000);

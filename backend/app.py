@@ -52,8 +52,16 @@ STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "whsec_123...")
 PRICE_MONTHLY_ID = os.getenv("STRIPE_PRICE_MONTHLY", "price_123...")
 PRICE_LIFETIME_ID = os.getenv("STRIPE_PRICE_LIFETIME", "price_456...")
 
-CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
-
+CORS(app, supports_credentials=True, resources={
+    r"/*": {
+        "origins": [
+            r"chrome-extension://.*",  # Allows any chrome extension
+            "https://context-notes.onrender.com",
+            "http://127.0.0.1:5000",   # Local dev
+            "http://localhost:5000"
+        ]
+    }
+})
 oauth = OAuth(app)
 
 # --- Models ---
@@ -81,6 +89,7 @@ class Note(db.Model):
     image_data = db.Column(db.Text, nullable=True)
     timestamp = db.Column(db.String(20), nullable=True)
     folder = db.Column(db.String(100), nullable=True)
+    tags = db.Column(db.Text, nullable=True)
     website_id = db.Column(db.Integer, db.ForeignKey('website.id'), nullable=False)
 
 
@@ -332,6 +341,14 @@ def sync_notes():
             db.session.flush()
             sites_cache[note["url"]] = site
 
+        incoming_tags = note.get("tags")
+        if isinstance(incoming_tags, list):
+            parsed_tags = ",".join(str(t) for t in incoming_tags)
+        elif incoming_tags:
+            parsed_tags = str(incoming_tags)
+        else:
+            parsed_tags = ""
+
         new_notes.append(
             Note(
                 local_id=local_id,
@@ -342,6 +359,7 @@ def sync_notes():
                 timestamp=note.get("timestamp", ""),
                 image_data=note.get("image_data", ""),
                 folder=note.get("folder", ""),
+                tags=parsed_tags,
                 website_id=site.id
             )
         )
@@ -366,7 +384,8 @@ def get_notes():
             "notes": [{
                 "id": n.local_id, "title": n.title, "content": n.content, 
                 "selection": n.selection, "pinned": n.pinned,
-                "timestamp": n.timestamp, "folder":n.folder,"image_data": n.image_data
+                "timestamp": n.timestamp, "folder":n.folder,"image_data": n.image_data,
+                "tags": n.tags.split(",") if n.tags else []
             } for n in s.notes]
         })
     return jsonify(result)

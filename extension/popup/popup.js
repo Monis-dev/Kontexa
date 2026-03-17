@@ -133,6 +133,7 @@ function setupSaveButton() {
   if (!saveBtn) return;
 
   saveBtn.addEventListener("click", async () => {
+    saveBtn.disabled = true;
     const titleInput = document.getElementById("noteTitle");
     const contentInput = document.getElementById("noteInput");
     const folderSelect = document.getElementById("folderSelect");
@@ -177,6 +178,8 @@ function setupSaveButton() {
 
     rebuildNotesCache(notes);
     loadPageNotes();
+
+    saveBtn.disabled = false;
   });
 }
 
@@ -248,7 +251,7 @@ function setupEditDeleteHandler() {
       const id = deleteBtn.dataset.id;
 
       let notes = await getNotes();
-      notes = notes.filter((n) => n.id !== id);
+      notes = notes.filter((n) => String(n.id) !== String(id));
 
       cachedNotes = notes;
       rebuildNotesCache(notes);
@@ -270,7 +273,7 @@ function setupEditDeleteHandler() {
 
       let notes = await getNotes();
 
-      const note = notes.find((n) => n.id === id);
+      const note = notes.find((n) => String(n.id) === String(id));
       if (!note) return;
 
       note.title = title.trim() || "Untitled";
@@ -320,7 +323,6 @@ const esc = (s) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
-
 
 // ── AI: SUMMARIZE PAGE INTO NOTES ──
 document.addEventListener("DOMContentLoaded", () => {
@@ -465,7 +467,12 @@ document.addEventListener("DOMContentLoaded", () => {
           const chk = document.getElementById(`ai-chk-${idx}`);
           if (chk && chk.checked) {
             notesToSave.push({
-              id: Date.now().toString() + "-" + Math.floor(Math.random() * 1000) + "-" + idx,
+              id:
+                Date.now().toString() +
+                "-" +
+                Math.floor(Math.random() * 1000) +
+                "-" +
+                idx,
               url: tab.url,
               domain: new URL(tab.url).hostname || "Unknown Domain",
               title: "✨ " + (n.title || "AI Concept"),
@@ -473,7 +480,7 @@ document.addEventListener("DOMContentLoaded", () => {
               selection: "",
               pinned: false,
               folder: null,
-              timestamp: null
+              timestamp: null,
             });
           }
         });
@@ -495,14 +502,13 @@ document.addEventListener("DOMContentLoaded", () => {
           const updatedNotes = [...currentNotes, ...notesToSave];
 
           cachedNotes = updatedNotes;
-          notesByUrlCache = null;
-
+          rebuildNotesCache(updatedNotes); // ⬅️ FIX: Rebuild the cache immediately
           await chrome.storage.local.set({ [STORAGE_KEY]: updatedNotes });
         }
 
         // Clean up UI and instantly reload the popup to show the new notes
         aiNotesContainer.style.display = "none";
-        loadPageNotes(); 
+        loadPageNotes();
       });
 
       // --- LOGIC: CANCEL ---

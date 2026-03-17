@@ -61,7 +61,10 @@ const AIService = {
       }
 
       const data = await response.json();
-      return data.candidates[0].content.parts[0].text;
+      const answer = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!answer)
+        return "⚠️ AI blocked this request due to safety guidelines or an empty response.";
+      return answer;
     } catch (error) {
       console.error("AI Service Error:", error);
       return "Connection error. Please check your internet connection and API key.";
@@ -116,8 +119,8 @@ const AIService = {
       if (!response.ok) return null;
 
       const data = await response.json();
-      let rawText = data.candidates[0].content.parts[0].text;
-
+      let rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!rawText) return null;
       // Clean up markdown in case the AI ignores the "no markdown" rule
       rawText = rawText
         .replace(/```json/gi, "")
@@ -128,6 +131,50 @@ const AIService = {
     } catch (error) {
       console.error("AI Generation Error:", error);
       return null;
+    }
+  },
+  async generateTags(noteText) {
+    const res = await chrome.storage.local.get(["gemini_key"]);
+    const apiKey = res.gemini_key;
+
+    if (!apiKey) return [];
+
+    const prompt = `
+Generate 3-5 topic tags for the note.
+
+Rules:
+- lowercase
+- 1-2 words
+- return JSON array only
+
+Example:
+["javascript","react","frontend"]
+
+Note:
+${noteText}
+`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.MODEL_NAME}:generateContent?key=${apiKey}`;
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.2 },
+        }),
+      });
+
+      const data = await response.json();
+      let text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) return [];
+      text = text.replace(/```json|```/g, "").trim();
+
+      return JSON.parse(text);
+    } catch (e) {
+      console.error("Tag generation error", e);
+      return [];
     }
   },
 };

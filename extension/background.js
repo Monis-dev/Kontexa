@@ -1,3 +1,4 @@
+importScripts("ai_service.js");
 const STORAGE_KEY = "context_notes_data";
 const FOLDERS_KEY = "cn_user_folders";
 
@@ -240,13 +241,42 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           notes = [];
         }
       }
-      notes.push(request.data);
-      chrome.storage.local.set({ [STORAGE_KEY]: notes }, () => {
-        if (sender.tab)
-          chrome.tabs.sendMessage(sender.tab.id, {
-            action: "refresh_highlights",
-          });
-      });
+      (async () => {
+        let note = request.data;
+
+        try {
+          const noteText =
+            (note.title || "") +
+            " " +
+            (note.content || "") +
+            " " +
+            (note.selection || "");
+
+          const tags = await AIService.generateTags(noteText);
+
+          note.tags = tags;
+        } catch (e) {
+          console.warn("Tag generation failed");
+          note.tags = [];
+        }
+
+        notes.push(note);
+
+        chrome.storage.local.set({ [STORAGE_KEY]: notes }, () => {
+          if (sender.tab && sender.tab.id) {
+            chrome.tabs.sendMessage(
+              sender.tab.id,
+              { action: "refresh_highlights" },
+              () => {
+                // This swallows the harmless error if the page isn't ready to receive messages
+                if (chrome.runtime.lastError) {
+                  /* ignore */
+                }
+              },
+            );
+          }
+        });
+      })();
     });
   }
   if (request.action === "capture_screenshot") {

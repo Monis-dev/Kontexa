@@ -11,7 +11,7 @@ let isProUserUI = false;
 let notesById = {};
 let notesByUrl = {};
 let sectionCache = [];
-let folderCounts = {}; 
+let folderCounts = {};
 
 const $ = (id) => document.getElementById(id);
 const E = (el, ev, fn) => {
@@ -231,7 +231,10 @@ const card = (n, dom) => {
     ${sel ? `<div class="chi">"${esc(sel)}"</div>` : ""}
     ${body ? `<div class="cb">${esc(body)}</div>` : ""}
     <div class="card-footer">
-      <div class="ctags"><span class="tag">${esc(dom.slice(0, 22))}</span></div>
+      <div class="ctags">
+      <span class="tag">${esc(dom.slice(0, 22))}</span>
+      ${(n.tags || []).map((t) => `<span class="tag">#${esc(t)}</span>`).join("")}
+    </div>
       <div class="ca">
         <button class="act btn-pin" title="Pin Note" data-id="${n.id}">
           <svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:${pinColor};fill:${pinFill};stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
@@ -249,7 +252,6 @@ const card = (n, dom) => {
     </div>
   </div>`;
 };
-
 
 // --- RENDER MAIN DASHBOARD ---
 function render(urlGroups, folderGroups) {
@@ -476,7 +478,7 @@ document.addEventListener("click", (e) => {
 
   if (pinBtn) {
     const id = pinBtn.dataset.id;
-    const idx = allNotesFlat.findIndex((n) => n.id === id);
+    const idx = allNotesFlat.findIndex((n) => String(n.id) === String(id));
     if (idx > -1) {
       allNotesFlat[idx].pinned = !allNotesFlat[idx].pinned;
       chrome.storage.local.set({ [STORAGE_KEY]: allNotesFlat }, async () => {
@@ -509,7 +511,7 @@ document.addEventListener("click", (e) => {
     const id = delBtn.dataset.id;
     if (!confirm("Delete this note?")) return;
     const url = allNotesFlat.find((n) => n.id === id)?.url;
-    allNotesFlat = allNotesFlat.filter((n) => n.id !== id);
+    allNotesFlat = allNotesFlat.filter((n) => String(n.id) !== String(id));
     chrome.storage.local.set({ [STORAGE_KEY]: allNotesFlat }, async () => {
       toast("Note deleted");
       if ($("singlePageView").style.display === "block" && url)
@@ -626,7 +628,10 @@ function loadLocalUI() {
       }
     }
 
-    allNotesFlat = stored || [];
+    allNotesFlat = (stored || []).map((n) => ({
+      ...n,
+      tags: n.tags || [],
+    }));
     notesById = Object.fromEntries(allNotesFlat.map((n) => [n.id, n]));
     sourceNames = res[NAMES_KEY] || {};
 
@@ -959,30 +964,42 @@ async function saveNewNote() {
     createdAt: new Date().toISOString(),
   };
 
-  allNotesFlat.push(newNote);
-
-  chrome.storage.local.set({ [STORAGE_KEY]: allNotesFlat }, async () => {
-    closeAddNoteModal();
-    toast("Note added ✓");
-
-    // Refresh the current view
-    if (context.type === "page") {
-      openSpecificPage(newNote.url);
-    } else {
-      openSpecificFolder(context.folderName);
-    }
-
-    // Sync to server if logged in
-    if (isLoggedIn) {
+  chrome.storage.local.get([STORAGE_KEY], (res) => {
+    let latestNotes = res[STORAGE_KEY] || [];
+    if (typeof latestNotes === "string") {
       try {
-        await fetch(`${API_BASE}/api/sync`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify([newNote]),
-          credentials: "include",
-        });
-      } catch (err) {}
+        latestNotes = JSON.parse(latestNotes);
+      } catch (e) {
+        latestNotes = [];
+      }
     }
+
+    latestNotes.push(newNote);
+    allNotesFlat = latestNotes; // Update global state
+
+    chrome.storage.local.set({ [STORAGE_KEY]: allNotesFlat }, async () => {
+      closeAddNoteModal();
+      toast("Note added ✓");
+
+      // Refresh the current view
+      if (context.type === "page") {
+        openSpecificPage(newNote.url);
+      } else {
+        openSpecificFolder(context.folderName);
+      }
+
+      // Sync to server if logged in
+      if (isLoggedIn) {
+        try {
+          await fetch(`${API_BASE}/api/sync`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify([newNote]),
+            credentials: "include",
+          });
+        } catch (err) {}
+      }
+    });
   });
 }
 
@@ -1022,7 +1039,6 @@ function openSpecificPage(targetUrl) {
         <button class="btn" id="addNoteBtn">
           <svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle;margin-right:4px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Note
         </button>
-        <button class="btn pri" id="chatWithAiBtn">💬 Chat with AI</button>
       </div>
     </div>
     <div class="grid wrap" id="pageNoteGrid">
@@ -1046,10 +1062,6 @@ function openSpecificPage(targetUrl) {
       domain: pageDomain,
       displayName,
     });
-  });
-  E($("chatWithAiBtn"), "click", () => {
-    $("aiModal").dataset.context = JSON.stringify(siteNotes);
-    $("aiModal").classList.add("on");
   });
   E($("downloadMdBtn"), "click", () => {
     const lines = [];
@@ -1110,7 +1122,6 @@ function openSpecificFolder(folderName) {
         <button class="btn" id="addNoteBtn">
           <svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle;margin-right:4px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Note
         </button>
-        <button class="btn pri" id="chatWithAiBtn">💬 Chat with AI</button>
       </div>
     </div>
     <div class="grid wrap" id="pageNoteGrid">
@@ -1129,10 +1140,6 @@ function openSpecificFolder(folderName) {
   });
   E($("addNoteBtn"), "click", () => {
     openAddNoteModal({ type: "folder", folderName });
-  });
-  E($("chatWithAiBtn"), "click", () => {
-    $("aiModal").dataset.context = JSON.stringify(folderNotes);
-    $("aiModal").classList.add("on");
   });
   E($("downloadMdBtn"), "click", () => {
     const lines = [];
@@ -1238,6 +1245,9 @@ function renderMarkdown(text) {
 
 // AI logic
 E($("aiBtn"), "click", () => {
+  $("aiChatBox").innerHTML =
+    '<div class="chat-msg chat-ai">Ask me anything about your saved notes.</div>';
+
   $("aiModal").dataset.context = JSON.stringify(allNotesFlat);
   $("aiModal").classList.add("on");
 });
@@ -1258,7 +1268,10 @@ async function handleAiSubmit() {
 
   const chatBox = $("aiChatBox");
   const tempMsgId = "msg-" + Date.now();
-  chatBox.insertAdjacentHTML("beforeend",`<div class="chat-msg chat-user" id="${tempMsgId}">${esc(q)}</div>`)
+  chatBox.insertAdjacentHTML(
+    "beforeend",
+    `<div class="chat-msg chat-user" id="${tempMsgId}">${esc(q)}</div>`,
+  );
   chatBox.scrollTop = chatBox.scrollHeight;
   input.value = "Checking permissions...";
 
@@ -1277,9 +1290,15 @@ async function handleAiSubmit() {
     const contextNotes = JSON.parse($("aiModal").dataset.context || "[]");
     const answer = await AIService.chat(q, contextNotes);
     // Use renderMarkdown instead of esc() + plain newline replacement
-    chatBox.insertAdjacentHTML("beforeend", `<div class="chat-msg chat-ai" style="line-height:1.6">${renderMarkdown(answer)}</div>`)
+    chatBox.insertAdjacentHTML(
+      "beforeend",
+      `<div class="chat-msg chat-ai" style="line-height:1.6">${renderMarkdown(answer)}</div>`,
+    );
   } catch (e) {
-    chatBox.insertAdjacentHTML("beforeend", `<div class="chat-msg chat-ai">Error: Could not connect to AI.</div>`)
+    chatBox.insertAdjacentHTML(
+      "beforeend",
+      `<div class="chat-msg chat-ai">Error: Could not connect to AI.</div>`,
+    );
   }
 
   input.value = "";
