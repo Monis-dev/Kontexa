@@ -228,35 +228,59 @@ chrome.commands.onCommand.addListener((command) => {
 });
 
 // Message Hub
+// Updated Message Hub
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "save_highlight_data") {
-    chrome.storage.local.get(STORAGE_KEY, (res) => {
-      let notes = res[STORAGE_KEY] || [];
+    
+    // We use an immediately invoked async function to handle the tagging
+    (async () => {
+      let noteData = request.data;
 
-      if (typeof notes === "string") {
-        try {
-          notes = JSON.parse(notes);
-        } catch {
-          notes = [];
+      // 1. Check if user is Pro (Only Pro users get Auto-Tags)
+      // We ping the server to be 100% sure of the status
+      const API_BASE = "https://context-notes.onrender.com";
+      try {
+        const authRes = await fetch(`${API_BASE}/api/me`, { credentials: "include" });
+        if (authRes.ok) {
+          const user = await authRes.json();
+          if (user.is_pro) {
+            // 2. TRIGGER TAGGING ONLY FOR THIS NEW NOTE
+            const autoTags = await generateTagsBackground(noteData.title, noteData.content, noteData.selection);
+            noteData.tags = autoTags;
+          }
         }
+      } catch (e) {
+        console.warn("Auth check failed during save, skipping tags.");
       }
-      notes.push(request.data);
-      chrome.storage.local.set({ [STORAGE_KEY]: notes }, () => {
-        if (sender.tab)
-          chrome.tabs.sendMessage(sender.tab.id, {
-            action: "refresh_highlights",
-          });
+
+      // 3. Save the note (now with tags) to local storage
+      chrome.storage.local.get(STORAGE_KEY, (res) => {
+        let notes = res[STORAGE_KEY] || [];
+        if (typeof notes === "string") {
+          try { notes = JSON.parse(notes); } catch { notes = []; }
+        }
+        
+        notes.push(noteData);
+        
+        chrome.storage.local.set({ [STORAGE_KEY]: notes }, () => {
+          // Notify the tab to refresh highlights
+          if (sender.tab) {
+            chrome.tabs.sendMessage(sender.tab.id, { action: "refresh_highlights" });
+          }
+        });
       });
-    });
+    })();
+
+    return true; // Keep channel open for async
   }
+
+  // ... keep your capture_screenshot logic below ...
   if (request.action === "capture_screenshot") {
-    chrome.tabs.captureVisibleTab(
-      null,
-      { format: "jpeg", quality: 60 },
-      (dataUrl) => {
-        sendResponse({ data: dataUrl });
-      },
-    );
+    chrome.tabs.captureVisibleTab(null, { format: "jpeg", quality: 60 }, (dataUrl) => {
+      sendResponse({ data: dataUrl });
+    });
     return true;
   }
 });
+
+

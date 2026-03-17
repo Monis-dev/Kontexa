@@ -1,5 +1,3 @@
-// popup.js — ContextNote Extension Popup
-
 const STORAGE_KEY = "context_notes_data";
 const FOLDERS_KEY = "cn_user_folders";
 const SETTINGS_KEY = "cn_show_highlights";
@@ -7,6 +5,7 @@ const THEME_KEY = "cn_theme";
 const API_BASE = "https://context-notes.onrender.com";
 
 let cachedNotes = null;
+let notesByUrlCache = null;
 
 // ── THEME ENGINE ──
 function applyThemeToPopup(theme) {
@@ -54,65 +53,93 @@ function loadFolderDropdown() {
 }
 
 // ── MAIN ──
-document.addEventListener("DOMContentLoaded", () => {
-  // Load folder dropdown on open
-  loadFolderDropdown();
+document.addEventListener("DOMContentLoaded", initPopup);
 
-  // ── HIGHLIGHT TOGGLE ──
+async function initPopup() {
+  loadFolderDropdown();
+  setupHighlightToggle();
+  setupPopupButtons();
+  setupSaveButton();
+  setupEditDeleteHandler();
+  await loadPageNotes();
+}
+
+//
+// ───────── HIGHLIGHT TOGGLE ─────────
+//
+function setupHighlightToggle() {
   const toggleEl = document.getElementById("highlightToggle");
-  if (toggleEl) {
-    chrome.storage.local.get(SETTINGS_KEY, (res) => {
-      toggleEl.checked = res[SETTINGS_KEY] !== false;
+  if (!toggleEl) return;
+
+  chrome.storage.local.get(SETTINGS_KEY, (res) => {
+    toggleEl.checked = res[SETTINGS_KEY] !== false;
+  });
+
+  toggleEl.addEventListener("change", async () => {
+    const enabled = toggleEl.checked;
+
+    await chrome.storage.local.set({ [SETTINGS_KEY]: enabled });
+
+    const [tab] = await chrome.tabs.query({
+      active: true,
+      currentWindow: true,
     });
 
-    toggleEl.addEventListener("change", async () => {
-      const isEnabled = toggleEl.checked;
-      await chrome.storage.local.set({ [SETTINGS_KEY]: isEnabled });
-      const [tab] = await chrome.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-      if (tab && tab.id) {
-        chrome.tabs
-          .sendMessage(tab.id, {
-            action: isEnabled ? "refresh_highlights" : "remove_highlights",
-          })
-          .catch(() => {});
-      }
+    if (!tab?.id) return;
+
+    chrome.tabs
+      .sendMessage(tab.id, {
+        action: enabled ? "refresh_highlights" : "remove_highlights",
+      })
+      .catch(() => {});
+  });
+}
+
+//
+// ───────── POPUP BUTTONS ─────────
+//
+function setupPopupButtons() {
+  const popOutBtn = document.getElementById("popOutBtn");
+  const dashBtn = document.getElementById("openDashboard");
+
+  if (popOutBtn) {
+    popOutBtn.addEventListener("click", () => {
+      chrome.windows.create(
+        {
+          url: chrome.runtime.getURL("popup.html"),
+          type: "popup",
+          width: 360,
+          height: 650,
+        },
+        () => window.close(),
+      );
     });
   }
 
-  // ── POP OUT ──
-  document.getElementById("popOutBtn").addEventListener("click", () => {
-    chrome.windows.create(
-      {
-        url: chrome.runtime.getURL("popup.html"),
-        type: "popup",
-        width: 360,
-        height: 650,
-      },
-      (win) => {
-        if (win) window.close();
-      },
-    );
-  });
-
-  // ── OPEN DASHBOARD ──
-  document.getElementById("openDashboard").addEventListener("click", () => {
-    chrome.tabs.create({
-      url: chrome.runtime.getURL("dashboard/dashboard.html"),
+  if (dashBtn) {
+    dashBtn.addEventListener("click", () => {
+      chrome.tabs.create({
+        url: chrome.runtime.getURL("dashboard/dashboard.html"),
+      });
     });
-  });
+  }
+}
 
-  // ── SAVE NOTE ──
-  document.getElementById("saveBtn").addEventListener("click", async () => {
-    const noteTitleInput = document.getElementById("noteTitle");
-    const noteInput = document.getElementById("noteInput");
+//
+// ───────── SAVE NOTE ─────────
+//
+function setupSaveButton() {
+  const saveBtn = document.getElementById("saveBtn");
+  if (!saveBtn) return;
+
+  saveBtn.addEventListener("click", async () => {
+    const titleInput = document.getElementById("noteTitle");
+    const contentInput = document.getElementById("noteInput");
     const folderSelect = document.getElementById("folderSelect");
 
-    const title = noteTitleInput.value.trim() || "Untitled";
-    const content = noteInput.value.trim();
-    const selectedFolder = folderSelect ? folderSelect.value : "";
+    const title = titleInput.value.trim() || "Untitled";
+    const content = contentInput.value.trim();
+    const folder = folderSelect?.value || null;
 
     if (!content && title === "Untitled") return;
 
@@ -121,180 +148,171 @@ document.addEventListener("DOMContentLoaded", () => {
       currentWindow: true,
     });
 
-    if (!tab || !tab.url) {
-      alert("Cannot save note on this specific page.");
+    if (!tab?.url) {
+      alert("Cannot save note on this page.");
       return;
     }
 
-    const noteData = {
+    const note = {
       id: Date.now().toString(),
       url: tab.url,
-      domain: new URL(tab.url).hostname || "Unknown Domain",
+      domain: new URL(tab.url).hostname || "Unknown",
       title,
       content,
       selection: "",
       pinned: false,
-      // Save folder if one was selected, otherwise null
-      folder: selectedFolder || null,
+      folder,
     };
 
-    const result = await chrome.storage.local.get(STORAGE_KEY);
+    let notes = await getNotes();
 
-    let notes = result[STORAGE_KEY] || [];
-
-    if (typeof notes === "string") {
-      try {
-        notes = JSON.parse(notes);
-      } catch {
-        notes = [];
-      }
-    }
-
-    notes.push(noteData);
+    notes.push(note);
+    cachedNotes = notes;
 
     await chrome.storage.local.set({ [STORAGE_KEY]: notes });
 
-    // Reset inputs
-    noteTitleInput.value = "";
-    noteInput.value = "";
+    titleInput.value = "";
+    contentInput.value = "";
     if (folderSelect) folderSelect.value = "";
 
+    rebuildNotesCache(notes);
     loadPageNotes();
   });
+}
 
-  // ── LOAD NOTES FOR CURRENT PAGE ──
-  async function loadPageNotes() {
-    const notesList = document.getElementById("notesList");
-    const [tab] = await chrome.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
+//
+// ───────── LOAD PAGE NOTES ─────────
+//
+async function loadPageNotes() {
+  const notesList = document.getElementById("notesList");
 
-    if (!tab || !tab.url) {
-      notesList.innerHTML =
-        '<div class="empty-state">Cannot read notes on this page.</div>';
-      return;
-    }
+  const [tab] = await chrome.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
 
-    let allNotes = cachedNotes;
-
-    if (!allNotes) {
-      const result = await chrome.storage.local.get(STORAGE_KEY);
-      allNotes = result[STORAGE_KEY] || [];
-      cachedNotes = allNotes;
-    }
-
-    if (typeof allNotes === "string") {
-      try {
-        allNotes = JSON.parse(allNotes);
-      } catch {
-        allNotes = [];
-      }
-    }
-    const notesByUrl = {};
-
-    for (const note of allNotes) {
-      if (!notesByUrl[note.url]) notesByUrl[note.url] = [];
-      notesByUrl[note.url].push(note);
-    }
-
-    const pageNotes = notesByUrl[tab.url] || [];
-
-    if (pageNotes.length === 0) {
-      notesList.innerHTML =
-        '<div class="empty-state">No notes for this page.</div>';
-      return;
-    }
-
-    notesList.innerHTML = "";
-    pageNotes
-      .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
-      .slice(0, 20)
-      .forEach((n) => {
-        const card = document.createElement("div");
-        card.className = "note-card";
-        card.innerHTML = `
-          <button class="btn-edit" data-id="${n.id}"
-            data-title="${n.title.replace(/"/g, "&quot;")}"
-            data-content="${(n.content || "").replace(/"/g, "&quot;")}">✎</button>
-          <button class="btn-delete" data-id="${n.id}">&times;</button>
-          <div class="note-title">${n.pinned ? "⭐ " : ""}${n.title.replace(/</g, "&lt;")}${n.folder ? ` <span class="note-folder-tag">${n.folder.replace(/</g, "&lt;")}</span>` : ""}</div>
-          ${n.selection ? `<div class="context">"${n.selection.replace(/</g, "&lt;")}"</div>` : ""}
-          ${n.content ? `<div class="content">${n.content.replace(/</g, "&lt;")}</div>` : ""}
-        `;
-        notesList.appendChild(card);
-      });
-
-    // Delete
-    document.querySelectorAll(".btn-delete").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
-        const id = e.target.getAttribute("data-id");
-        if (!confirm("Delete this note?")) return;
-
-        allNotes = allNotes.filter((n) => n.id !== id);
-        await chrome.storage.local.set({
-          [STORAGE_KEY]: allNotes,
-        });
-
-        try {
-          const res = await fetch(`${API_BASE}/api/notes/${id}`, {
-            method: "DELETE",
-            credentials: "include",
-          });
-          if (!res.ok)
-            console.warn("Note deleted locally, but sync to cloud failed.");
-        } catch (e) {
-          console.log("Server offline, note deleted locally.");
-        }
-
-        loadPageNotes();
-      });
-    });
-
-    // Edit
-    document.querySelectorAll(".btn-edit").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
-        const id = e.target.getAttribute("data-id");
-        const newTitle = prompt(
-          "Edit Heading:",
-          e.target.getAttribute("data-title"),
-        );
-        if (newTitle === null) return;
-        const newContent = prompt(
-          "Edit Description:",
-          e.target.getAttribute("data-content"),
-        );
-        if (newContent === null) return;
-
-        const idx = allNotes.findIndex((n) => n.id === id);
-        if (idx > -1) {
-          allNotes[idx].title = newTitle;
-          allNotes[idx].content = newContent;
-
-          await chrome.storage.local.set({
-            [STORAGE_KEY]: allNotes,
-          });
-
-          try {
-            await fetch(`${API_BASE}/api/notes/${id}`, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ title: newTitle, content: newContent }),
-              credentials: "include",
-            });
-          } catch (err) {
-            console.error("Server is offline, update saved locally only.");
-          }
-
-          loadPageNotes();
-        }
-      });
-    });
+  if (!tab?.url) {
+    notesList.innerHTML =
+      '<div class="empty-state">Cannot read notes on this page.</div>';
+    return;
   }
 
-  loadPageNotes();
-});
+  if (!cachedNotes) {
+    cachedNotes = await getNotes();
+    rebuildNotesCache(cachedNotes);
+  }
 
+  const pageNotes = notesByUrlCache[tab.url] || [];
+
+  if (!pageNotes.length) {
+    notesList.innerHTML =
+      '<div class="empty-state">No notes for this page.</div>';
+    return;
+  }
+
+  notesList.innerHTML = "";
+
+  pageNotes
+    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
+    .slice(0, 20)
+    .forEach((n) => {
+      const card = document.createElement("div");
+
+      card.className = "note-card";
+      card.innerHTML = `
+        <button class="btn-edit" data-id="${n.id}" data-title="${esc(n.title)}" data-content="${esc(n.content)}">✎</button>
+        <button class="btn-delete" data-id="${n.id}">&times;</button>
+
+        <div class="note-title">
+          ${n.pinned ? "⭐ " : ""}${esc(n.title)}
+          ${n.folder ? `<span class="note-folder-tag">${esc(n.folder)}</span>` : ""}
+        </div>
+
+        ${n.selection ? `<div class="context">"${esc(n.selection)}"</div>` : ""}
+        ${n.content ? `<div class="content">${esc(n.content)}</div>` : ""}
+      `;
+
+      notesList.appendChild(card);
+    });
+}
+
+//
+// ───────── EDIT / DELETE HANDLER ─────────
+//
+function setupEditDeleteHandler() {
+  document.addEventListener("click", async (e) => {
+    const deleteBtn = e.target.closest(".btn-delete");
+    const editBtn = e.target.closest(".btn-edit");
+
+    if (deleteBtn) {
+      const id = deleteBtn.dataset.id;
+
+      let notes = await getNotes();
+      notes = notes.filter((n) => n.id !== id);
+
+      cachedNotes = notes;
+      rebuildNotesCache(notes);
+
+      await chrome.storage.local.set({ [STORAGE_KEY]: notes });
+
+      loadPageNotes();
+      return;
+    }
+
+    if (editBtn) {
+      const id = editBtn.dataset.id;
+
+      const title = prompt("Edit title:", editBtn.dataset.title);
+      if (title === null) return;
+
+      const content = prompt("Edit content:", editBtn.dataset.content);
+      if (content === null) return;
+
+      let notes = await getNotes();
+
+      const note = notes.find((n) => n.id === id);
+      if (!note) return;
+
+      note.title = title.trim() || "Untitled";
+      note.content = content.trim();
+
+      cachedNotes = notes;
+      rebuildNotesCache(notes);
+
+      await chrome.storage.local.set({ [STORAGE_KEY]: notes });
+
+      loadPageNotes();
+    }
+  });
+}
+
+//
+// ───────── HELPERS ─────────
+//
+async function getNotes() {
+  const res = await chrome.storage.local.get(STORAGE_KEY);
+
+  let notes = res[STORAGE_KEY] || [];
+
+  if (typeof notes === "string") {
+    try {
+      notes = JSON.parse(notes);
+    } catch {
+      notes = [];
+    }
+  }
+
+  return notes;
+}
+
+function rebuildNotesCache(notes) {
+  notesByUrlCache = {};
+
+  for (const n of notes) {
+    if (!notesByUrlCache[n.url]) notesByUrlCache[n.url] = [];
+    notesByUrlCache[n.url].push(n);
+  }
+}
 const esc = (s) =>
   String(s || "")
     .replace(/&/g, "&amp;")
@@ -344,7 +362,7 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         const results = await chrome.scripting.executeScript({
           target: { tabId: tab.id },
-          func: () => document.body.innerText,
+          func: () => document.body.textContent,
         });
         pageText = results[0]?.result || "";
       } catch (e) {
@@ -475,6 +493,9 @@ document.addEventListener("DOMContentLoaded", () => {
           }
 
           const updatedNotes = [...currentNotes, ...notesToSave];
+
+          cachedNotes = updatedNotes;
+          notesByUrlCache = null;
 
           await chrome.storage.local.set({ [STORAGE_KEY]: updatedNotes });
         }

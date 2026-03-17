@@ -9,10 +9,12 @@ const AIService = {
     if (!apiKey) throw new Error("API_KEY_MISSING");
 
     // 1. Cleanly format the notes so the AI isn't confused by empty fields
+    // 1. Cleanly format the notes including Tags
     const notesText = contextNotes
       .map((n, i) => {
         let parts = [`--- Note ${i + 1} ---`];
         if (n.title) parts.push(`Page Title: ${n.title}`);
+        if (n.tags) parts.push(`Tags: ${n.tags}`); // Added Tags to context
         if (n.selection) parts.push(`Highlighted Text: ${n.selection}`);
         if (n.content) parts.push(`User's Written Note: ${n.content}`);
         return parts.join("\n");
@@ -20,12 +22,12 @@ const AIService = {
       .join("\n\n");
 
     // 2. Stronger System Prompt
-    const systemPrompt = `You are an expert research assistant. Your ONLY source of knowledge is the user's notes provided below. 
-    These notes contain webpage titles, text the user highlighted from websites, and their own written comments.
+    const systemPrompt = `You are an expert research assistant. Your ONLY source of knowledge is the user's research notes provided below. 
+    I have filtered the 15 most relevant notes from the user's entire library based on their question.
     
     INSTRUCTIONS:
-    1. Read ALL the provided notes carefully.
-    2. Answer the user's question by synthesizing information from the Titles, Highlighted Text, and Written Notes. Treat this data as absolute truth.
+    1. Read ALL the provided notes carefully, paying attention to the Tags and Titles.
+    2. Answer the user's question by synthesizing information from the Titles, Tags, Highlights, and Written Notes. Treat this data as absolute truth.
     3. If the answer can be reasonably inferred or pieced together from any part of the notes, provide a detailed and helpful answer.
     4. Only if the topic is completely absent from the notes, reply strictly with: "I don't have enough information in your notes to answer that."
 
@@ -128,6 +130,39 @@ const AIService = {
     } catch (error) {
       console.error("AI Generation Error:", error);
       return null;
+    }
+  },
+
+  async generateAutoTags(title, content, selection) {
+    const res = await chrome.storage.local.get(["gemini_key"]);
+    if (!res.gemini_key) return "";
+
+    const prompt = `Analyze this research note and provide 3 to 5 relevant one-word tags. Return ONLY the tags separated by commas.
+    Title: ${title} | Content: ${content} | Highlight: ${selection}`;
+
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${this.MODEL_NAME}:generateContent?key=${res.gemini_key}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.4 },
+          }),
+        },
+      );
+
+      // Handle 429 smoothly
+      if (response.status === 429) {
+        console.warn("AI Tagging throttled (429). Returning empty tags.");
+        return "";
+      }
+
+      const data = await response.json();
+      return data.candidates[0].content.parts[0].text.trim();
+    } catch (e) {
+      return "";
     }
   },
 };

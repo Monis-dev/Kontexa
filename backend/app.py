@@ -81,6 +81,7 @@ class Note(db.Model):
     image_data = db.Column(db.Text, nullable=True)
     timestamp = db.Column(db.String(20), nullable=True)
     folder = db.Column(db.String(100), nullable=True)
+    tags = db.Column(db.Text, nullable=True)
     website_id = db.Column(db.Integer, db.ForeignKey('website.id'), nullable=False)
 
 
@@ -342,6 +343,7 @@ def sync_notes():
                 timestamp=note.get("timestamp", ""),
                 image_data=note.get("image_data", ""),
                 folder=note.get("folder", ""),
+                tags=note.get('tags', ''),
                 website_id=site.id
             )
         )
@@ -366,7 +368,7 @@ def get_notes():
             "notes": [{
                 "id": n.local_id, "title": n.title, "content": n.content, 
                 "selection": n.selection, "pinned": n.pinned,
-                "timestamp": n.timestamp, "folder":n.folder,"image_data": n.image_data
+                "timestamp": n.timestamp, "folder":n.folder,"image_data": n.image_data, "tags": n.tags 
             } for n in s.notes]
         })
     return jsonify(result)
@@ -397,6 +399,8 @@ def update_note(local_id):
         note.pinned = data['pinned'] # This is now safe
     if 'folder' in data:
         note.folder = data['folder']
+    if 'tags' in data:
+        note.tags = data['tags']
         
     db.session.commit()
     return jsonify({"message": "Updated successfully"})
