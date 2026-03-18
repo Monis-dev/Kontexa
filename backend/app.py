@@ -407,7 +407,6 @@ def update_note(local_id):
     # 2. Get data safely
     data = request.json
     
-    # 3. Update fields (this avoids the dictionary syntax error)
     if 'title' in data:
         note.title = data['title']
     if 'content' in data:
@@ -416,6 +415,8 @@ def update_note(local_id):
         note.pinned = data['pinned'] # This is now safe
     if 'folder' in data:
         note.folder = data['folder']
+    if 'tags' in data:
+        note.tags = data['tags']
         
     db.session.commit()
     return jsonify({"message": "Updated successfully"})
