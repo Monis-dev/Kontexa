@@ -1,246 +1,234 @@
-const STORAGE_KEY = "context_notes_data";
-const SETTINGS_KEY = "cn_show_highlights";
-
 // ==========================================
-// ── 1. HIGHLIGHT ENGINE ──
+// ── DOUBLE-INJECTION GUARD ──
 // ==========================================
+if (!window.__cnInjected) {
+  window.__cnInjected = true;
 
-function removeHighlights() {
-  document.querySelectorAll("mark.cn-highlight").forEach((mark) => {
-    const parent = mark.parentNode;
-    while (mark.firstChild) {
-      parent.insertBefore(mark.firstChild, mark);
-    }
-    parent.removeChild(mark);
-    parent.normalize();
-  });
-}
+  const STORAGE_KEY = "context_notes_data";
+  const SETTINGS_KEY = "cn_show_highlights";
 
-// ✅ NEW ADVANCED HIGHLIGHTER (Handles links, spans, and bold text!)
-function highlightTextOnPage(searchText, noteTitle) {
-  if (!searchText || searchText.length < 2) return;
+  // ==========================================
+  // ── 1. HIGHLIGHT ENGINE ──
+  // ==========================================
 
-  // 1. Get every text node on the page
-  const walker = document.createTreeWalker(
-    document.body,
-    NodeFilter.SHOW_TEXT,
-    null
-  );
-
-  const textNodes = [];
-  let fullText = "";
-  let node;
-
-  // 2. Build one massive string of the page, keeping track of where each DOM node starts and ends
-  while ((node = walker.nextNode())) {
-    const parentTag = node.parentNode ? node.parentNode.tagName : "";
-    if (!['SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT', 'NOSCRIPT', 'MARK'].includes(parentTag)) {
-      const start = fullText.length;
-      fullText += node.nodeValue;
-      textNodes.push({ node, start, end: fullText.length });
-    }
+  function removeHighlights() {
+    document.querySelectorAll("mark.cn-highlight").forEach((mark) => {
+      const parent = mark.parentNode;
+      while (mark.firstChild) {
+        parent.insertBefore(mark.firstChild, mark);
+      }
+      parent.removeChild(mark);
+      parent.normalize();
+    });
   }
 
-  // 3. Search the massive string using Regex (ignoring HTML whitespace)
-  const search = searchText.trim();
-  const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const regexStr = escapedSearch.replace(/\s+/g, '\\s+');
-  const regex = new RegExp(regexStr, 'i');
+  function highlightTextOnPage(searchText, noteTitle) {
+    if (!searchText || searchText.length < 2) return;
 
-  const match = fullText.match(regex);
-  if (!match) return; // Text not found on screen
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+      null,
+    );
 
-  const matchStart = match.index;
-  const matchEnd = matchStart + match[0].length;
+    const textNodes = [];
+    let fullText = "";
+    let node;
 
-  // 4. Find all the individual DOM nodes that this text spans across
-  const overlappingNodes = textNodes.filter(n => n.end > matchStart && n.start < matchEnd);
-
-  // 5. Wrap each overlapping piece in a <mark> tag. 
-  // We go backwards (.reverse) so we don't mess up the character positions of earlier nodes!
-  overlappingNodes.reverse().forEach(n => {
-    // Figure out exactly which part of THIS specific node needs highlighting
-    const relativeStart = Math.max(0, matchStart - n.start);
-    const relativeEnd = Math.min(n.node.nodeValue.length, matchEnd - n.start);
-
-    if (relativeStart >= relativeEnd) return;
-
-    const range = document.createRange();
-    range.setStart(n.node, relativeStart);
-    range.setEnd(n.node, relativeEnd);
-
-    const mark = document.createElement("mark");
-    mark.className = "cn-highlight";
-    mark.style.backgroundColor = "#fde047";
-    mark.style.color = "#92400e";
-    mark.style.borderBottom = "2px solid #f59e0b";
-    mark.title = `ContextNote: ${noteTitle}`;
-
-    try {
-      range.surroundContents(mark);
-    } catch (e) {
-      // If the HTML is incredibly broken, fallback to wrapping the text manually
-      const frag = range.extractContents();
-      mark.appendChild(frag);
-      range.insertNode(mark);
+    while ((node = walker.nextNode())) {
+      const parentTag = node.parentNode ? node.parentNode.tagName : "";
+      if (
+        !["SCRIPT", "STYLE", "TEXTAREA", "INPUT", "NOSCRIPT", "MARK"].includes(
+          parentTag,
+        )
+      ) {
+        const start = fullText.length;
+        fullText += node.nodeValue;
+        textNodes.push({ node, start, end: fullText.length });
+      }
     }
-  });
-}
 
-function initHighlights() {
-  if (!chrome.runtime?.id) return;
+    const search = searchText.trim();
+    const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regexStr = escapedSearch.replace(/\s+/g, "\\s+");
+    const regex = new RegExp(regexStr, "i");
 
-  const scrollX = window.scrollX;
-  const scrollY = window.scrollY;
+    const match = fullText.match(regex);
+    if (!match) return;
 
-  try {
-    chrome.storage.local.get([STORAGE_KEY, SETTINGS_KEY], (res) => {
-      if (chrome.runtime.lastError) return;
+    const matchStart = match.index;
+    const matchEnd = matchStart + match[0].length;
 
-      const isEnabled = res[SETTINGS_KEY] !== false;
-      if (!isEnabled) {
-        removeHighlights();
-        return;
-      }
+    const overlappingNodes = textNodes.filter(
+      (n) => n.end > matchStart && n.start < matchEnd,
+    );
 
-      let allNotes = res[STORAGE_KEY] || [];
+    overlappingNodes.reverse().forEach((n) => {
+      const relativeStart = Math.max(0, matchStart - n.start);
+      const relativeEnd = Math.min(n.node.nodeValue.length, matchEnd - n.start);
 
-      if (typeof allNotes === "string") {
-        try {
-          allNotes = JSON.parse(allNotes);
-        } catch {
-          allNotes = [];
-        }
-      }
-      const currentUrlNotes = allNotes.filter(
-        (n) => n.url.split("#")[0] === window.location.href.split("#")[0],
-      );
+      if (relativeStart >= relativeEnd) return;
 
-      if (currentUrlNotes.length > 0) {
-        currentUrlNotes
-          .filter((n) => n.selection && n.selection.length > 1)
-          .sort((a, b) => b.selection.length - a.selection.length);
-        removeHighlights();
-        currentUrlNotes.forEach((note) => {
-          highlightTextOnPage(note.selection, note.title);
-        });
-        window.scrollTo(scrollX, scrollY);
+      const range = document.createRange();
+      range.setStart(n.node, relativeStart);
+      range.setEnd(n.node, relativeEnd);
+
+      const mark = document.createElement("mark");
+      mark.className = "cn-highlight";
+      mark.style.backgroundColor = "#fde047";
+      mark.style.color = "#92400e";
+      mark.style.borderBottom = "2px solid #f59e0b";
+      mark.title = `ContextNote: ${noteTitle}`;
+
+      try {
+        range.surroundContents(mark);
+      } catch (e) {
+        const frag = range.extractContents();
+        mark.appendChild(frag);
+        range.insertNode(mark);
       }
     });
-  } catch (e) {}
-}
-
-// ==========================================
-// ── 2. YOUTUBE VIDEO TIMESTAMP MARKERS ──
-// ==========================================
-
-function isContextValid() {
-  try {
-    return !!chrome.runtime.id;
-  } catch (e) {
-    return false;
   }
-}
 
-function timeToSeconds(timeStr) {
-  if (!timeStr) return 0;
-  const parts = timeStr.split(":").map(Number);
-  if (parts.length === 2) return parts[0] * 60 + parts[1];
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  return 0;
-}
+  function initHighlights() {
+    if (!chrome.runtime?.id) return;
 
-function getYouTubeVideoId(url) {
-  try {
-    const urlObj = new URL(url);
-    if (urlObj.hostname.includes("youtube.com")) {
-      return urlObj.searchParams.get("v");
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+
+    try {
+      chrome.storage.local.get([STORAGE_KEY, SETTINGS_KEY], (res) => {
+        if (chrome.runtime.lastError) return;
+
+        const isEnabled = res[SETTINGS_KEY] !== false;
+        if (!isEnabled) {
+          removeHighlights();
+          return;
+        }
+
+        let allNotes = res[STORAGE_KEY] || [];
+
+        if (typeof allNotes === "string") {
+          try {
+            allNotes = JSON.parse(allNotes);
+          } catch {
+            allNotes = [];
+          }
+        }
+
+        const currentUrlNotes = allNotes.filter(
+          (n) => n.url.split("#")[0] === window.location.href.split("#")[0],
+        );
+
+        if (currentUrlNotes.length > 0) {
+          currentUrlNotes
+            .filter((n) => n.selection && n.selection.length > 1)
+            .sort((a, b) => b.selection.length - a.selection.length);
+          removeHighlights();
+          currentUrlNotes.forEach((note) => {
+            highlightTextOnPage(note.selection, note.title);
+          });
+          window.scrollTo(scrollX, scrollY);
+        }
+      });
+    } catch (e) {}
+  }
+
+  // ==========================================
+  // ── 2. YOUTUBE VIDEO TIMESTAMP MARKERS ──
+  // ==========================================
+
+  function isContextValid() {
+    try {
+      return !!chrome.runtime.id;
+    } catch (e) {
+      return false;
     }
-  } catch (e) {
+  }
+
+  function timeToSeconds(timeStr) {
+    if (!timeStr) return 0;
+    const parts = timeStr.split(":").map(Number);
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    return 0;
+  }
+
+  function getYouTubeVideoId(url) {
+    try {
+      const urlObj = new URL(url);
+      if (urlObj.hostname.includes("youtube.com")) {
+        return urlObj.searchParams.get("v");
+      }
+    } catch (e) {
+      return null;
+    }
     return null;
   }
-  return null;
-}
 
-// Guard flag so we never run two storage lookups simultaneously
-let isMarkersRunning = false;
+  let isMarkersRunning = false;
 
-function initVideoMarkers() {
-  if (!isContextValid()) return;
-  if (!window.location.hostname.includes("youtube.com")) return;
-  if (isMarkersRunning) return; // Prevent overlapping async calls
+  function initVideoMarkers() {
+    if (!isContextValid()) return;
+    if (!window.location.hostname.includes("youtube.com")) return;
+    if (isMarkersRunning) return;
 
-  const video = document.querySelector("video");
+    const video = document.querySelector("video");
+    const progressBar = document.querySelector(".ytp-progress-bar");
 
-  // ── FIX: Use ".ytp-progress-bar" as the positioning parent, not ".ytp-progress-list"
-  // ".ytp-progress-list" has inner padding that shifts percent-based positions.
-  // ".ytp-progress-bar" is the true full-width bar element markers should be relative to.
-  const progressBar = document.querySelector(".ytp-progress-bar");
+    if (!video || !progressBar) return;
+    if (
+      isNaN(video.duration) ||
+      video.duration === 0 ||
+      !isFinite(video.duration)
+    )
+      return;
 
-  if (!video || !progressBar) return;
-  if (
-    isNaN(video.duration) ||
-    video.duration === 0 ||
-    !isFinite(video.duration)
-  )
-    return;
+    isMarkersRunning = true;
+    document.querySelectorAll(".cn-vid-marker").forEach((m) => m.remove());
 
-  isMarkersRunning = true;
+    try {
+      chrome.storage.local.get([STORAGE_KEY, "cn_show_highlights"], (res) => {
+        isMarkersRunning = false;
 
-  // ── FIX: Remove old markers BEFORE the async storage call so there's no
-  // window where two sets of markers exist simultaneously.
-  document.querySelectorAll(".cn-vid-marker").forEach((m) => m.remove());
+        if (!isContextValid() || chrome.runtime.lastError) return;
+        if (res["cn_show_highlights"] === false) return;
 
-  try {
-    chrome.storage.local.get([STORAGE_KEY, "cn_show_highlights"], (res) => {
-      isMarkersRunning = false; // Release lock after storage returns
+        let allNotes = res[STORAGE_KEY] || [];
 
-      if (!isContextValid() || chrome.runtime.lastError) return;
-
-      if (res["cn_show_highlights"] === false) return; // Already cleaned up above
-
-      let allNotes = res[STORAGE_KEY] || [];
-
-      if (typeof allNotes === "string") {
-        try {
-          allNotes = JSON.parse(allNotes);
-        } catch {
-          allNotes = [];
+        if (typeof allNotes === "string") {
+          try {
+            allNotes = JSON.parse(allNotes);
+          } catch {
+            allNotes = [];
+          }
         }
-      }
-      const currentVideoId = getYouTubeVideoId(window.location.href);
-      if (!currentVideoId) return;
 
-      const videoNotes = allNotes.filter((n) => {
-        const noteVideoId = getYouTubeVideoId(n.url);
-        return noteVideoId === currentVideoId && n.timestamp;
-      });
+        const currentVideoId = getYouTubeVideoId(window.location.href);
+        if (!currentVideoId) return;
 
-      if (videoNotes.length === 0) return;
+        const videoNotes = allNotes.filter((n) => {
+          const noteVideoId = getYouTubeVideoId(n.url);
+          return noteVideoId === currentVideoId && n.timestamp;
+        });
 
-      const duration = video.duration;
+        if (videoNotes.length === 0) return;
 
-      // ── FIX: Get the actual rendered width of the progress bar so we can
-      // place markers using pixel offsets instead of % — this avoids any
-      // discrepancy from CSS padding on parent containers.
-      const barRect = progressBar.getBoundingClientRect();
-      const barWidth = barRect.width;
+        const duration = video.duration;
+        const barRect = progressBar.getBoundingClientRect();
+        const barWidth = barRect.width;
+        if (barWidth === 0) return;
 
-      if (barWidth === 0) return; // Bar not rendered yet, skip this tick
+        videoNotes.forEach((note) => {
+          const seconds = timeToSeconds(note.timestamp);
+          if (seconds > duration) return;
 
-      videoNotes.forEach((note) => {
-        const seconds = timeToSeconds(note.timestamp);
-        if (seconds > duration) return;
+          const fraction = seconds / duration;
+          const pixelLeft = fraction * barWidth;
 
-        // ── FIX: Calculate pixel position relative to the bar's own width,
-        // not a CSS percentage which can be affected by padding/box-model.
-        const fraction = seconds / duration;
-        const pixelLeft = fraction * barWidth;
-
-        const marker = document.createElement("div");
-        marker.className = "cn-vid-marker";
-
-        marker.style.cssText = `
+          const marker = document.createElement("div");
+          marker.className = "cn-vid-marker";
+          marker.style.cssText = `
           position: absolute;
           left: ${pixelLeft}px;
           top: 0;
@@ -256,68 +244,196 @@ function initVideoMarkers() {
           transform-origin: center;
         `;
 
-        const cleanTitle = note.title || "Timestamp";
-        marker.title = `ContextNote: ${cleanTitle} @ ${note.timestamp}`;
+          const cleanTitle = note.title || "Timestamp";
+          marker.title = `ContextNote: ${cleanTitle} @ ${note.timestamp}`;
 
-        marker.addEventListener("mouseenter", () => {
-          marker.style.transform = "scaleX(2) scaleY(1.15)";
-          marker.style.backgroundColor = "#ffffff";
-        });
-        marker.addEventListener("mouseleave", () => {
-          marker.style.transform = "scaleX(1) scaleY(1)";
-          marker.style.backgroundColor = "#fbbf24";
-        });
-        marker.addEventListener("click", (e) => {
-          e.stopPropagation();
-          video.currentTime = seconds;
-        });
+          marker.addEventListener("mouseenter", () => {
+            marker.style.transform = "scaleX(2) scaleY(1.15)";
+            marker.style.backgroundColor = "#ffffff";
+          });
+          marker.addEventListener("mouseleave", () => {
+            marker.style.transform = "scaleX(1) scaleY(1)";
+            marker.style.backgroundColor = "#fbbf24";
+          });
+          marker.addEventListener("click", (e) => {
+            e.stopPropagation();
+            video.currentTime = seconds;
+          });
 
-        progressBar.appendChild(marker);
+          progressBar.appendChild(marker);
+        });
       });
-    });
-  } catch (e) {
-    isMarkersRunning = false;
+    } catch (e) {
+      isMarkersRunning = false;
+    }
   }
-}
 
-// ==========================================
-// ── 3. INITIALIZATION & LISTENERS ──
-// ==========================================
+  // ==========================================
+  // ── 3. YOUTUBE TRANSCRIPT EXTRACTOR ──
+  // ==========================================
 
-initHighlights();
-setTimeout(initHighlights, 1500);
+  async function extractYouTubeTranscript() {
+    try {
+      // 1. Find the "More actions" button — try multiple selectors
+      // YouTube changes this periodically so we cast a wide net
+      const moreBtn =
+        document.querySelector('button[aria-label="More actions"]') ||
+        document.querySelector('button[aria-label="More Actions"]') ||
+        document.querySelector("#button-shape button") ||
+        [...document.querySelectorAll("button")].find(
+          (b) =>
+            b.getAttribute("aria-label")?.toLowerCase().includes("more") &&
+            b.closest("ytd-menu-renderer"),
+        );
 
-let ytInterval = setInterval(() => {
-  if (!isContextValid()) {
-    clearInterval(ytInterval);
-    return;
+      if (!moreBtn) return { error: "NO_MORE_BTN" };
+
+      moreBtn.click();
+      await new Promise((r) => setTimeout(r, 1000));
+
+      // 2. Find "Show transcript" — try text match AND partial match
+      const allFormattedStrings = [
+        ...document.querySelectorAll("yt-formatted-string"),
+      ];
+
+      // Also check tp-yt-paper-item and plain text inside menu items
+      const allMenuTexts = [
+        ...document.querySelectorAll(
+          "tp-yt-paper-item, ytd-menu-service-item-renderer",
+        ),
+      ];
+
+      const transcriptBtn =
+        allFormattedStrings.find(
+          (el) => el.textContent.trim() === "Show transcript",
+        ) ||
+        allFormattedStrings.find((el) =>
+          el.textContent.trim().toLowerCase().includes("transcript"),
+        ) ||
+        allMenuTexts.find((el) =>
+          el.textContent.trim().toLowerCase().includes("transcript"),
+        );
+
+      if (!transcriptBtn) {
+        // Close the menu before returning
+        document.body.click();
+        await new Promise((r) => setTimeout(r, 300));
+        return { error: "NO_TRANSCRIPT" };
+      }
+
+      transcriptBtn.click();
+      let segments = [];
+      const MAX_WAIT = 5000;
+      const POLL_INTERVAL = 300;
+      let waited = 0;
+
+      while (waited < MAX_WAIT) {
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL));
+        waited += POLL_INTERVAL;
+
+        const found = document.querySelectorAll(
+          "ytd-transcript-segment-renderer",
+        );
+        if (found.length > 0) {
+          segments = [...found];
+          break;
+        }
+      }
+
+      if (!segments.length) return { error: "NO_SEGMENTS" };
+
+      // Newer YouTube layout fallback
+      if (!segments.length) {
+        segments = document.querySelectorAll(
+          "ytd-transcript-segment-list-renderer ytd-transcript-segment-renderer",
+        );
+      }
+
+      if (!segments.length) return { error: "NO_SEGMENTS" };
+
+      const lines = [...segments]
+        .map((seg) => {
+          // Try multiple possible text container selectors
+          const text =
+            seg.querySelector(".segment-text")?.textContent?.trim() ||
+            seg.querySelector("yt-formatted-string")?.textContent?.trim() ||
+            seg.textContent?.trim() ||
+            "";
+          return text;
+        })
+        .filter(Boolean);
+
+      if (!lines.length) return { error: "NO_SEGMENTS" };
+
+      // 4. Close transcript panel
+      const closeBtn =
+        document.querySelector('button[aria-label="Close transcript"]') ||
+        document.querySelector('button[aria-label="close"]');
+      closeBtn?.click();
+
+      // 5. Get video title — try multiple selectors
+      const title =
+        document
+          .querySelector("h1.ytd-video-primary-info-renderer")
+          ?.textContent?.trim() ||
+        document
+          .querySelector("ytd-video-primary-info-renderer h1")
+          ?.textContent?.trim() ||
+        document
+          .querySelector("h1.style-scope.ytd-watch-metadata")
+          ?.textContent?.trim() ||
+        document.title;
+
+      return { transcript: lines.join(" "), title };
+    } catch (e) {
+      return { error: "EXTRACT_FAILED: " + e.message };
+    }
   }
-  if (window.location.hostname.includes("youtube.com")) {
-    initVideoMarkers();
-  }
-}, 2000);
 
-try {
-  if (isContextValid()) {
-    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-      if (request.action === "refresh_highlights") {
+  // ==========================================
+  // ── 4. INITIALIZATION & LISTENERS ──
+  // ==========================================
+
+  initHighlights();
+  setTimeout(initHighlights, 1500);
+
+  let ytInterval = setInterval(() => {
+    if (!isContextValid()) {
+      clearInterval(ytInterval);
+      return;
+    }
+    if (window.location.hostname.includes("youtube.com")) {
+      initVideoMarkers();
+    }
+  }, 2000);
+
+  try {
+    if (isContextValid()) {
+      chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+        if (request.action === "refresh_highlights") {
+          initHighlights();
+          initVideoMarkers();
+        } else if (request.action === "remove_highlights") {
+          removeHighlights();
+          document
+            .querySelectorAll(".cn-vid-marker")
+            .forEach((m) => m.remove());
+        } else if (request.action === "GET_YOUTUBE_TRANSCRIPT") {
+          extractYouTubeTranscript().then(sendResponse);
+          return true;
+        }
+      });
+    }
+  } catch (e) {}
+
+  let currentHref = window.location.href;
+  setInterval(() => {
+    if (window.location.href !== currentHref) {
+      currentHref = window.location.href;
+      setTimeout(() => {
         initHighlights();
         initVideoMarkers();
-      } else if (request.action === "remove_highlights") {
-        removeHighlights();
-        document.querySelectorAll(".cn-vid-marker").forEach((m) => m.remove());
-      }
-    });
-  }
-} catch (e) {}
-
-let currentHref = window.location.href;
-setInterval(() => {
-  if (window.location.href !== currentHref) {
-    currentHref = window.location.href;
-    setTimeout(() => {
-      initHighlights();
-      initVideoMarkers();
-    }, 1000); // Give the new page a second to load text
-  }
-}, 1000);
+      }, 1000);
+    }
+  }, 1000);
+} // ── END window.__cnInjected guard ──

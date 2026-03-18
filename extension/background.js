@@ -252,9 +252,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             " " +
             (note.selection || "");
 
-          const tags = await AIService.generateTags(noteText);
+          // const tags = await AIService.generateTags(noteText);
 
-          note.tags = tags;
+          note.tags = [];
         } catch (e) {
           console.warn("Tag generation failed");
           note.tags = [];

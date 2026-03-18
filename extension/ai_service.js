@@ -1,3 +1,6 @@
+let lastCallTime = 0;
+const MIN_DELAY = 2000;
+
 const AIService = {
   // Model Configuration
   MODEL_NAME: "gemini-2.5-flash",
@@ -8,10 +11,18 @@ const AIService = {
 
     if (!apiKey) throw new Error("API_KEY_MISSING");
 
+    const now = Date.now();
+
+    if (now - lastCallTime < MIN_DELAY) {
+      await new Promise((res) => setTimeout(res, MIN_DELAY));
+    }
+
+    lastCallTime = Date.now();
+
     // 1. Cleanly format the notes so the AI isn't confused by empty fields
     const notesText = contextNotes
       .map((n, i) => {
-        let parts = [`--- Note ${i + 1} ---`];
+        let parts = [`--- Note ${i + 1} (ID: ${n.id}) ---`];
         if (n.title) parts.push(`Page Title: ${n.title}`);
         if (n.selection) parts.push(`Highlighted Text: ${n.selection}`);
         if (n.content) parts.push(`User's Written Note: ${n.content}`);
@@ -20,17 +31,32 @@ const AIService = {
       .join("\n\n");
 
     // 2. Stronger System Prompt
-    const systemPrompt = `You are an expert research assistant. Your ONLY source of knowledge is the user's notes provided below. 
-    These notes contain webpage titles, text the user highlighted from websites, and their own written comments.
-    
-    INSTRUCTIONS:
-    1. Read ALL the provided notes carefully.
-    2. Answer the user's question by synthesizing information from the Titles, Highlighted Text, and Written Notes. Treat this data as absolute truth.
-    3. If the answer can be reasonably inferred or pieced together from any part of the notes, provide a detailed and helpful answer.
-    4. Only if the topic is completely absent from the notes, reply strictly with: "I don't have enough information in your notes to answer that."
+    const systemPrompt = `
+You are an expert research assistant.
 
-    USER'S RESEARCH NOTES:
-    ${notesText || "No notes provided."}`;
+You must return a JSON response with TWO things:
+1. "answer" → answer to user question using ONLY the provided notes
+2. "tags" → object mapping each note's EXACT ID to an array of tags
+
+RULES:
+- Use the EXACT note ID as the key (e.g., "abc123", not "note_id_1")
+- Tags must be 2–4 words max
+- lowercase
+- no duplicates
+- based ONLY on note content
+
+FORMAT (use the real IDs from the notes below):
+{
+  "answer": "your answer here",
+  "tags": {
+    "<exact_note_id>": ["tag1", "tag2"],
+    "<exact_note_id>": ["tag3"]
+  }
+}
+
+NOTES:
+${notesText || "No notes provided."}
+`;
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.MODEL_NAME}:generateContent?key=${apiKey}`;
 
@@ -61,10 +87,28 @@ const AIService = {
       }
 
       const data = await response.json();
-      const answer = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!answer)
-        return "⚠️ AI blocked this request due to safety guidelines or an empty response.";
-      return answer;
+      let raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!raw) {
+        return { answer: "⚠️ Empty AI response", tags: {} };
+      }
+
+      // clean markdown
+      raw = raw.replace(/```json|```/g, "").trim();
+
+      let parsed;
+
+      try {
+        parsed = JSON.parse(raw);
+      } catch (e) {
+        console.warn("JSON parse failed", raw);
+        return { answer: raw, tags: {} };
+      }
+
+      return {
+        answer: parsed.answer || "No answer",
+        tags: parsed.tags || {},
+      };
     } catch (error) {
       console.error("AI Service Error:", error);
       return "Connection error. Please check your internet connection and API key.";
@@ -134,23 +178,26 @@ const AIService = {
     }
   },
   async generateTags(noteText) {
+    if (!noteText || noteText.trim().length < 10) return [];
+
     const res = await chrome.storage.local.get(["gemini_key"]);
     const apiKey = res.gemini_key;
 
     if (!apiKey) return [];
 
     const prompt = `
-Generate 3-5 topic tags for the note.
+Generate 3-5 topic tags.
 
 Rules:
 - lowercase
-- 1-2 words
-- return JSON array only
+- 1-2 words max
+- no symbols
+- return ONLY JSON array
 
 Example:
 ["javascript","react","frontend"]
 
-Note:
+Text:
 ${noteText}
 `;
 
@@ -166,15 +213,171 @@ ${noteText}
         }),
       });
 
+      if (!response.ok) return [];
+
       const data = await response.json();
       let text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
       if (!text) return [];
+
       text = text.replace(/```json|```/g, "").trim();
 
-      return JSON.parse(text);
+      let parsed = JSON.parse(text);
+
+      // ✅ sanitize
+      if (!Array.isArray(parsed)) return [];
+
+      return parsed
+        .map((t) => t.toLowerCase().trim())
+        .filter((t) => t.length > 0);
     } catch (e) {
-      console.error("Tag generation error", e);
+      console.warn("Tag generation failed:", e);
       return [];
     }
   },
+
+  async generateNotesFromTranscript(transcript, videoTitle) {
+    const res = await chrome.storage.local.get(["gemini_key"]);
+    const apiKey = res.gemini_key;
+    if (!apiKey) throw new Error("API_KEY_MISSING");
+
+    const safeTranscript = transcript.substring(0, 20000);
+
+    const prompt = `You are an expert note-taker watching a YouTube video titled: "${videoTitle}"
+
+Extract the 4 to 6 most important concepts or insights from the transcript below.
+
+RULES:
+- Each note must have a short "title" (5 words max)
+- Each note must have "content" (2-3 sentences summarizing the point)
+- Each note must have "tags" (2-4 lowercase single-word tags)
+- Return ONLY a valid JSON array, no markdown, no extra text
+
+FORMAT:
+[
+  { "title": "Concept title", "content": "Explanation here.", "tags": ["tag1", "tag2"] }
+]
+
+TRANSCRIPT:
+${safeTranscript}`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.MODEL_NAME}:generateContent?key=${apiKey}`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.3 },
+      }),
+    });
+
+    if (!response.ok) throw new Error("Gemini API error");
+
+    const data = await response.json();
+    let raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    raw = raw.replace(/```json|```/g, "").trim();
+    return JSON.parse(raw);
+  },
 };
+
+async function lazyTagNotes(notes) {
+  const updated = [];
+
+  const MAX_TAGS_PER_RUN = 2;
+
+  let count = 0;
+
+  for (let note of notes) {
+    if (count >= MAX_TAGS_PER_RUN) break;
+
+    if (note.tags && note.tags.length > 0) continue;
+
+    try {
+      const text =
+        (note.title || "") +
+        " " +
+        (note.content || "") +
+        " " +
+        (note.selection || "");
+
+      const tags = await AIService.generateTags(text);
+
+      if (tags.length > 0) {
+        note.tags = tags;
+        count++;
+      }
+    } catch (e) {
+      console.warn("Lazy tagging failed");
+    }
+  }
+
+  return updated;
+}
+
+function smartFilterNotes(notes, query) {
+  query = query.toLowerCase();
+  const words = query.split(/\s+/).filter((w) => w.length > 1);
+
+  return notes
+    .map((note) => {
+      let score = 0;
+
+      const text =
+        (note.title || "") +
+        " " +
+        (note.content || "") +
+        " " +
+        (note.selection || "");
+
+      const lowerText = text.toLowerCase();
+
+      // Exact query match
+      if (lowerText.includes(query)) score += 8;
+
+      // Word-level matching
+      words.forEach((word) => {
+        if (lowerText.includes(word)) score += 3;
+      });
+
+      // Title boost
+      if ((note.title || "").toLowerCase().includes(query)) {
+        score += 5;
+      }
+
+      // Short notes penalty (avoid noise)
+      if (text.length < 50) score -= 2;
+
+      return { note, score };
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 9)
+    .map((item) => item.note);
+}
+
+function detectDomain(query) {
+  query = query.toLowerCase();
+
+  if (
+    query.includes("neural") ||
+    query.includes("machine learning") ||
+    query.includes("ai")
+  ) {
+    return "ai";
+  }
+
+  if (
+    query.includes("react") ||
+    query.includes("javascript") ||
+    query.includes("frontend")
+  ) {
+    return "web";
+  }
+
+  if (query.includes("database") || query.includes("sql")) {
+    return "database";
+  }
+
+  return null;
+}

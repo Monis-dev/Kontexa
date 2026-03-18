@@ -8,7 +8,8 @@
     "storage",
     "unlimitedStorage",
     "scripting",
-    "activeTab"
+    "activeTab",
+    "tabs"
   ],
   "host_permissions": ["<all_urls>", "https://generativelanguage.googleapis.com/*", "https://context-notes.onrender.com/*"],
   "background": {
@@ -19,7 +20,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": ["<all_urls>", "https://www.youtube.com/*"],
       "js": ["content.js"]
     }
   ],

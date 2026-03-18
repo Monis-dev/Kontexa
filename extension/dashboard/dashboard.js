@@ -1257,8 +1257,11 @@ let isAiProcessing = false;
 
 async function handleAiSubmit() {
   if (isAiProcessing) return;
+
   const input = $("aiInput");
   const sendBtn = $("aiSendBtn");
+  const chatBox = $("aiChatBox");
+
   const q = input.value.trim();
   if (!q || q === "Thinking..." || q === "Checking permissions...") return;
 
@@ -1266,16 +1269,17 @@ async function handleAiSubmit() {
   sendBtn.disabled = true;
   input.disabled = true;
 
-  const chatBox = $("aiChatBox");
   const tempMsgId = "msg-" + Date.now();
   chatBox.insertAdjacentHTML(
     "beforeend",
     `<div class="chat-msg chat-user" id="${tempMsgId}">${esc(q)}</div>`,
   );
   chatBox.scrollTop = chatBox.scrollHeight;
+
   input.value = "Checking permissions...";
 
   const hasAccess = await ProMode.canAccessAI();
+
   if (!hasAccess) {
     document.getElementById(tempMsgId)?.remove();
     input.value = q;
@@ -1286,25 +1290,99 @@ async function handleAiSubmit() {
   }
 
   input.value = "Thinking...";
+
   try {
     const contextNotes = JSON.parse($("aiModal").dataset.context || "[]");
-    const answer = await AIService.chat(q, contextNotes);
-    // Use renderMarkdown instead of esc() + plain newline replacement
+
+    const domain = detectDomain(q);
+
+    let scopedNotes = contextNotes;
+
+    if (domain) {
+      const domainFiltered = contextNotes.filter((n) =>
+        (n.tags || []).some((tag) => tag.includes(domain)),
+      );
+
+      // fallback if no match
+      if (domainFiltered.length > 0) {
+        scopedNotes = domainFiltered;
+      }
+    }
+
+    const filteredNotes = smartFilterNotes(scopedNotes, q);
+
+    const result = await AIService.chat(q, filteredNotes);
+
+    const aiAnswer = result?.answer || "⚠️ No answer received.";
+    const aiTags = result?.tags || {};
+
+    console.log(
+      "Filtered Notes:",
+      filteredNotes.map((n) => n.id),
+    );
+    console.log("AI TAGS:", aiTags);
+
+    const res = await new Promise((resolve) => {
+      chrome.storage.local.get("context_notes_data", resolve);
+    });
+
+    let allNotes = res.context_notes_data || [];
+
+    const updated = allNotes.map((note) => {
+      const newTags = aiTags[note.id];
+      if (newTags && newTags.length > 0) {
+        const existingTags = note.tags || [];
+        const merged = [...new Set([...existingTags, ...newTags])]; // merge, no duplicates
+        return { ...note, tags: merged };
+      }
+      return note;
+    });
+
+    await new Promise((resolve) => {
+      chrome.storage.local.set({ context_notes_data: updated }, resolve);
+    });
+
+    const tagUpdates = Object.entries(aiTags)
+      .filter(([id, tags]) => tags && tags.length > 0)
+      .map(([id, tags]) => ({ id, tags }));
+
+    if (tagUpdates.length > 0) {
+      try {
+        const resp = await fetch(`${API_BASE}/api/notes/tags`, {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(tagUpdates),
+        });
+        console.log("Tags synced:", await resp.json());
+      } catch (e) {
+        console.warn("Tag sync failed", e);
+      }
+    }
+
     chatBox.insertAdjacentHTML(
       "beforeend",
-      `<div class="chat-msg chat-ai" style="line-height:1.6">${renderMarkdown(answer)}</div>`,
+      `<div class="chat-msg chat-ai" style="line-height:1.6">
+        ${renderMarkdown(aiAnswer)}
+      </div>`,
     );
   } catch (e) {
+    console.error("AI ERROR:", e);
+
     chatBox.insertAdjacentHTML(
       "beforeend",
-      `<div class="chat-msg chat-ai">Error: Could not connect to AI.</div>`,
+      `<div class="chat-msg chat-ai">
+        Error: Could not connect to AI.
+      </div>`,
     );
   }
 
+  // 🔓 unlock UI
   input.value = "";
   input.disabled = false;
   sendBtn.disabled = false;
   isAiProcessing = false;
+
   chatBox.scrollTop = chatBox.scrollHeight;
   setTimeout(() => input.focus(), 10);
 }
