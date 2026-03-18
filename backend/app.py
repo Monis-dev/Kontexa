@@ -438,23 +438,37 @@ def delete_note(local_id):
         
     return jsonify({"error": "Note not found or Unauthorized"}), 404
 
-@app.route('/api/websites/rename', methods=['PUT'])
-def rename_website():
-    if 'user_id' not in session: return jsonify({"error": "Login required"}), 401
-    
-    data = request.json
-    url = data.get('url')
-    custom_name = data.get('custom_name')
-    
-    # Find the website associated with this user and URL
-    site = Website.query.filter_by(url=url, user_id=session['user_id']).first()
-    
-    if site:
-        site.custom_name = custom_name
-        db.session.commit()
-        return jsonify({"message": "Renamed successfully"})
-        
-    return jsonify({"error": "Website not found"}), 404
+@app.route('/api/notes/tags', methods=['PUT'])
+def update_note_tags():
+    if 'user_id' not in session:
+        return jsonify({"error": "Login required"}), 401
+
+    user = db.session.get(User, session['user_id'])
+    if not user.is_pro:
+        return jsonify({"error": "Pro required"}), 403
+
+    data = request.json  # expects: [{"id": "local_id", "tags": ["tag1", "tag2"]}]
+    if not data:
+        return jsonify({"error": "No data"}), 400
+
+    updated_count = 0
+    for item in data:
+        local_id = str(item.get("id"))
+        new_tags = item.get("tags", [])
+
+        note = Note.query.join(Website).filter(
+            Website.user_id == user.id,
+            Note.local_id == local_id
+        ).first()
+
+        if note:
+            existing = set(note.tags.split(",")) if note.tags else set()
+            merged = existing | set(new_tags)  # union — no duplicates
+            note.tags = ",".join(t for t in merged if t)
+            updated_count += 1
+
+    db.session.commit()
+    return jsonify({"message": f"Updated tags for {updated_count} notes"}), 200
 
 # if __name__ == "__main__":
 #     app.run(port=5000, debug=True)
