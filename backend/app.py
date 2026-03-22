@@ -488,5 +488,5 @@ def update_note_tags():
     db.session.commit()
     return jsonify({"message": f"Updated tags for {updated_count} notes"}), 200
 
-if __name__ == "__main__":
-    app.run(port=5000, debug=True)
+# if __name__ == "__main__":
+#     app.run(port=5000, debug=True)
