@@ -69,7 +69,6 @@ CORS(app, supports_credentials=True, resources={
             "https://context-notes.onrender.com",
             "http://127.0.0.1:5000",
             "http://localhost:5000",
-            MOBILE_PWA_ORIGIN,           # ← mobile PWA origin
         ]
     }
 })
@@ -140,14 +139,15 @@ def home():
 MOBILE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mobile')
 
 @app.route("/mobile")
+def mobile_redirect():
+    return redirect("/mobile/", code=301)
+
 @app.route("/mobile/")
 def mobile_app():
-    """Serve the PWA shell."""
     return send_from_directory(MOBILE_DIR, 'index.html')
 
 @app.route("/mobile/<path:filename>")
 def mobile_static(filename):
-    """Serve PWA static assets — manifest, sw.js, icons, etc."""
     return send_from_directory(MOBILE_DIR, filename)
 
 # ─────────────────────────────────────────────────────────────────────────────
