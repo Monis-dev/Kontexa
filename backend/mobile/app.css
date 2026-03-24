@@ -928,13 +928,12 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
-  margin-bottom: 10px;
   height: calc(60px + var(--sb));
   background: var(--nav);
   border-top: 1px solid var(--bdr);
+  padding-top: 2px;
   display: flex;
   align-items: flex-start;
-  padding-top: 6px;
   z-index: 50;
   transition:
     background 0.3s,
@@ -947,7 +946,7 @@ body {
   align-items: center;
   gap: 3px;
   cursor: pointer;
-  padding: 4px 2px 0;
+  padding: 0px 2px 0;
   color: var(--mut2);
   transition: color 0.15s;
   font-size: 10px;
