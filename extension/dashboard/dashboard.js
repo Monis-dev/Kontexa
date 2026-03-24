@@ -1,6 +1,7 @@
 const STORAGE_KEY = "context_notes_data";
 const FOLDERS_KEY = "cn_user_folders";
 const PRO_CACHE_KEY = "cn_is_pro_cached";
+const THEME_KEY = "cn_theme";
 const NAMES_KEY = "cn_source_names"; // custom display names for URLs
 const API_BASE = "https://context-notes.onrender.com";
 
@@ -12,6 +13,15 @@ let notesById = {};
 let notesByUrl = {};
 let sectionCache = [];
 let folderCounts = {};
+
+let syncQueue = []
+let syncTimer = null;
+let lastSyncTime = 0;
+let retryDelay = 2000;
+
+const SYNC_DEBOUNCE = 4000;
+const SYNC_MAX_INTERVAL = 30000;
+const MAX_BATCH_SIZE = 25;
 
 const $ = (id) => document.getElementById(id);
 const E = (el, ev, fn) => {
@@ -99,6 +109,96 @@ E($("logoutWipeBtn"), "click", async () => {
   } catch (e) {}
   chrome.storage.local.clear(() => window.location.reload());
 });
+
+// ---- Rate Limiting Functions ----- //
+function queueSync(notes) {
+  if (!isLoggedIn) return;
+
+  if (!Array.isArray(notes)) notes = [notes];
+
+  // Add to queue
+  syncQueue.push(...notes);
+
+  // Remove duplicates by id
+  const seen = new Set();
+  syncQueue = syncQueue.filter((n) => {
+    if (seen.has(n.id)) return false;
+    seen.add(n.id);
+    return true;
+  });
+
+  scheduleSync();
+}
+
+function updateSyncStatus(text) {
+  console.log("SYNC:", text);
+}
+
+function scheduleSync() {
+  if (syncTimer) clearTimeout(syncTimer);
+
+  const now = Date.now();
+
+  const timeSinceLastSync = now - lastSyncTime;
+
+  if (timeSinceLastSync > SYNC_MAX_INTERVAL) {
+    flushSyncQueue();
+    return;
+  }
+
+  syncTimer = setTimeout(flushSyncQueue, SYNC_DEBOUNCE);
+}
+
+async function flushSyncQueue() {
+  if (!navigator.onLine) {
+    console.warn("Offline — sync paused");
+    return;
+  }
+  window.addEventListener("online", () => {
+    if (syncQueue.length > 0) {
+      console.log("Back online — resuming sync");
+      flushSyncQueue();
+    }
+  });
+  if (!syncQueue.length) return;
+
+  const batch = syncQueue.splice(0, MAX_BATCH_SIZE);
+  updateSyncStatus("Syncing...");
+  try {
+    const res = await fetch(`${API_BASE}/api/sync`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(batch),
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      throw new Error("Sync failed: " + res.status);
+    }
+
+    lastSyncTime = Date.now();
+    updateSyncStatus("Synced ✓");
+    console.log("Synced batch:", batch.length);
+  } catch (err) {
+    console.warn("Sync failed — retrying later");
+
+    syncQueue.unshift(...batch);
+
+    setTimeout(flushSyncQueue, retryDelay);
+
+    retryDelay = Math.min(retryDelay * 2, 30000);
+
+    return;
+  }
+  retryDelay = 2000;
+  // Continue syncing if more remain
+  if (syncQueue.length > 0) {
+    setTimeout(flushSyncQueue, 1500);
+  }
+  
+}
 
 // --- OPEN NOTE MODAL ---
 function openNoteModal(noteId) {
@@ -487,12 +587,7 @@ document.addEventListener("click", (e) => {
         else loadLocalUI();
         if (isLoggedIn) {
           try {
-            await fetch(`${API_BASE}/api/notes/${id}`, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ pinned: allNotesFlat[idx].pinned }),
-              credentials: "include",
-            });
+            queueSync(allNotesFlat[idx]);
           } catch (err) {}
         }
       });
@@ -519,9 +614,9 @@ document.addEventListener("click", (e) => {
       else loadLocalUI();
       if (isLoggedIn) {
         try {
-          await fetch(`${API_BASE}/api/notes/${id}`, {
-            method: "DELETE",
-            credentials: "include",
+          queueSync({
+            id: id,
+            deleted: true,
           });
         } catch (err) {}
       }
@@ -546,12 +641,7 @@ E($("saveMove"), "click", async () => {
       loadLocalUI();
       if (isLoggedIn) {
         try {
-          await fetch(`${API_BASE}/api/notes/${allNotesFlat[idx].id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ folder: allNotesFlat[idx].folder }),
-            credentials: "include",
-          });
+          queueSync(allNotesFlat[idx]);
         } catch (err) {}
       }
     });
@@ -583,12 +673,7 @@ E($("saveEdit"), "click", async () => {
       else loadLocalUI();
       if (isLoggedIn) {
         try {
-          await fetch(`${API_BASE}/api/notes/${savedId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title: titleVal, content: contentVal }),
-            credentials: "include",
-          });
+          queueSync(allNotesFlat[idx]);
         } catch (err) {}
       }
     });
@@ -810,12 +895,7 @@ async function checkAuthAndSync() {
         }
         if (localNotes.length > 0) {
           try {
-            await fetch(`${API_BASE}/api/sync`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(localNotes),
-              credentials: "include",
-            });
+            queueSync(localNotes);
           } catch (e) {}
         }
         const cloudRes = await fetch(`${API_BASE}/api/notes`, {
@@ -850,10 +930,23 @@ async function checkAuthAndSync() {
               });
             }),
           );
-          chrome.storage.local.set(
-            { [STORAGE_KEY]: flattenedCloudNotes },
-            loadLocalUI,
-          );
+          const mergedMap = new Map();
+
+          // Add cloud notes first
+          flattenedCloudNotes.forEach((n) => {
+            mergedMap.set(n.id, n);
+          });
+
+          // Add local notes (preserve anything missing)
+          localNotes.forEach((n) => {
+            if (!mergedMap.has(n.id)) {
+              mergedMap.set(n.id, n);
+            }
+          });
+
+          const mergedNotes = Array.from(mergedMap.values());
+
+          chrome.storage.local.set({ [STORAGE_KEY]: mergedNotes }, loadLocalUI);
         }
       });
     } else {
@@ -991,12 +1084,7 @@ async function saveNewNote() {
       // Sync to server if logged in
       if (isLoggedIn) {
         try {
-          await fetch(`${API_BASE}/api/sync`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify([newNote]),
-            credentials: "include",
-          });
+          queueSync(newNote);
         } catch (err) {}
       }
     });
@@ -1413,40 +1501,103 @@ E($("saveApiKey"), "click", () => {
   });
 });
 
+
 // Theme Engine
-const THEME_KEY = "cn_theme";
+const panel = document.getElementById("themeGrid");
+// Dynamically build the theme menu based on CN_THEMES
+function buildThemeMenu() {
+  const grid = document.querySelector(".palette-grid");
+  if (!grid || typeof CN_THEMES === "undefined") return;
+
+  grid.innerHTML = "";
+
+  Object.keys(CN_THEMES).forEach((themeKey) => {
+    const theme = CN_THEMES[themeKey];
+
+    const swatch = document.createElement("div");
+    swatch.className = "palette-swatch";
+    swatch.dataset.theme = themeKey;
+
+    swatch.innerHTML = `
+      <div class="swatch-circle" style="background:${theme.swatch}"></div>
+      <span class="swatch-label">${theme.emoji} ${theme.label}</span>
+    `;
+
+    swatch.addEventListener("click", () => {
+      applyTheme(themeKey);
+      $("themePanel").classList.remove("on");
+    });
+
+    grid.appendChild(swatch);
+  });
+}
+
+// Apply Theme Function
 function applyTheme(theme) {
+  // 1. Check if CN_THEMES exists and fallback to "nova" if missing
+  if (typeof CN_THEMES === "undefined" || !CN_THEMES[theme]) {
+    theme = "nova";
+  }
+
+  // 2. Set HTML data attribute
   document.documentElement.setAttribute("data-theme", theme);
+
+  // 3. Inject CSS Variables into the page
+  if (typeof CN_THEMES !== "undefined" && CN_THEMES[theme]) {
+    const themeData = CN_THEMES[theme];
+    for (const [key, value] of Object.entries(themeData.vars)) {
+      document.documentElement.style.setProperty(key, value);
+    }
+  }
+
+  // 4. Update the active checkmark/highlight in the UI menu
   document.querySelectorAll(".palette-swatch").forEach((s) => {
     s.classList.toggle("active", s.dataset.theme === theme);
   });
+
+  // 5. Save to Chrome storage
   if (typeof chrome !== "undefined" && chrome.storage) {
     chrome.storage.local.set({ [THEME_KEY]: theme });
   }
 }
+
+// Initialize Menu
+buildThemeMenu();
+
+// Load Saved Theme
 if (typeof chrome !== "undefined" && chrome.storage) {
   chrome.storage.local.get([THEME_KEY], (res) => {
-    applyTheme(res[THEME_KEY] || "indigo");
+    applyTheme(res[THEME_KEY] || "nova"); // Default is now nova
   });
 } else {
-  applyTheme("indigo");
+  applyTheme("nova");
 }
-E($("themeBtn"), "click", (e) => {
-  e.stopPropagation();
-  $("themePanel").classList.toggle("on");
-});
-document.querySelectorAll(".palette-swatch").forEach((swatch) => {
-  swatch.addEventListener("click", () => {
-    applyTheme(swatch.dataset.theme);
-    $("themePanel").classList.remove("on");
+
+// Panel Toggle Events (Opening and closing the menu)
+if ($("themeBtn")) {
+  E($("themeBtn"), "click", (e) => {
+    e.stopPropagation();
+    $("themePanel").classList.toggle("on");
   });
-});
+}
+
 document.addEventListener("click", (e) => {
   if (
     $("themePanel") &&
     !$("themePanel").contains(e.target) &&
-    e.target !== $("themeBtn")
+    $("themeBtn") &&
+    e.target !== $("themeBtn") &&
+    !$("themeBtn").contains(e.target)
   ) {
     $("themePanel").classList.remove("on");
+  }
+});
+
+window.addEventListener("beforeunload", () => {
+  if (syncQueue.length > 0) {
+    navigator.sendBeacon(
+      `${API_BASE}/api/sync`,
+      new Blob([JSON.stringify(syncQueue)], { type: "application/json" }),
+    );
   }
 });

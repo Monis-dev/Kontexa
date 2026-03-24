@@ -9,11 +9,28 @@ let notesByUrlCache = null;
 
 // ── THEME ENGINE ──
 function applyThemeToPopup(theme) {
-  if (theme) document.documentElement.setAttribute("data-theme", theme);
+  // Fallback to "nova" if theme is missing or CN_THEMES isn't loaded
+  if (typeof CN_THEMES === "undefined" || !CN_THEMES[theme]) {
+    theme = "nova";
+  }
+
+  document.documentElement.setAttribute("data-theme", theme);
+
+  // Inject CSS Variables directly to the popup window
+  if (typeof CN_THEMES !== "undefined" && CN_THEMES[theme]) {
+    const themeData = CN_THEMES[theme];
+    for (const [key, value] of Object.entries(themeData.vars)) {
+      document.documentElement.style.setProperty(key, value);
+    }
+    // Optional: apply the theme's font to the popup body
+    if (themeData.fontBody) {
+      document.body.style.fontFamily = themeData.fontBody;
+    }
+  }
 }
 
 chrome.storage.local.get([THEME_KEY], (res) => {
-  applyThemeToPopup(res[THEME_KEY] || "indigo");
+  applyThemeToPopup(res[THEME_KEY] || "nova");
 });
 
 chrome.storage.onChanged.addListener((changes) => {
@@ -325,306 +342,313 @@ const esc = (s) =>
     .replace(/'/g, "&#39;");
 
 // ── AI: SUMMARIZE PAGE INTO NOTES ──
-aiGenerateBtn.addEventListener("click", async () => {
-  // ── STEP 1: Gate check ──
-  const hasAccess = await ProMode.canAccessAI();
-  if (!hasAccess) {
-    chrome.tabs.create({
-      url: chrome.runtime.getURL("dashboard/dashboard.html"),
-    });
-    return;
-  }
+const aiGenerateBtn = document.getElementById("aiGenerateBtn"); // Ensure this is defined if missing
+const aiNotesContainer = document.getElementById("aiNotesContainer"); // Ensure this is defined if missing
 
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.url) return;
-
-  const isYouTube = tab.url.includes("youtube.com/watch");
-
-  // ── STEP 2: Lock UI ──
-  aiGenerateBtn.disabled = true;
-  aiGenerateBtn.style.display = "flex";
-  aiNotesContainer.style.display = "none";
-  aiNotesContainer.innerHTML = "";
-
-  // ── STEP 3: Fetch content (YouTube transcript OR page text) ──
-  let generatedNotes = null;
-
-  if (isYouTube) {
-    aiGenerateBtn.innerHTML = "⏳ Connecting to page...";
-
-    // Step 1: Force inject
-    try {
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        files: ["content.js"],
+if (aiGenerateBtn) {
+  aiGenerateBtn.addEventListener("click", async () => {
+    // ── STEP 1: Gate check ──
+    const hasAccess = await ProMode.canAccessAI();
+    if (!hasAccess) {
+      chrome.tabs.create({
+        url: chrome.runtime.getURL("dashboard/dashboard.html"),
       });
-    } catch (injectErr) {
-      console.log("Inject note:", injectErr.message);
+      return;
     }
 
-    // Step 2: Wait longer for listener to register
-    await new Promise((r) => setTimeout(r, 800));
+    const [tab] = await chrome.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
+    if (!tab?.url) return;
 
-    aiGenerateBtn.innerHTML = "⏳ Fetching transcript...";
+    // FIXED: Syntax error was here, missing the closing quotes and parenthesis
+    const isYouTube = tab.url.includes("youtube.com");
 
-    // Step 3: Send message WITH retry
-    let transcriptResult;
-    let attempts = 0;
-    const MAX_ATTEMPTS = 3;
+    // ── STEP 2: Lock UI ──
+    aiGenerateBtn.disabled = true;
+    aiGenerateBtn.style.display = "flex";
+    aiNotesContainer.style.display = "none";
+    aiNotesContainer.innerHTML = "";
 
-    while (attempts < MAX_ATTEMPTS) {
+    // ── STEP 3: Fetch content (YouTube transcript OR page text) ──
+    let generatedNotes = null;
+
+    if (isYouTube) {
+      aiGenerateBtn.innerHTML = "⏳ Connecting to page...";
+
+      // Step 1: Force inject
       try {
-        transcriptResult = await chrome.tabs.sendMessage(tab.id, {
-          action: "GET_YOUTUBE_TRANSCRIPT",
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ["content.js"],
         });
-        break; // success — exit retry loop
-      } catch (e) {
-        attempts++;
-        console.warn(`sendMessage attempt ${attempts} failed:`, e.message);
+      } catch (injectErr) {
+        console.log("Inject note:", injectErr.message);
+      }
 
-        if (attempts >= MAX_ATTEMPTS) {
+      // Step 2: Wait longer for listener to register
+      await new Promise((r) => setTimeout(r, 800));
+
+      aiGenerateBtn.innerHTML = "⏳ Fetching transcript...";
+
+      // Step 3: Send message WITH retry
+      let transcriptResult;
+      let attempts = 0;
+      const MAX_ATTEMPTS = 3;
+
+      while (attempts < MAX_ATTEMPTS) {
+        try {
+          transcriptResult = await chrome.tabs.sendMessage(tab.id, {
+            action: "GET_YOUTUBE_TRANSCRIPT",
+          });
+          break; // success — exit retry loop
+        } catch (e) {
+          attempts++;
+          console.warn(`sendMessage attempt ${attempts} failed:`, e.message);
+
+          if (attempts >= MAX_ATTEMPTS) {
+            return resetBtn(
+              "❌ Could not reach page. Reload the YouTube tab and try again.",
+            );
+          }
+
+          // Wait before retrying
+          await new Promise((r) => setTimeout(r, 600));
+        }
+      }
+
+      // Step 4: Handle specific error codes from content script
+      if (!transcriptResult || transcriptResult.error) {
+        const err = transcriptResult?.error || "";
+
+        if (err === "NO_TRANSCRIPT") {
+          return showNoTranscriptUI(tab);
+        }
+        if (err === "NO_MORE_BTN") {
           return resetBtn(
-            "❌ Could not reach page. Reload the YouTube tab and try again.",
+            "❌ Could not find video menu. Scroll down a bit and try again.",
+          );
+        }
+        if (err === "NO_SEGMENTS") {
+          return resetBtn(
+            "❌ Transcript opened but text couldn't be read. Try again.",
           );
         }
 
-        // Wait before retrying
-        await new Promise((r) => setTimeout(r, 600));
+        return resetBtn(`❌ ${err || "Unknown error fetching transcript."}`);
       }
-    }
 
-    // Step 4: Handle specific error codes from content script
-    if (!transcriptResult || transcriptResult.error) {
-      const err = transcriptResult?.error || "";
+      aiGenerateBtn.innerHTML = "🤖 AI summarizing transcript...";
 
-      if (err === "NO_TRANSCRIPT") {
-        return showNoTranscriptUI(tab);
-      }
-      if (err === "NO_MORE_BTN") {
-        return resetBtn(
-          "❌ Could not find video menu. Scroll down a bit and try again.",
+      try {
+        generatedNotes = await AIService.generateNotesFromTranscript(
+          transcriptResult.transcript,
+          transcriptResult.title,
         );
+      } catch (e) {
+        console.error("Transcript AI error:", e);
+        return resetBtn("❌ AI summarization failed.");
       }
-      if (err === "NO_SEGMENTS") {
-        return resetBtn(
-          "❌ Transcript opened but text couldn't be read. Try again.",
-        );
+    } else {
+      aiGenerateBtn.innerHTML = "⏳ Reading page...";
+
+      let pageText = "";
+      try {
+        const results = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () => document.body.textContent,
+        });
+        pageText = results[0]?.result || "";
+      } catch (e) {
+        return resetBtn("❌ Extension lacks permission for this page.");
       }
 
-      return resetBtn(`❌ ${err || "Unknown error fetching transcript."}`);
+      if (pageText.trim().length < 50) {
+        return resetBtn("❌ Not enough text on this page to summarize.");
+      }
+
+      aiGenerateBtn.innerHTML = "✨ Generating notes...";
+
+      try {
+        generatedNotes = await AIService.generateNotesFromPage(pageText);
+      } catch (e) {
+        console.error("Page AI error:", e);
+      }
     }
 
-    // ... rest of YouTube path unchanged
-
-    aiGenerateBtn.innerHTML = "🤖 AI summarizing transcript...";
-
-    try {
-      generatedNotes = await AIService.generateNotesFromTranscript(
-        transcriptResult.transcript,
-        transcriptResult.title,
-      );
-    } catch (e) {
-      console.error("Transcript AI error:", e);
-      return resetBtn("❌ AI summarization failed.");
-    }
-  } else {
-    aiGenerateBtn.innerHTML = "⏳ Reading page...";
-
-    let pageText = "";
-    try {
-      const results = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: () => document.body.textContent,
-      });
-      pageText = results[0]?.result || "";
-    } catch (e) {
-      return resetBtn("❌ Extension lacks permission for this page.");
+    // ── STEP 4: Validate AI response ──
+    if (!Array.isArray(generatedNotes) || generatedNotes.length === 0) {
+      return resetBtn("❌ AI returned no notes. Please try again.");
     }
 
-    if (pageText.trim().length < 50) {
-      return resetBtn("❌ Not enough text on this page to summarize.");
-    }
+    // ── STEP 5: Hide button, render review cards ──
+    aiGenerateBtn.style.display = "none";
+    aiNotesContainer.style.display = "block";
 
-    aiGenerateBtn.innerHTML = "✨ Generating notes...";
+    const headerLabel = isYouTube
+      ? "🎬 Video Notes Preview"
+      : "✨ AI Generated Concepts";
 
-    try {
-      generatedNotes = await AIService.generateNotesFromPage(pageText);
-    } catch (e) {
-      console.error("Page AI error:", e);
-    }
-  }
-
-  // ── STEP 4: Validate AI response ──
-  if (!Array.isArray(generatedNotes) || generatedNotes.length === 0) {
-    return resetBtn("❌ AI returned no notes. Please try again.");
-  }
-
-  // ── STEP 5: Hide button, render review cards ──
-  aiGenerateBtn.style.display = "none";
-  aiNotesContainer.style.display = "block";
-
-  const headerLabel = isYouTube
-    ? "🎬 Video Notes Preview"
-    : "✨ AI Generated Concepts";
-
-  aiNotesContainer.innerHTML = `
-    <div style="
-      font-size: 13px;
-      font-weight: bold;
-      color: var(--acc, #4f46e5);
-      margin-bottom: 10px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    ">
-      <span>${headerLabel}</span>
-      <button id="cancelAiBtn" style="
-        background: none;
-        border: none;
-        color: var(--mut, #64748b);
-        cursor: pointer;
-        font-size: 12px;
-        padding: 4px;
-      ">Cancel</button>
-    </div>
-  `;
-
-  // ── STEP 6: Render each note as a checkable card ──
-  generatedNotes.forEach((n, idx) => {
-    const safeTitle = n.title || "Untitled Concept";
-    const safeContent = n.content || "No details provided.";
-
-    const card = document.createElement("div");
-    card.className = "ai-review-card";
-    card.style.cssText = `
-      background: #fffbeb;
-      border: 1px solid #fde68a;
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 8px;
-      display: flex;
-      gap: 10px;
-      align-items: flex-start;
-      cursor: pointer;
-    `;
-
-    card.innerHTML = `
-      <input
-        type="checkbox"
-        id="ai-chk-${idx}"
-        class="ai-checkbox"
-        checked
-        style="margin-top: 3px; cursor: pointer;"
-      >
-      <div style="flex: 1;">
-        <label for="ai-chk-${idx}" style="
-          font-weight: bold;
-          font-size: 13px;
-          color: #92400e;
-          margin-bottom: 4px;
-          display: block;
+    aiNotesContainer.innerHTML = `
+      <div style="
+        font-size: 13px;
+        font-weight: bold;
+        color: var(--acc, #4f46e5);
+        margin-bottom: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      ">
+        <span>${headerLabel}</span>
+        <button id="cancelAiBtn" style="
+          background: none;
+          border: none;
+          color: var(--mut, #64748b);
           cursor: pointer;
-        ">${esc(safeTitle)}</label>
-        <div style="font-size: 12px; color: #b45309; line-height: 1.4;">
-          ${esc(safeContent)}
-        </div>
+          font-size: 12px;
+          padding: 4px;
+        ">Cancel</button>
       </div>
     `;
 
-    // Clicking anywhere on the card (except label/checkbox itself) toggles checkbox
-    card.addEventListener("click", (e) => {
-      if (e.target.tagName !== "INPUT" && e.target.tagName !== "LABEL") {
-        const chk = document.getElementById(`ai-chk-${idx}`);
-        if (chk) chk.checked = !chk.checked;
-      }
+    // ── STEP 6: Render each note as a checkable card ──
+    generatedNotes.forEach((n, idx) => {
+      const safeTitle = n.title || "Untitled Concept";
+      const safeContent = n.content || "No details provided.";
+
+      const card = document.createElement("div");
+      card.className = "ai-review-card";
+      card.style.cssText = `
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 8px;
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        cursor: pointer;
+      `;
+
+      card.innerHTML = `
+        <input
+          type="checkbox"
+          id="ai-chk-${idx}"
+          class="ai-checkbox"
+          checked
+          style="margin-top: 3px; cursor: pointer;"
+        >
+        <div style="flex: 1;">
+          <label for="ai-chk-${idx}" style="
+            font-weight: bold;
+            font-size: 13px;
+            color: #92400e;
+            margin-bottom: 4px;
+            display: block;
+            cursor: pointer;
+          ">${esc(safeTitle)}</label>
+          <div style="font-size: 12px; color: #b45309; line-height: 1.4;">
+            ${esc(safeContent)}
+          </div>
+        </div>
+      `;
+
+      // Clicking anywhere on the card (except label/checkbox itself) toggles checkbox
+      card.addEventListener("click", (e) => {
+        if (e.target.tagName !== "INPUT" && e.target.tagName !== "LABEL") {
+          const chk = document.getElementById(`ai-chk-${idx}`);
+          if (chk) chk.checked = !chk.checked;
+        }
+      });
+
+      aiNotesContainer.appendChild(card);
     });
 
-    aiNotesContainer.appendChild(card);
-  });
+    // ── STEP 7: Save Selected button ──
+    const saveAllBtn = document.createElement("button");
+    saveAllBtn.style.cssText = `
+      width: 100%;
+      padding: 10px;
+      background: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-top: 4px;
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+    `;
+    saveAllBtn.innerHTML = "💾 Save Selected Notes";
+    aiNotesContainer.appendChild(saveAllBtn);
 
-  // ── STEP 7: Save Selected button ──
-  const saveAllBtn = document.createElement("button");
-  saveAllBtn.style.cssText = `
-    width: 100%;
-    padding: 10px;
-    background: #4f46e5;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: bold;
-    margin-top: 4px;
-    display: flex;
-    justify-content: center;
-    gap: 6px;
-  `;
-  saveAllBtn.innerHTML = "💾 Save Selected Notes";
-  aiNotesContainer.appendChild(saveAllBtn);
+    // ── STEP 8: Handle save ──
+    saveAllBtn.addEventListener("click", async () => {
+      saveAllBtn.disabled = true;
+      saveAllBtn.innerHTML = "Saving...";
 
-  // ── STEP 8: Handle save ──
-  saveAllBtn.addEventListener("click", async () => {
-    saveAllBtn.disabled = true;
-    saveAllBtn.innerHTML = "Saving...";
+      const folderName = isYouTube ? "YouTube Notes" : null;
 
-    const folderName = isYouTube ? "YouTube Notes" : null;
+      const notesToSave = generatedNotes
+        .filter((_, idx) => document.getElementById(`ai-chk-${idx}`)?.checked)
+        .map((n, idx) => ({
+          id: `${Date.now()}-${Math.floor(Math.random() * 10000)}-${idx}`,
+          url: tab.url,
+          domain: new URL(tab.url).hostname || "Unknown Domain",
+          title: (isYouTube ? "🎬 " : "✨ ") + (n.title || "AI Note"),
+          content: n.content || "",
+          tags: n.tags || [],
+          selection: "",
+          pinned: false,
+          folder: folderName,
+          timestamp: null,
+          image_data: "",
+        }));
 
-    const notesToSave = generatedNotes
-      .filter((_, idx) => document.getElementById(`ai-chk-${idx}`)?.checked)
-      .map((n, idx) => ({
-        id: `${Date.now()}-${Math.floor(Math.random() * 10000)}-${idx}`,
-        url: tab.url,
-        domain: new URL(tab.url).hostname || "Unknown Domain",
-        title: (isYouTube ? "🎬 " : "✨ ") + (n.title || "AI Note"),
-        content: n.content || "",
-        tags: n.tags || [],
-        selection: "",
-        pinned: false,
-        folder: folderName,
-        timestamp: null,
-        image_data: "",
-      }));
+      if (notesToSave.length > 0) {
+        const storage = await chrome.storage.local.get(STORAGE_KEY);
+        let currentNotes = storage[STORAGE_KEY] || [];
 
-    if (notesToSave.length > 0) {
-      const storage = await chrome.storage.local.get(STORAGE_KEY);
-      let currentNotes = storage[STORAGE_KEY] || [];
-
-      if (typeof currentNotes === "string") {
-        try {
-          currentNotes = JSON.parse(currentNotes);
-        } catch {
-          currentNotes = [];
+        if (typeof currentNotes === "string") {
+          try {
+            currentNotes = JSON.parse(currentNotes);
+          } catch {
+            currentNotes = [];
+          }
         }
+
+        const updatedNotes = [...currentNotes, ...notesToSave];
+        cachedNotes = updatedNotes;
+        rebuildNotesCache(updatedNotes);
+        await chrome.storage.local.set({ [STORAGE_KEY]: updatedNotes });
       }
 
-      const updatedNotes = [...currentNotes, ...notesToSave];
-      cachedNotes = updatedNotes;
-      rebuildNotesCache(updatedNotes);
-      await chrome.storage.local.set({ [STORAGE_KEY]: updatedNotes });
-    }
+      aiNotesContainer.style.display = "none";
+      aiNotesContainer.innerHTML = "";
+      loadPageNotes();
+    });
 
-    aiNotesContainer.style.display = "none";
-    aiNotesContainer.innerHTML = "";
-    loadPageNotes();
-  });
-
-  // ── STEP 9: Handle cancel ──
-  document.getElementById("cancelAiBtn").addEventListener("click", () => {
-    aiNotesContainer.style.display = "none";
-    aiNotesContainer.innerHTML = "";
-    aiGenerateBtn.style.display = "flex";
-    aiGenerateBtn.innerHTML = "✨ Summarize Page to Notes";
-    aiGenerateBtn.disabled = false;
-  });
-
-  // ── HELPER: reset button to idle state with an error message ──
-  function resetBtn(msg) {
-    aiGenerateBtn.innerHTML = msg;
-    aiGenerateBtn.disabled = false;
-    setTimeout(() => {
+    // ── STEP 9: Handle cancel ──
+    document.getElementById("cancelAiBtn").addEventListener("click", () => {
+      aiNotesContainer.style.display = "none";
+      aiNotesContainer.innerHTML = "";
+      aiGenerateBtn.style.display = "flex";
       aiGenerateBtn.innerHTML = "✨ Summarize Page to Notes";
-    }, 2500);
-  }
-});
+      aiGenerateBtn.disabled = false;
+    });
+
+    // ── HELPER: reset button to idle state with an error message ──
+    function resetBtn(msg) {
+      aiGenerateBtn.innerHTML = msg;
+      aiGenerateBtn.disabled = false;
+      setTimeout(() => {
+        aiGenerateBtn.innerHTML = "✨ Summarize Page to Notes";
+      }, 2500);
+    }
+  });
+}
 
 function showNoTranscriptUI(tab) {
   aiGenerateBtn.style.display = "none";
@@ -709,7 +733,10 @@ function showNoTranscriptUI(tab) {
         return resetBtn("❌ AI returned no notes.");
       }
 
-      renderNoteCards(fallbackNotes, tab, false);
+      // Ensure `renderNoteCards` exists elsewhere or falls back appropriately
+      if (typeof renderNoteCards === "function") {
+        renderNoteCards(fallbackNotes, tab, false);
+      }
     });
 
   document
