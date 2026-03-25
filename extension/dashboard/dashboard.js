@@ -14,7 +14,7 @@ let notesByUrl = {};
 let sectionCache = [];
 let folderCounts = {};
 
-let syncQueue = []
+let syncQueue = [];
 let syncTimer = null;
 let lastSyncTime = 0;
 let retryDelay = 2000;
@@ -111,94 +111,94 @@ E($("logoutWipeBtn"), "click", async () => {
 });
 
 // ---- Rate Limiting Functions ----- //
-function queueSync(notes) {
-  if (!isLoggedIn) return;
+// function queueSync(notes) {
+//   if (!isLoggedIn) return;
 
-  if (!Array.isArray(notes)) notes = [notes];
+//   if (!Array.isArray(notes)) notes = [notes];
 
-  // Add to queue
-  syncQueue.push(...notes);
+//   // Add to queue
+//   syncQueue.push(...notes);
 
-  // Remove duplicates by id
-  const seen = new Set();
-  syncQueue = syncQueue.filter((n) => {
-    if (seen.has(n.id)) return false;
-    seen.add(n.id);
-    return true;
-  });
+//   // Remove duplicates by id
+//   const seen = new Set();
+//   syncQueue = syncQueue.filter((n) => {
+//     if (seen.has(n.id)) return false;
+//     seen.add(n.id);
+//     return true;
+//   });
 
-  scheduleSync();
-}
+//   scheduleSync();
+// }
 
-function updateSyncStatus(text) {
-  console.log("SYNC:", text);
-}
+// function updateSyncStatus(text) {
+//   console.log("SYNC:", text);
+// }
 
-function scheduleSync() {
-  if (syncTimer) clearTimeout(syncTimer);
+// function scheduleSync() {
+//   if (syncTimer) clearTimeout(syncTimer);
 
-  const now = Date.now();
+//   const now = Date.now();
 
-  const timeSinceLastSync = now - lastSyncTime;
+//   const timeSinceLastSync = now - lastSyncTime;
 
-  if (timeSinceLastSync > SYNC_MAX_INTERVAL) {
-    flushSyncQueue();
-    return;
-  }
+//   if (timeSinceLastSync > SYNC_MAX_INTERVAL) {
+//     flushSyncQueue();
+//     return;
+//   }
 
-  syncTimer = setTimeout(flushSyncQueue, SYNC_DEBOUNCE);
-}
+//   syncTimer = setTimeout(flushSyncQueue, SYNC_DEBOUNCE);
+// }
 
-async function flushSyncQueue() {
-  if (!navigator.onLine) {
-    console.warn("Offline — sync paused");
-    return;
-  }
-  window.addEventListener("online", () => {
-    if (syncQueue.length > 0) {
-      console.log("Back online — resuming sync");
-      flushSyncQueue();
-    }
-  });
-  if (!syncQueue.length) return;
+// async function flushSyncQueue() {
+//   if (!navigator.onLine) {
+//     console.warn("Offline — sync paused");
+//     return;
+//   }
+//   window.addEventListener("online", () => {
+//     if (syncQueue.length > 0) {
+//       console.log("Back online — resuming sync");
+//       flushSyncQueue();
+//     }
+//   });
+//   if (!syncQueue.length) return;
 
-  const batch = syncQueue.splice(0, MAX_BATCH_SIZE);
-  updateSyncStatus("Syncing...");
-  try {
-    const res = await fetch(`${API_BASE}/api/sync`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(batch),
-      credentials: "include",
-    });
+//   const batch = syncQueue.splice(0, MAX_BATCH_SIZE);
+//   updateSyncStatus("Syncing...");
+//   try {
+//     const res = await fetch(`${API_BASE}/api/sync`, {
+//       method: "POST",
+//       headers: {
+//         "Content-Type": "application/json",
+//       },
+//       body: JSON.stringify(batch),
+//       credentials: "include",
+//     });
 
-    if (!res.ok) {
-      throw new Error("Sync failed: " + res.status);
-    }
+//     if (!res.ok) {
+//       throw new Error("Sync failed: " + res.status);
+//     }
 
-    lastSyncTime = Date.now();
-    updateSyncStatus("Synced ✓");
-    console.log("Synced batch:", batch.length);
-  } catch (err) {
-    console.warn("Sync failed — retrying later");
+//     lastSyncTime = Date.now();
+//     updateSyncStatus("Synced ✓");
+//     console.log("Synced batch:", batch.length);
+//   } catch (err) {
+//     console.warn("Sync failed — retrying later");
 
-    syncQueue.unshift(...batch);
+//     syncQueue.unshift(...batch);
 
-    setTimeout(flushSyncQueue, retryDelay);
+//     setTimeout(flushSyncQueue, retryDelay);
 
-    retryDelay = Math.min(retryDelay * 2, 30000);
+//     retryDelay = Math.min(retryDelay * 2, 30000);
 
-    return;
-  }
-  retryDelay = 2000;
-  // Continue syncing if more remain
-  if (syncQueue.length > 0) {
-    setTimeout(flushSyncQueue, 1500);
-  }
-  
-}
+//     return;
+//   }
+//   retryDelay = 2000;
+//   // Continue syncing if more remain
+//   if (syncQueue.length > 0) {
+//     setTimeout(flushSyncQueue, 1500);
+//   }
+
+// }
 
 // --- OPEN NOTE MODAL ---
 function openNoteModal(noteId) {
@@ -587,8 +587,19 @@ document.addEventListener("click", (e) => {
         else loadLocalUI();
         if (isLoggedIn) {
           try {
-            queueSync(allNotesFlat[idx]);
-          } catch (err) {}
+            await fetch(`${API_BASE}/api/notes/${id}`, {
+              method: "PUT",
+              credentials: "include",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                pinned: allNotesFlat[idx].pinned,
+              }),
+            });
+          } catch (err) {
+            console.error("Pin sync failed", err);
+          }
         }
       });
     }
@@ -613,12 +624,10 @@ document.addEventListener("click", (e) => {
         openSpecificPage(url);
       else loadLocalUI();
       if (isLoggedIn) {
-        try {
-          queueSync({
-            id: id,
-            deleted: true,
-          });
-        } catch (err) {}
+        await fetch(`${API_BASE}/api/notes/${id}`, {
+          method: "DELETE",
+          credentials: "include",
+        });
       }
     });
   }
@@ -641,8 +650,19 @@ E($("saveMove"), "click", async () => {
       loadLocalUI();
       if (isLoggedIn) {
         try {
-          queueSync(allNotesFlat[idx]);
-        } catch (err) {}
+          await fetch(`${API_BASE}/api/notes/${mId}`, {
+            method: "PUT",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              folder: selectedFolder || null,
+            }),
+          });
+        } catch (err) {
+          console.error("Move sync failed", err);
+        }
       }
     });
   }
@@ -673,8 +693,20 @@ E($("saveEdit"), "click", async () => {
       else loadLocalUI();
       if (isLoggedIn) {
         try {
-          queueSync(allNotesFlat[idx]);
-        } catch (err) {}
+          await fetch(`${API_BASE}/api/notes/${savedId}`, {
+            method: "PUT",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              title: titleVal,
+              content: contentVal,
+            }),
+          });
+        } catch (err) {
+          console.error("Edit sync failed", err);
+        }
       }
     });
   }
@@ -932,17 +964,50 @@ async function checkAuthAndSync() {
           );
           const mergedMap = new Map();
 
+          // Create cloud ID set
+          const cloudIds = new Set(flattenedCloudNotes.map((n) => n.id));
+
           // Add cloud notes first
           flattenedCloudNotes.forEach((n) => {
             mergedMap.set(n.id, n);
           });
 
-          // Add local notes (preserve anything missing)
+          // Detect notes deleted on other devices
+          const deletedElsewhere = [];
+
           localNotes.forEach((n) => {
-            if (!mergedMap.has(n.id)) {
+            if (!cloudIds.has(n.id)) {
+              deletedElsewhere.push(n);
+            } else {
               mergedMap.set(n.id, n);
             }
           });
+          for (const note of deletedElsewhere) {
+            const shouldDelete = confirm(
+              `⚠ This note was deleted on another device:\n\n"${note.title}"\n\nDelete it here too?`,
+            );
+
+            if (shouldDelete) {
+              // Remove locally
+              mergedMap.delete(note.id);
+            } else {
+              // Restore to cloud
+              try {
+                await fetch(`${API_BASE}/api/sync`, {
+                  method: "POST",
+                  credentials: "include",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify([note]),
+                });
+              } catch (err) {
+                console.error("Restore failed", err);
+              }
+
+              mergedMap.set(note.id, note);
+            }
+          }
 
           const mergedNotes = Array.from(mergedMap.values());
 
@@ -1084,8 +1149,17 @@ async function saveNewNote() {
       // Sync to server if logged in
       if (isLoggedIn) {
         try {
-          queueSync(newNote);
-        } catch (err) {}
+          await fetch(`${API_BASE}/api/sync`, {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify([newNote]),
+          });
+        } catch (err) {
+          console.error("Add sync failed", err);
+        }
       }
     });
   });
@@ -1500,7 +1574,6 @@ E($("saveApiKey"), "click", () => {
     $("apiSettingsModal").classList.remove("on");
   });
 });
-
 
 // Theme Engine
 const panel = document.getElementById("themeGrid");

@@ -1,6 +1,6 @@
 import os
 import stripe
-import datetime
+from datetime import datetime
 
 from urllib.parse import unquote
 from flask import Flask, request, jsonify, session, redirect, url_for, render_template, send_from_directory
@@ -482,17 +482,27 @@ def update_note(local_id):
 
 @app.route('/api/notes/<string:local_id>', methods=['DELETE'])
 def delete_note(local_id):
-    if 'user_id' not in session: return jsonify({"error": "Login required"}), 401
-    note = Note.query.join(Website).filter(
-        Website.user_id == session['user_id'],
-        Note.local_id == local_id
-    ).first()
-    if note:
-        note.delete = True
-        note.delete_at = datetime.utcnow()
+    if 'user_id' not in session:
+        return jsonify({"error": "Login required"}), 401
+    try:
+        note = Note.query.join(Website).filter(
+            Website.user_id == session['user_id'],
+            Note.local_id == local_id
+        ).first()
+        if not note:
+            return jsonify({
+                "error": "Note not found"
+            }), 404
+        note.deleted = True
+        note.deleted_at = datetime.utcnow()
         db.session.commit()
         return '', 204
-    return jsonify({"error": "Note not found or Unauthorized"}), 404
+    except Exception as e:
+        db.session.rollback()
+        print("DELETE ERROR:", e)
+        return jsonify({
+            "error": str(e)
+        }), 500
 
 @app.route('/api/notes/tags', methods=['PUT'])
 def update_note_tags():
