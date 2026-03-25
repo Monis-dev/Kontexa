@@ -373,22 +373,21 @@ def sync_notes():
 
     for note in notes:
         local_id = str(note.get("id"))
-        # if note.get("deleted"):
-        #     existing_note = (
-        #         Note.query
-        #         .join(Website)
-        #         .filter(
-        #             Website.user_id == user.id,
-        #             Note.local_id == local_id
-        #         )
-        #         .first()
-        #     )
-        #     if existing_note:
-        #         site = existing_note.website
-        #         db.session.delete(existing_note)
-        #         if len(site.notes) == 1:
-        #             db.session.delete(site)
-        #     continue
+        
+        if note.get("deleted"):
+            existing_note = (
+                Note.query
+                .join(Website)
+                .filter(
+                    Website.user_id == user.id,
+                    Note.local_id == local_id
+                )
+                .first()
+            )
+            if existing_note:
+                existing_note.deleted = True
+                existing_note.deleted_at = datetime.utcnow()
+            continue
 
         if local_id in existing_ids:
             continue
@@ -448,16 +447,25 @@ def get_notes():
     websites = Website.query.options(joinedload(Website.notes)).filter_by(user_id=user.id).all()
     result = []
     for s in websites:
+        filtered_notes = [{
+            "id": n.local_id,
+            "title": n.title,
+            "content": n.content,
+            "selection": n.selection,
+            "pinned": n.pinned,
+            "timestamp": n.timestamp,
+            "folder": n.folder,
+            "image_data": n.image_data,
+            "tags": n.tags.split(",") if n.tags else []
+        }for n in s.notes if not n.deleted
+        ]
+        if not filtered_notes:
+            continue 
         result.append({
-            "domain": s.domain, "url": s.url, "custom_name": s.custom_name,
-            "notes": [{
-                "id": n.local_id, "title": n.title, "content": n.content,
-                "selection": n.selection, "pinned": n.pinned,
-                "timestamp": n.timestamp, "folder": n.folder,
-                "image_data": n.image_data,
-                "tags": n.tags.split(",") if n.tags else [],
-                "deleted": n.deleted
-            } for n in s.notes]
+            "domain": s.domain,
+            "url": s.url,
+            "custom_name": s.custom_name,
+            "notes": filtered_notes
         })
     return jsonify(result)
 
