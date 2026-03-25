@@ -368,41 +368,71 @@ def sync_notes():
     new_notes    = []
 
     for note in notes:
+
         local_id = str(note.get("id"))
+
+        if note.get("deleted"):
+            existing_note = (
+                Note.query
+                .join(Website)
+                .filter(
+                    Website.user_id == user.id,
+                    Note.local_id == local_id
+                )
+                .first()
+            )
+            if existing_note:
+                site = existing_note.website
+                db.session.delete(existing_note)
+                if len(site.notes) == 1:
+                    db.session.delete(site)
+            continue
+
         if local_id in existing_ids:
             continue
+
         site = sites_cache.get(note["url"])
+
         if not site:
             site = Website(
                 url=note["url"],
-                domain=note.get("domain", urlparse(note["url"]).netloc),
+                domain=note.get(
+                    "domain",
+                    urlparse(note["url"]).netloc
+                ),
                 user_id=user.id
             )
+
             db.session.add(site)
             db.session.flush()
+
             sites_cache[note["url"]] = site
 
         incoming_tags = note.get("tags")
+
         if isinstance(incoming_tags, list):
-            parsed_tags = ",".join(str(t) for t in incoming_tags)
+            parsed_tags = ",".join(
+                str(t) for t in incoming_tags
+            )
         elif incoming_tags:
             parsed_tags = str(incoming_tags)
         else:
             parsed_tags = ""
 
-        new_notes.append(Note(
-            local_id=local_id,
-            title=note.get("title", "Untitled"),
-            content=note.get("content", ""),
-            selection=note.get("selection", ""),
-            pinned=note.get("pinned", False),
-            timestamp=note.get("timestamp", ""),
-            image_data=note.get("image_data", ""),
-            folder=note.get("folder", ""),
-            tags=parsed_tags,
-            website_id=site.id
-        ))
-
+        new_notes.append(
+            Note(
+                local_id=local_id,
+                title=note.get("title", "Untitled"),
+                content=note.get("content", ""),
+                selection=note.get("selection", ""),
+                pinned=note.get("pinned", False),
+                timestamp=note.get("timestamp", ""),
+                image_data=note.get("image_data", ""),
+                folder=note.get("folder", ""),
+                tags=parsed_tags,
+                website_id=site.id
+            )
+        )
     db.session.add_all(new_notes)
     db.session.commit()
     return jsonify({"message": "Sync complete"}), 200
