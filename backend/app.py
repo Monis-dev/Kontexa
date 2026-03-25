@@ -1,5 +1,7 @@
 import os
 import stripe
+import datetime
+
 from urllib.parse import unquote
 from flask import Flask, request, jsonify, session, redirect, url_for, render_template, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
@@ -104,6 +106,8 @@ class Note(db.Model):
     folder     = db.Column(db.String(100), nullable=True)
     tags       = db.Column(db.Text, nullable=True)
     website_id = db.Column(db.Integer, db.ForeignKey('website.id'), nullable=False)
+    deleted    = db.Column(db.Boolean, default=False)
+    deleted_at = db.Column(db.DateTime, nullable=True)
 
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -368,25 +372,23 @@ def sync_notes():
     new_notes    = []
 
     for note in notes:
-
         local_id = str(note.get("id"))
-
-        if note.get("deleted"):
-            existing_note = (
-                Note.query
-                .join(Website)
-                .filter(
-                    Website.user_id == user.id,
-                    Note.local_id == local_id
-                )
-                .first()
-            )
-            if existing_note:
-                site = existing_note.website
-                db.session.delete(existing_note)
-                if len(site.notes) == 1:
-                    db.session.delete(site)
-            continue
+        # if note.get("deleted"):
+        #     existing_note = (
+        #         Note.query
+        #         .join(Website)
+        #         .filter(
+        #             Website.user_id == user.id,
+        #             Note.local_id == local_id
+        #         )
+        #         .first()
+        #     )
+        #     if existing_note:
+        #         site = existing_note.website
+        #         db.session.delete(existing_note)
+        #         if len(site.notes) == 1:
+        #             db.session.delete(site)
+        #     continue
 
         if local_id in existing_ids:
             continue
@@ -453,7 +455,8 @@ def get_notes():
                 "selection": n.selection, "pinned": n.pinned,
                 "timestamp": n.timestamp, "folder": n.folder,
                 "image_data": n.image_data,
-                "tags": n.tags.split(",") if n.tags else []
+                "tags": n.tags.split(",") if n.tags else [],
+                "deleted": n.deleted
             } for n in s.notes]
         })
     return jsonify(result)
@@ -485,7 +488,8 @@ def delete_note(local_id):
         Note.local_id == local_id
     ).first()
     if note:
-        db.session.delete(note)
+        note.delete = True
+        note.delete_at = datetime.utcnow()
         db.session.commit()
         return '', 204
     return jsonify({"error": "Note not found or Unauthorized"}), 404
