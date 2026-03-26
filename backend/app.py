@@ -244,6 +244,26 @@ def logout():
     return jsonify({"message": "Logged out"}), 200
 
 
+# ─── at the top, replace the module-level db.create_all() block with this ───
+
+@app.route("/init-db")
+def init_db():
+    try:
+        db.create_all()
+        # Safely add new columns if they don't exist yet
+        with db.engine.connect() as con:
+            try:
+                con.execute(db.text("ALTER TABLE note ADD COLUMN deleted BOOLEAN DEFAULT FALSE"))
+                con.execute(db.text("ALTER TABLE note ADD COLUMN deleted_at TIMESTAMP"))
+                con.commit()
+                print("Columns added.")
+            except Exception as col_err:
+                # Columns already exist — safe to ignore
+                print(f"Columns may already exist: {col_err}")
+        return "Database initialized!", 200
+    except Exception as e:
+        return str(e), 500
+
 # ─── Testing routes ───────────────────────────────────────────────────────────
 
 @app.route("/revoke")
@@ -456,11 +476,11 @@ def get_notes():
             "timestamp": n.timestamp,
             "folder": n.folder,
             "image_data": n.image_data,
-            "tags": n.tags.split(",") if n.tags else []
-        }for n in s.notes if not n.deleted
-        ]
+            "tags": n.tags.split(",") if n.tags else [],
+            "deleted": n.deleted  # ← send deleted flag so other devices can sync it
+        } for n in s.notes]  # ← include ALL notes, let client handle deleted ones
         if not filtered_notes:
-            continue 
+            continue
         result.append({
             "domain": s.domain,
             "url": s.url,
