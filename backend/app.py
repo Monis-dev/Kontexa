@@ -456,7 +456,8 @@ def get_notes():
             "timestamp": n.timestamp,
             "folder": n.folder,
             "image_data": n.image_data,
-            "tags": n.tags.split(",") if n.tags else []
+            "tags": n.tags.split(",") if n.tags else [],
+            "deleted": n.deleted
         }for n in s.notes if not n.deleted
         ]
         if not filtered_notes:
