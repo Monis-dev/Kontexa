@@ -36,14 +36,6 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 }
 db = SQLAlchemy(app)
 
-try:
-    with app.app_context():
-        print("Connecting to database...")
-        db.create_all()
-        print("Database connected and tables verified!")
-except Exception as e:
-    print(f"CRITICAL ERROR: Could not connect to database. Reason: {e}")
-
 # Stripe
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "sk_test_123...")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "whsec_123...")
@@ -422,8 +414,7 @@ def sync_notes():
                 .first()
             )
             if existing_note:
-                existing_note.deleted = True
-                existing_note.deleted_at = datetime.utcnow()
+                db.session.delete(existing_note)  # hard delete on sync too
             continue
 
         if local_id in existing_ids:
@@ -522,6 +513,7 @@ def update_note(local_id):
     if 'pinned'  in data: note.pinned  = data['pinned']
     if 'folder'  in data: note.folder  = data['folder']
     if 'tags'    in data: note.tags    = data['tags']
+    if 'deleted' in data: note.deleted = data['deleted']
     db.session.commit()
     return jsonify({"message": "Updated successfully"})
 
@@ -535,19 +527,14 @@ def delete_note(local_id):
             Note.local_id == local_id
         ).first()
         if not note:
-            return jsonify({
-                "error": "Note not found"
-            }), 404
-        note.deleted = True
-        note.deleted_at = datetime.utcnow()
+            return '', 204  # already deleted, treat as success
+        db.session.delete(note)  # hard delete — removes row entirely
         db.session.commit()
         return '', 204
     except Exception as e:
         db.session.rollback()
         print("DELETE ERROR:", e)
-        return jsonify({
-            "error": str(e)
-        }), 500
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/notes/tags', methods=['PUT'])
 def update_note_tags():
