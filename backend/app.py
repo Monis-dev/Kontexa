@@ -128,6 +128,23 @@ def weakUp():
 def home():
     return render_template("index.html")
 
+import threading
+import requests
+import time
+
+def self_ping():
+    while True:
+        time.sleep(600)  # every 10 minutes
+        try:
+            requests.get("https://context-notes.onrender.com/weakUp", timeout=10)
+            print("Self-ping OK")
+        except Exception as e:
+            print(f"Self-ping failed: {e}")
+
+# Start the ping thread when app boots
+ping_thread = threading.Thread(target=self_ping, daemon=True)
+ping_thread.start()
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  MOBILE PWA — served at /mobile and /mobile/*
 #
