@@ -36,13 +36,6 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 }
 db = SQLAlchemy(app)
 
-try:
-    with app.app_context():
-        print("Connecting to database...")
-        db.create_all()
-        print("Database connected and tables verified!")
-except Exception as e:
-    print(f"CRITICAL ERROR: Could not connect to database. Reason: {e}")
 
 # Stripe
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "sk_test_123...")
@@ -244,6 +237,15 @@ def logout():
     return jsonify({"message": "Logged out"}), 200
 
 
+@app.route("/init-db")
+def init_db():
+    try:
+        db.create_all()
+        return "Database initialized!", 200
+    except Exception as e:
+        return str(e), 500
+
+
 # ─── Testing routes ───────────────────────────────────────────────────────────
 
 @app.route("/revoke")
@@ -367,7 +369,14 @@ def sync_notes():
     if not user.is_pro: return jsonify({"error": "Pro upgrade required"}), 403
 
     notes        = request.json
-    existing_ids = {n.local_id for n in Note.query.join(Website).filter(Website.user_id == user.id).all()}
+    existing_ids = set(
+        db.session.query(Note.local_id)
+        .join(Website)
+        .filter(Website.user_id == user.id)
+        .all()
+    )
+
+    existing_ids = {x[0] for x in existing_ids}
     sites_cache  = {s.url: s for s in Website.query.filter_by(user_id=user.id).all()}
     new_notes    = []
 
@@ -458,7 +467,7 @@ def get_notes():
             "image_data": n.image_data,
             "tags": n.tags.split(",") if n.tags else [],
             "deleted": n.deleted
-        }for n in s.notes if not n.deleted
+        }for n in s.notes 
         ]
         if not filtered_notes:
             continue 
