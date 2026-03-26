@@ -475,6 +475,8 @@ def get_notes():
     websites = Website.query.options(joinedload(Website.notes)).filter_by(user_id=user.id).all()
     result = []
     for s in websites:
+        if s.url == "general://notes":
+            continue
         filtered_notes = [{
             "id": n.local_id,
             "title": n.title,
@@ -496,6 +498,38 @@ def get_notes():
             "notes": filtered_notes
         })
     return jsonify(result)
+
+@app.route('/api/general-notes', methods=['GET'])
+def get_general_notes():
+    if 'user_id' not in session: return jsonify([]), 401
+    user = db.session.get(User, session['user_id'])
+    if not user.is_pro: return jsonify([]), 403
+
+    site = Website.query.filter_by(
+        url="general://notes",
+        user_id=user.id
+    ).first()
+
+    if not site:
+        return jsonify([])
+
+    notes = [{
+        "id": n.local_id,
+        "title": n.title,
+        "content": n.content,
+        "selection": n.selection,
+        "pinned": n.pinned,
+        "timestamp": n.timestamp,
+        "folder": n.folder,
+        "image_data": n.image_data,
+        "tags": n.tags.split(",") if n.tags else [],
+        "deleted": n.deleted,
+        "url": "general://notes",
+        "domain": "general",
+        "_synced": True
+    } for n in site.notes if not n.deleted]
+
+    return jsonify(notes)
 
 @app.route('/api/notes/<string:local_id>', methods=['PUT'])
 def update_note(local_id):
