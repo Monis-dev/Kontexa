@@ -598,5 +598,49 @@ def update_note_tags():
     db.session.commit()
     return jsonify({"message": f"Updated tags for {updated_count} notes"}), 200
 
+@app.route('/api/folders/rename', methods=['PUT'])
+def rename_folder():
+
+    if 'user_id' not in session:
+        return jsonify({"error": "Login required"}), 401
+
+    data = request.json
+
+    old_name = data.get("old_name")
+    new_name = data.get("new_name")
+
+    if not old_name or not new_name:
+        return jsonify({"error": "Invalid folder names"}), 400
+
+    try:
+
+        notes = (
+            Note.query
+            .join(Website)
+            .filter(
+                Website.user_id == session['user_id'],
+                Note.folder == old_name
+            )
+            .all()
+        )
+
+        for note in notes:
+            note.folder = new_name
+
+        db.session.commit()
+
+        return jsonify({
+            "message": "Folder renamed"
+        }), 200
+
+    except Exception as e:
+
+        db.session.rollback()
+
+        return jsonify({
+            "error": str(e)
+        }), 500
+    
 # if __name__ == "__main__":
 #     app.run(port=5000, debug=True)
+ 
