@@ -359,6 +359,17 @@ const card = (n, dom) => {
   </div>`;
 };
 
+function ensureFolder(folderName) {
+  chrome.storage.local.get([FOLDERS_KEY], (res) => {
+    const folders = res[FOLDERS_KEY] || [];
+    if (!folders.includes(folderName)) {
+      const updated = [...folders, folderName];
+      chrome.storage.local.set({ [FOLDERS_KEY]: updated });
+      userFolders = updated;
+    }
+  });
+}
+
 // --- RENDER MAIN DASHBOARD ---
 function render(urlGroups, folderGroups) {
   $("skel")?.remove();
@@ -758,11 +769,10 @@ function loadLocalUI() {
       }
     }
 
-    allNotesFlat = (stored || [])
-      .map((n) => ({
-        ...n,
-        tags: n.tags || [],
-      }));
+    allNotesFlat = (stored || []).map((n) => ({
+      ...n,
+      tags: n.tags || [],
+    }));
     notesById = Object.fromEntries(allNotesFlat.map((n) => [n.id, n]));
     sourceNames = res[NAMES_KEY] || {};
 
@@ -772,22 +782,24 @@ function loadLocalUI() {
     folderCounts = {};
 
     for (const n of allNotesFlat) {
-      // URL grouping
-      if (!notesByUrl[n.url]) notesByUrl[n.url] = [];
-      notesByUrl[n.url].push(n);
+      // Skip general notes from URL grouping entirely
+      if (n.url !== "general://notes" && n.url !== "folder://notes") {
+        if (!notesByUrl[n.url]) notesByUrl[n.url] = [];
+        notesByUrl[n.url].push(n);
 
-      if (!groupedUrls[n.url]) {
-        groupedUrls[n.url] = {
-          id: getSafeId(n.url),
-          domain: n.domain,
-          url: n.url,
-          notes: [],
-          type: "url",
-        };
+        if (!groupedUrls[n.url]) {
+          groupedUrls[n.url] = {
+            id: getSafeId(n.url),
+            domain: n.domain,
+            url: n.url,
+            notes: [],
+            type: "url",
+          };
+        }
+        groupedUrls[n.url].notes.push(n);
       }
-      groupedUrls[n.url].notes.push(n);
 
-      // Folder grouping
+      // Folder grouping — general notes always land here
       if (n.folder) {
         folderCounts[n.folder] = (folderCounts[n.folder] || 0) + 1;
         if (!groupedFolders[n.folder]) {
@@ -960,120 +972,131 @@ async function checkAuthAndSync() {
         }
 
         // ── FETCH cloud ────────────────────────────────────────────────────
-        const cloudRes = await fetch(`${API_BASE}/api/notes`, {
-          credentials: "include",
-        });
-        if (!cloudRes.ok) {
-          console.error("❌ Cloud fetch failed:", cloudRes.status);
-          loadLocalUI();
-          return;
-        }
+        const [cloudRes, generalRes] = await Promise.all([
+          fetch(`${API_BASE}/api/notes`, { credentials: "include" }),
+          fetch(`${API_BASE}/api/general-notes`, { credentials: "include" }),
+        ]);
 
-        const cloudData = await cloudRes.json();
+        if (cloudRes.ok) {
+          const cloudData = await cloudRes.json();
+          const generalNotes = generalRes.ok ? await generalRes.json() : [];
 
-        // Sync custom names
-        cloudData.forEach((site) => {
-          if (site.custom_name) sourceNames[site.url] = site.custom_name;
-        });
-        chrome.storage.local.set({ [NAMES_KEY]: sourceNames });
+          // Sync custom names
+          cloudData.forEach((site) => {
+            if (site.custom_name) sourceNames[site.url] = site.custom_name;
+          });
+          chrome.storage.local.set({ [NAMES_KEY]: sourceNames });
 
-        const localForFolderLookup = localNotes.reduce((acc, n) => {
-          if (n.folder) acc[n.id] = n.folder;
-          return acc;
-        }, {});
+          const localForFolderLookup = localNotes.reduce((acc, n) => {
+            if (n.folder) acc[n.id] = n.folder;
+            return acc;
+          }, {});
 
-        let flattenedCloudNotes = [];
-        cloudData.forEach((site) =>
-          site.notes.forEach((n) => {
+          let flattenedCloudNotes = [];
+          cloudData.forEach((site) =>
+            site.notes.forEach((n) => {
+              flattenedCloudNotes.push({
+                id: n.id,
+                url: site.url,
+                domain: site.domain,
+                title: n.title,
+                content: n.content,
+                selection: n.selection,
+                pinned: n.pinned,
+                timestamp: n.timestamp,
+                image_data: n.image_data,
+                folder: n.folder || localForFolderLookup[n.id] || null,
+                deleted: n.deleted || false,
+                _synced: true,
+              });
+            }),
+          );
+
+          // Merge general notes into the same flat list
+          generalNotes.forEach((n) => {
             flattenedCloudNotes.push({
-              id: n.id,
-              url: site.url,
-              domain: site.domain,
-              title: n.title,
-              content: n.content,
-              selection: n.selection,
-              pinned: n.pinned,
-              timestamp: n.timestamp,
-              image_data: n.image_data,
-              folder: n.folder || localForFolderLookup[n.id] || null,
-              deleted: n.deleted || false,
+              ...n,
               _synced: true,
             });
-          }),
-        );
+          });
 
-        console.log(`☁️  CLOUD: ${flattenedCloudNotes.length} notes`);
-        flattenedCloudNotes.forEach((n) =>
-          console.log(
-            `  CLOUD: id=${n.id} title="${n.title}" deleted=${n.deleted}`,
-          ),
-        );
-
-        const cloudIdSet = new Set(flattenedCloudNotes.map((n) => n.id));
-
-        // Notes only on this device
-        const localOnlyNotes = localNotes.filter((n) => !cloudIdSet.has(n.id));
-        console.log(
-          `🔍 LOCAL-ONLY (missing from cloud): ${localOnlyNotes.length} notes`,
-        );
-        localOnlyNotes.forEach((n) =>
-          console.log(
-            `  LOCAL-ONLY: id=${n.id} title="${n.title}" _synced=${n._synced}`,
-          ),
-        );
-
-        // Truly new = never synced to server before
-        const trulyNewNotes =
-          cloudIdSet.size === 0
-            ? localOnlyNotes
-            : localOnlyNotes.filter((n) => !n._synced);
-
-        // Missing from cloud AND was synced before = deleted on another device
-        const deletedOnOtherDevice =
-          cloudIdSet.size === 0 ? [] : localOnlyNotes.filter((n) => n._synced);
-
-        console.log(
-          `✨ TRULY NEW (will upload): ${trulyNewNotes.length} notes`,
-        );
-        trulyNewNotes.forEach((n) =>
-          console.log(`  NEW: id=${n.id} title="${n.title}"`),
-        );
-
-        console.log(
-          `🗑️  DELETED ON OTHER DEVICE (will remove locally): ${deletedOnOtherDevice.length} notes`,
-        );
-        deletedOnOtherDevice.forEach((n) =>
-          console.log(`  REMOVE: id=${n.id} title="${n.title}"`),
-        );
-
-        // MERGE
-        const mergedMap = new Map();
-        flattenedCloudNotes.forEach((n) => mergedMap.set(n.id, n));
-        trulyNewNotes.forEach((n) => mergedMap.set(n.id, n));
-        localNotes.forEach((n) => {
-          if (mergedMap.has(n.id)) {
-            mergedMap.set(n.id, { ...mergedMap.get(n.id), ...n });
-          }
-        });
-
-        const mergedNotes = Array.from(mergedMap.values());
-        console.log(`✅ MERGED RESULT: ${mergedNotes.length} notes`);
-        mergedNotes.forEach((n) =>
-          console.log(
-            `  MERGED: id=${n.id} title="${n.title}" _synced=${n._synced}`,
-          ),
-        );
-        console.log("🔄 ===== SYNC END =====");
-
-        chrome.storage.local.set({ [STORAGE_KEY]: mergedNotes }, () => {
-          loadLocalUI();
-          if (trulyNewNotes.length > 0) {
+          console.log(`☁️  CLOUD: ${flattenedCloudNotes.length} notes`);
+          flattenedCloudNotes.forEach((n) =>
             console.log(
-              `⬆️  Uploading ${trulyNewNotes.length} truly new notes`,
-            );
-            queueSync(trulyNewNotes);
-          }
-        });
+              `  CLOUD: id=${n.id} title="${n.title}" deleted=${n.deleted}`,
+            ),
+          );
+
+          const cloudIdSet = new Set(flattenedCloudNotes.map((n) => n.id));
+
+          // Notes only on this device
+          const localOnlyNotes = localNotes.filter(
+            (n) => !cloudIdSet.has(n.id),
+          );
+          console.log(
+            `🔍 LOCAL-ONLY (missing from cloud): ${localOnlyNotes.length} notes`,
+          );
+          localOnlyNotes.forEach((n) =>
+            console.log(
+              `  LOCAL-ONLY: id=${n.id} title="${n.title}" _synced=${n._synced}`,
+            ),
+          );
+
+          // Truly new = never synced to server before
+          const trulyNewNotes =
+            cloudIdSet.size === 0
+              ? localOnlyNotes
+              : localOnlyNotes.filter((n) => !n._synced);
+
+          // Missing from cloud AND was synced before = deleted on another device
+          const deletedOnOtherDevice =
+            cloudIdSet.size === 0
+              ? []
+              : localOnlyNotes.filter((n) => n._synced);
+
+          console.log(
+            `✨ TRULY NEW (will upload): ${trulyNewNotes.length} notes`,
+          );
+          trulyNewNotes.forEach((n) =>
+            console.log(`  NEW: id=${n.id} title="${n.title}"`),
+          );
+
+          console.log(
+            `🗑️  DELETED ON OTHER DEVICE (will remove locally): ${deletedOnOtherDevice.length} notes`,
+          );
+          deletedOnOtherDevice.forEach((n) =>
+            console.log(`  REMOVE: id=${n.id} title="${n.title}"`),
+          );
+
+          // MERGE
+          const mergedMap = new Map();
+          flattenedCloudNotes.forEach((n) => mergedMap.set(n.id, n));
+          trulyNewNotes.forEach((n) => mergedMap.set(n.id, n));
+          localNotes.forEach((n) => {
+            if (mergedMap.has(n.id)) {
+              mergedMap.set(n.id, { ...mergedMap.get(n.id), ...n });
+            }
+          });
+
+          const mergedNotes = Array.from(mergedMap.values());
+          console.log(`✅ MERGED RESULT: ${mergedNotes.length} notes`);
+          mergedNotes.forEach((n) =>
+            console.log(
+              `  MERGED: id=${n.id} title="${n.title}" _synced=${n._synced}`,
+            ),
+          );
+          console.log("🔄 ===== SYNC END =====");
+
+          chrome.storage.local.set({ [STORAGE_KEY]: mergedNotes }, () => {
+            loadLocalUI();
+            if (trulyNewNotes.length > 0) {
+              console.log(
+                `⬆️  Uploading ${trulyNewNotes.length} truly new notes`,
+              );
+              queueSync(trulyNewNotes);
+            }
+          });
+        }
       });
     } else {
       $("uStatus").textContent = "Local Mode Only";
@@ -1161,16 +1184,21 @@ async function saveNewNote() {
 
   const context = JSON.parse($("addNoteModal").dataset.context || "{}");
 
-  // Build the note object — mirrors the shape used by the extension
+  // Notes added from a folder context are general notes
+  const isGeneralNote = context.type === "folder";
+
   const newNote = {
     id: "dash_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
     title: titleVal,
     content: contentVal,
     selection: "",
-    url:
-      urlVal || (context.type === "page" ? context.url : "dashboard://manual"),
-    domain:
-      context.type === "page"
+    url: isGeneralNote
+      ? "general://notes"
+      : urlVal ||
+        (context.type === "page" ? context.url : "dashboard://manual"),
+    domain: isGeneralNote
+      ? "general"
+      : context.type === "page"
         ? context.domain ||
           urlVal.replace(/^https?:\/\/(www\.)?/, "").split("/")[0] ||
           "manual"
@@ -1182,6 +1210,7 @@ async function saveNewNote() {
     timestamp: null,
     image_data: null,
     createdAt: new Date().toISOString(),
+    _synced: false,
   };
 
   chrome.storage.local.get([STORAGE_KEY], (res) => {
@@ -1245,7 +1274,9 @@ function openSpecificPage(targetUrl) {
   $("main").style.display = "none";
   $("singlePageView").style.display = "block";
 
-  const siteNotes = notesByUrl[targetUrl] || [];
+  const siteNotes = (notesByUrl[targetUrl] || []).filter(
+    (n) => n.url !== "general://notes",
+  );
   siteNotes.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
 
   const displayName = getDisplayName(targetUrl);

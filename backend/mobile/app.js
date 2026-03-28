@@ -140,10 +140,23 @@ function toast(m, ms = 2500) {
 
 function byDomain(ns) {
   const m = {};
+
   ns.forEach((n) => {
-    if (!m[n.url]) m[n.url] = { url: n.url, domain: n.domain, notes: [] };
+    if (n.url === "folder://notes" || n.url === "general://notes") {
+      return;
+    }
+
+    if (!m[n.url]) {
+      m[n.url] = {
+        url: n.url,
+        domain: n.domain,
+        notes: [],
+      };
+    }
+
     m[n.url].notes.push(n);
   });
+
   return Object.values(m);
 }
 
@@ -347,7 +360,9 @@ function renderHome(data) {
   all.forEach((g) => {
     const nm = g.iF
       ? g.name
-      : g.domain || g.url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0];
+      : g.url === "folder://notes"
+        ? null
+        : g.domain || g.url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0];
     const srt = [...g.notes].sort(
       (a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0),
     );
@@ -594,7 +609,9 @@ $("searchIn").addEventListener("input", () => {
       (n.title || "").toLowerCase().includes(q) ||
       (n.content || "").toLowerCase().includes(q) ||
       (n.selection || "").toLowerCase().includes(q) ||
-      (n.domain || "").toLowerCase().includes(q),
+      (n.url !== "folder://notes" &&
+        n.url !== "general://notes" &&
+        (n.domain || "").toLowerCase().includes(q)),
   );
 
   $("homeCnt").innerHTML = hits.length

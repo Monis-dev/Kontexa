@@ -44,19 +44,22 @@ function loadFolderDropdown() {
   const select = document.getElementById("folderSelect");
   if (!select) return;
 
-  chrome.storage.local.get([FOLDERS_KEY, "cn_show_pro_ui"], (res) => {
+  chrome.storage.local.get([FOLDERS_KEY], (res) => {
     const folders = res[FOLDERS_KEY] || [];
+    const row = document.getElementById("folderRow");
 
+    // Always show folder row so General Note toggle can use it
+    if (row) row.style.display = "flex";
+
+    // If no folders exist, seed a default "General Notes" folder
     if (folders.length === 0) {
-      // Hide the whole folder row if no folders exist yet
-      const row = document.getElementById("folderRow");
-      if (row) row.style.display = "none";
+      chrome.storage.local.set({ [FOLDERS_KEY]: ["General Notes"] });
+      select.innerHTML = `
+        <option value="">No folder</option>
+        <option value="General Notes">General Notes</option>
+      `;
       return;
     }
-
-    // Show the folder row
-    const row = document.getElementById("folderRow");
-    if (row) row.style.display = "flex";
 
     select.innerHTML =
       `<option value="">No folder</option>` +
@@ -76,9 +79,79 @@ async function initPopup() {
   loadFolderDropdown();
   setupHighlightToggle();
   setupPopupButtons();
+  injectGeneralNoteToggle(); // ← add this
   setupSaveButton();
   setupEditDeleteHandler();
   await loadPageNotes();
+}
+
+function injectGeneralNoteToggle() {
+  // Find the folder row and inject the toggle above it
+  const folderRow = document.getElementById("folderRow");
+  if (!folderRow || document.getElementById("generalToggleRow")) return;
+
+  const toggleRow = document.createElement("div");
+  toggleRow.id = "generalToggleRow";
+  toggleRow.style.cssText = `
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 12px;
+    color: var(--mut, #64748b);
+    cursor: pointer;
+    user-select: none;
+  `;
+  toggleRow.innerHTML = `
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;width:100%;">
+      <div id="generalToggleSwitch" style="
+        width: 32px; height: 18px; background: var(--bdr, #e2e8f0);
+        border-radius: 20px; position: relative; transition: background 0.2s;
+        flex-shrink: 0;
+      ">
+        <div id="generalToggleThumb" style="
+          width: 14px; height: 14px; background: white;
+          border-radius: 50%; position: absolute; top: 2px; left: 2px;
+          transition: left 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        "></div>
+      </div>
+      <span id="generalToggleLabel">Save as General Note</span>
+    </label>
+  `;
+
+  folderRow.parentNode.insertBefore(toggleRow, folderRow);
+
+  // Toggle state
+  let isGeneral = false;
+  const switchEl = document.getElementById("generalToggleSwitch");
+  const thumbEl = document.getElementById("generalToggleThumb");
+  const folderSelect = document.getElementById("folderSelect");
+
+  toggleRow.addEventListener("click", () => {
+    isGeneral = !isGeneral;
+
+    // Update switch visuals
+    switchEl.style.background = isGeneral
+      ? "var(--acc, #4f46e5)"
+      : "var(--bdr, #e2e8f0)";
+    thumbEl.style.left = isGeneral ? "16px" : "2px";
+
+    // Show/hide folder row based on toggle
+    folderRow.style.display = isGeneral ? "flex" : "none";
+
+    // If turning on general mode, auto-select first folder
+    if (isGeneral && folderSelect) {
+      // Select first non-empty option
+      const firstFolder = [...folderSelect.options].find((o) => o.value !== "");
+      if (firstFolder) folderSelect.value = firstFolder.value;
+    }
+
+    // Store toggle state so setupSaveButton can read it
+    document.getElementById("generalToggleRow").dataset.isGeneral = isGeneral;
+  });
+
+  // Start with folder row hidden (domain mode is default)
+  folderRow.style.display = "none";
 }
 
 //
@@ -171,17 +244,48 @@ function setupSaveButton() {
       return;
     }
 
+    const isGeneral =
+      document.getElementById("generalToggleRow")?.dataset.isGeneral === "true";
+
+    // If general mode and no folder selected, use/create "General Notes"
+    let finalFolder = folder;
+    if (isGeneral && !finalFolder) {
+      finalFolder = "General Notes";
+      // Ensure folder exists in storage
+      chrome.storage.local.get([FOLDERS_KEY], (res) => {
+        const folders = res[FOLDERS_KEY] || [];
+        if (!folders.includes("General Notes")) {
+          chrome.storage.local.set({
+            [FOLDERS_KEY]: [...folders, "General Notes"],
+          });
+        }
+      });
+    }
+
+    let noteUrl;
+    let noteDomain;
+
+    if (isGeneral || finalFolder) {
+      // Folder-based note
+      noteUrl = "folder://notes";
+      noteDomain = "folder";
+    } else {
+      // Domain-based note
+      noteUrl = tab.url;
+      noteDomain = new URL(tab.url).hostname || "Unknown";
+    }
+
     const note = {
       id: Date.now().toString(),
-      url: tab.url,
-      domain: new URL(tab.url).hostname || "Unknown",
+      url: noteUrl,
+      domain: noteDomain,
       title,
       content,
       selection: "",
       pinned: false,
-      folder,
+      folder: finalFolder,
+      _synced: false,
     };
-
     let notes = await getNotes();
 
     notes.push(note);
@@ -222,7 +326,10 @@ async function loadPageNotes() {
     rebuildNotesCache(cachedNotes);
   }
 
-  const pageNotes = notesByUrlCache[tab.url] || [];
+  // Only show notes for the current page URL, never general notes
+  const pageNotes = (notesByUrlCache[tab.url] || []).filter(
+    (n) => n.url !== "general://notes",
+  );
 
   if (!pageNotes.length) {
     notesList.innerHTML =
