@@ -1,21 +1,22 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 //  CONFIG
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 const API = "https://context-notes.onrender.com";
 const NKEY = "cn_notes_v3";
 const KKEY = "cn_keys";
 const TKEY = "cn_theme";
 const UKEY = "cn_user";
+const NMKEY = "cn_source_names"; // ← custom display names (synced from extension)
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 //  THEMES
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 const TH = {
   nova: {
     l: "Nova",
     e: "✦",
     s: "linear-gradient(135deg,#6366f1,#4f46e5)",
-    f: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap",
+    f: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap",
     fv: "'Plus Jakarta Sans',sans-serif",
     bg: "#f6f7f9",
   },
@@ -23,8 +24,8 @@ const TH = {
     l: "Midnight",
     e: "🌙",
     s: "linear-gradient(135deg,#1e293b,#0f172a)",
-    f: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
-    fv: "'Inter',sans-serif",
+    f: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap",
+    fv: "'Plus Jakarta Sans',sans-serif",
     bg: "#080f1a",
   },
   aurora: {
@@ -108,9 +109,44 @@ function renderTGrid() {
 
 applyTheme(curTheme);
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+//  CUSTOM SOURCE NAMES
+//  The extension saves to localStorage key "cn_source_names"
+//  as a JSON object { [url]: "custom display name" }
+// ═══════════════════════════════════════════════════════════
+function getSourceNames() {
+  try {
+    const raw = localStorage.getItem(NMKEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+/**
+ * Returns the display name for a URL:
+ *  1. Custom name set via extension (if any)
+ *  2. Cleaned domain (strip protocol, www.)
+ */
+function getDisplayName(url) {
+  if (!url) return "Unknown";
+  const names = getSourceNames();
+  if (names[url]) return names[url];
+  // Clean domain
+  let name = url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0];
+  if (name.length > 48) name = name.slice(0, 48) + "…";
+  return name;
+}
+
+/** Whether a URL has a custom name set */
+function hasCustomName(url) {
+  const names = getSourceNames();
+  return !!names[url];
+}
+
+// ═══════════════════════════════════════════════════════════
 //  STATE
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 let notes = [];
 let curUser = null;
 let curView = "notes";
@@ -119,9 +155,9 @@ let curProv = "gemini";
 let aiRunning = false;
 let toastT;
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 //  HELPERS
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 const $ = (id) => document.getElementById(id);
 const esc = (s) =>
   String(s || "")
@@ -138,28 +174,18 @@ function toast(m, ms = 2500) {
   toastT = setTimeout(() => t.classList.remove("on"), ms);
 }
 
+/** Group notes by URL, skipping special-protocol URLs */
 function byDomain(ns) {
   const m = {};
-
   ns.forEach((n) => {
-    if (n.url === "folder://notes" || n.url === "general://notes") {
-      return;
-    }
-
-    if (!m[n.url]) {
-      m[n.url] = {
-        url: n.url,
-        domain: n.domain,
-        notes: [],
-      };
-    }
-
+    if (n.url === "folder://notes" || n.url === "general://notes") return;
+    if (!m[n.url]) m[n.url] = { url: n.url, domain: n.domain, notes: [] };
     m[n.url].notes.push(n);
   });
-
   return Object.values(m);
 }
 
+/** Group notes by folder name */
 function byFolder(ns) {
   const m = {};
   ns.forEach((n) => {
@@ -171,9 +197,9 @@ function byFolder(ns) {
   return Object.values(m);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 //  AUTH
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 async function checkAuth() {
   const cached = localStorage.getItem(UKEY);
   if (cached) {
@@ -194,15 +220,15 @@ async function checkAuth() {
       notes = [];
     }
   } catch (e) {
-    // offline — keep cached state
+    /* offline — keep cached state */
   }
 
   loadNotes();
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  NOTES
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+//  LOAD NOTES
+// ═══════════════════════════════════════════════════════════
 async function loadNotes() {
   if (!curUser) {
     renderLoggedOut();
@@ -213,6 +239,7 @@ async function loadNotes() {
     return;
   }
 
+  // Show cached notes immediately
   const raw = localStorage.getItem(NKEY);
   if (raw) {
     try {
@@ -221,13 +248,25 @@ async function loadNotes() {
       renderDrw();
     } catch (e) {}
   } else {
-    $("homeCnt").innerHTML = '<div class="spin"></div>';
+    $("homeCnt").innerHTML =
+      '<div class="spin-wrap"><div class="spin"></div></div>';
   }
 
+  // Fetch from server
   try {
     const r = await fetch(`${API}/api/notes`, { credentials: "include" });
     if (r.ok) {
       const sites = await r.json();
+
+      // Also sync any custom names the server knows about
+      const localNames = getSourceNames();
+      sites.forEach((s) => {
+        if (s.custom_name && !localNames[s.url]) {
+          localNames[s.url] = s.custom_name;
+        }
+      });
+      localStorage.setItem(NMKEY, JSON.stringify(localNames));
+
       notes = [];
       sites.forEach((s) =>
         (s.notes || []).forEach((n) =>
@@ -269,14 +308,14 @@ async function loadNotes() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 //  AUTH SCREENS
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 function renderLoggedOut() {
   $("homeCnt").innerHTML = `
     <div class="auth">
       <div class="auth-logo">
-        <svg viewBox="0 0 24 24" style="width:34px;height:34px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round">
+        <svg viewBox="0 0 24 24" style="width:36px;height:36px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round">
           <path d="M9 12h6M9 16h6M7 8h10M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"/>
         </svg>
       </div>
@@ -288,7 +327,7 @@ function renderLoggedOut() {
         </svg>
         Continue with Google
       </a>
-      <div class="auth-note">A Google sign-in page will open. After signing in, return to this app — your notes load automatically.</div>
+      <div class="auth-note">A Google sign-in page will open. After signing in, return here — your notes load automatically.</div>
     </div>`;
 }
 
@@ -304,7 +343,6 @@ function renderFreeUser() {
     </div>`;
 }
 
-// Poll /api/me every 5 s after the Google tab opens (max 24 attempts = 2 min)
 let pollT,
   pollN = 0;
 function startAuthPoll() {
@@ -328,9 +366,9 @@ function startAuthPoll() {
   }, 5000);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  RENDER HOME
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+//  RENDER HOME — now uses getDisplayName() everywhere
+// ═══════════════════════════════════════════════════════════
 function renderHome(data) {
   data = data || notes;
   if (!data.length) {
@@ -347,9 +385,9 @@ function renderHome(data) {
   const tot = data.length;
 
   let h = `<div class="stats">
-    <div class="chip"><div class="chip-dot"></div><strong>${tot}</strong>&nbsp;notes</div>
-    <div class="chip"><div class="chip-dot"></div><strong>${doms.length}</strong>&nbsp;sources</div>
-    ${fdrs.length ? `<div class="chip"><div class="chip-dot"></div><strong>${fdrs.length}</strong>&nbsp;folders</div>` : ""}
+    <div class="chip"><div class="chip-dot"></div><strong>${tot}</strong>&nbsp;note${tot !== 1 ? "s" : ""}</div>
+    <div class="chip"><div class="chip-dot"></div><strong>${doms.length}</strong>&nbsp;source${doms.length !== 1 ? "s" : ""}</div>
+    ${fdrs.length ? `<div class="chip"><div class="chip-dot"></div><strong>${fdrs.length}</strong>&nbsp;folder${fdrs.length !== 1 ? "s" : ""}</div>` : ""}
   </div>`;
 
   const all = [
@@ -358,11 +396,14 @@ function renderHome(data) {
   ];
 
   all.forEach((g) => {
-    const nm = g.iF
+    const rawName = g.iF
       ? g.name
-      : g.url === "folder://notes"
-        ? null
-        : g.domain || g.url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0];
+      : g.domain || g.url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0];
+
+    // Use custom name for URL groups
+    const displayName = g.iF ? rawName : getDisplayName(g.url);
+    const isCustom = g.iF ? false : hasCustomName(g.url);
+
     const srt = [...g.notes].sort(
       (a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0),
     );
@@ -381,12 +422,12 @@ function renderHome(data) {
           }
         </div>
         <div class="grp-inf">
-          <div class="grp-name">${esc(nm)}</div>
-          <div class="grp-sub">${srt.length} note${srt.length !== 1 ? "s" : ""}</div>
+          <div class="grp-name" data-custom="${isCustom}">${esc(displayName)}</div>
+          <div class="grp-sub">${isCustom ? `<span style="font-size:10px;opacity:0.7;">${esc(rawName)}</span> · ` : ""}${srt.length} note${srt.length !== 1 ? "s" : ""}</div>
         </div>
         <span class="grp-cnt">${srt.length}</span>
       </div>
-      <div class="clist">${pre.map((n) => nCard(n, nm)).join("")}</div>
+      <div class="clist">${pre.map((n) => nCard(n, displayName)).join("")}</div>
       ${ex > 0 ? `<button class="va" onclick="${clk}">View all ${srt.length} notes →</button>` : ""}
     </div>`;
   });
@@ -394,34 +435,55 @@ function renderHome(data) {
   $("homeCnt").innerHTML = h;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  NOTE CARD
-// ═══════════════════════════════════════════════════════════════════════════
-function nCard(n, dl) {
-  const hs = n.selection?.trim();
-  const hb = n.content?.trim();
-  return `<div class="nc${n.pinned ? " pin" : ""}" onclick="openNote('${esc(n.id)}')">
-    <div class="nc-t">${esc(n.title || "Untitled")}</div>
-    ${hs ? `<div class="nc-s">"${esc(n.selection.slice(0, 110))}${n.selection.length > 110 ? "…" : ""}"</div>` : ""}
-    ${hb ? `<div class="nc-b">${esc(n.content)}</div>` : ""}
-    ${n.image_data ? `<img class="nc-img" src="${n.image_data}" loading="lazy"/>` : ""}
+// ═══════════════════════════════════════════════════════════
+//  NOTE CARD — redesigned to match dashboard
+// ═══════════════════════════════════════════════════════════
+function nCard(n, displayLabel) {
+  const sel = n.selection?.trim();
+  const body = n.content?.trim();
+  const hasFooter = n.pinned || n.folder || n.timestamp;
+
+  // Build content pieces
+  let contentParts = "";
+  if (sel)
+    contentParts += `<div class="nc-s">"${esc(sel.length > 120 ? sel.slice(0, 120) + "…" : sel)}"</div>`;
+  if (body) contentParts += `<div class="nc-b">${esc(body)}</div>`;
+  if (!sel && !body && !n.image_data && !n.timestamp) {
+    contentParts += `<div class="nc-empty">No description added.</div>`;
+  }
+
+  const footerHtml = hasFooter
+    ? `
     <div class="nc-ft">
       ${n.pinned ? '<span class="tag p">⭐ Pinned</span>' : ""}
       ${n.folder ? `<span class="tag">📁 ${esc(n.folder)}</span>` : ""}
       ${n.timestamp ? `<span class="tstag">⏱ ${esc(n.timestamp)}</span>` : ""}
-      <span class="tag d">${esc((dl || "").slice(0, 22))}</span>
+      <span class="tag d">${esc((displayLabel || "").slice(0, 22))}</span>
+    </div>`
+    : `
+    <div class="nc-ft">
+      <span class="tag d">${esc((displayLabel || "").slice(0, 22))}</span>
+    </div>`;
+
+  return `<div class="nc${n.pinned ? " pin" : ""}" onclick="openNote('${esc(n.id)}')">
+    <div class="nc-top">
+      <div class="nc-t">${esc(n.title || "Untitled")}</div>
+      ${contentParts}
     </div>
+    ${n.image_data ? `<img class="nc-img" src="${n.image_data}" loading="lazy" alt="Screenshot"/>` : ""}
+    ${footerHtml}
   </div>`;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 //  NAVIGATION
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 function showView(v) {
   ["homeView", "pageView", "noteView", "settingsView"].forEach((id) =>
     $(id)?.classList.toggle("active", id === v + "View"),
   );
   curView = v;
+  $("mainScr").scrollTop = 0;
 }
 
 function navPg(enc) {
@@ -430,11 +492,11 @@ function navPg(enc) {
   const ns = notes
     .filter((n) => n.url === url)
     .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
-  const dom =
+  const displayName = getDisplayName(url);
+  const rawDomain =
     ns[0]?.domain || url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0];
-  renderPgView(ns, dom, url, false);
+  renderPgView(ns, displayName, rawDomain, url, false);
   showView("page");
-  $("mainScr").scrollTop = 0;
 }
 
 function navFdr(enc) {
@@ -443,12 +505,16 @@ function navFdr(enc) {
   const ns = notes
     .filter((n) => n.folder === nm)
     .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
-  renderPgView(ns, nm, null, true);
+  renderPgView(ns, nm, null, null, true);
   showView("page");
-  $("mainScr").scrollTop = 0;
 }
 
-function renderPgView(ns, ttl, url, iF) {
+function renderPgView(ns, ttl, rawDomain, url, iF) {
+  const isCustom = url ? hasCustomName(url) : false;
+  const subLine = isCustom
+    ? `<div class="phd-meta">${esc(rawDomain)} · ${ns.length} note${ns.length !== 1 ? "s" : ""}</div>`
+    : `<div class="phd-meta">${ns.length} note${ns.length !== 1 ? "s" : ""}</div>`;
+
   let h = `<div class="phd">
     <div class="phd-ico">
       ${
@@ -459,7 +525,7 @@ function renderPgView(ns, ttl, url, iF) {
     </div>
     <div class="phd-inf">
       <div class="phd-ttl">${esc(ttl)}</div>
-      <div class="phd-meta">${ns.length} note${ns.length !== 1 ? "s" : ""}</div>
+      ${subLine}
     </div>
   </div>`;
 
@@ -478,12 +544,15 @@ function openNote(id) {
   if (!n) return;
   prevView = curView;
 
+  // Use custom display name for the domain chip
+  const domainDisplay = n.url ? getDisplayName(n.url) : n.domain || "";
+
   let h = "";
-  if (n.domain)
+  if (domainDisplay)
     h += `<span class="nd-dom">
-    <svg viewBox="0 0 24 24" style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2"><circle cx="12" cy="12" r="10"/></svg>
-    ${esc(n.domain)}
-  </span>`;
+      <svg viewBox="0 0 24 24" style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2"><circle cx="12" cy="12" r="10"/></svg>
+      ${esc(domainDisplay)}
+    </span>`;
 
   h += `<div class="nd-ttl">${esc(n.title || "Untitled")}</div>`;
 
@@ -501,16 +570,15 @@ function openNote(id) {
 
   if (n.url)
     h += `<div class="nd-src">
-    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/></svg>
-    <a href="${esc(n.url)}" target="_blank" rel="noopener">${esc(n.url)}</a>
-  </div>`;
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/></svg>
+      <a href="${esc(n.url)}" target="_blank" rel="noopener">${esc(n.url)}</a>
+    </div>`;
 
   $("noteDet").innerHTML = h;
   showView("note");
-  $("mainScr").scrollTop = 0;
 }
 
-$("backBtn").onclick = () => {
+$("backBtn").onclick = () =>
   showView(
     prevView === "page"
       ? "page"
@@ -518,31 +586,28 @@ $("backBtn").onclick = () => {
         ? "settings"
         : "home",
   );
-  $("mainScr").scrollTop = 0;
-};
-$("noteBackBtn").onclick = () => {
+$("noteBackBtn").onclick = () =>
   showView(prevView === "page" ? "page" : "home");
-  $("mainScr").scrollTop = 0;
-};
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 //  TAB SWITCH
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 function switchTab(t) {
   document.querySelectorAll(".nt").forEach((x) => x.classList.remove("on"));
   $(`tab-${t}`).classList.add("on");
-  if (t === "notes") showView("home");
+  if (t === "notes") {
+    showView("home");
+  }
   if (t === "settings") {
     showView("settings");
     renderSettings();
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  DRAWER
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+//  DRAWER — uses custom names
+// ═══════════════════════════════════════════════════════════
 $("menuBtn").onclick = openDrw;
-
 function openDrw() {
   $("drw").classList.add("on");
   $("drwO").classList.add("on");
@@ -559,13 +624,15 @@ function renderDrw() {
 
   let h = `<div class="drw-sec"><div class="drw-lbl">Sources (${doms.length})</div>`;
   if (!doms.length)
-    h += `<div style="padding:10px 16px;font-size:13px;color:var(--mut)">No sources</div>`;
-  doms.forEach((g) => {
-    const nm =
-      g.domain || g.url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0];
-    h += `<div class="drw-it" onclick="closeDrw();navPg('${encodeURIComponent(g.url)}')">
+    h += `<div style="padding:10px 16px;font-size:13px;color:var(--mut)">No sources yet</div>`;
+
+  doms.forEach((g, i) => {
+    const displayName = getDisplayName(g.url);
+    const isCustom = hasCustomName(g.url);
+    h += `<div class="drw-it" style="animation-delay:${i * 30}ms"
+              onclick="closeDrw();navPg('${encodeURIComponent(g.url)}')">
       <div class="drw-dot"></div>
-      <span class="drw-nm">${esc(nm)}</span>
+      <span class="drw-nm" data-custom="${isCustom}">${esc(displayName)}</span>
       <span class="drw-bdg">${g.notes.length}</span>
     </div>`;
   });
@@ -573,8 +640,9 @@ function renderDrw() {
 
   if (fdrs.length) {
     h += `<div class="drw-sec"><div class="drw-lbl">Folders (${fdrs.length})</div>`;
-    fdrs.forEach((f) => {
-      h += `<div class="drw-it" onclick="closeDrw();navFdr('${encodeURIComponent(f.name)}')">
+    fdrs.forEach((f, i) => {
+      h += `<div class="drw-it" style="animation-delay:${i * 30}ms"
+                onclick="closeDrw();navFdr('${encodeURIComponent(f.name)}')">
         <div class="drw-fdot"></div>
         <span class="drw-nm">📁 ${esc(f.name)}</span>
         <span class="drw-bdg">${f.notes.length}</span>
@@ -586,9 +654,9 @@ function renderDrw() {
   $("drwBdy").innerHTML = h;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  SEARCH
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+//  SEARCH — uses custom names in results
+// ═══════════════════════════════════════════════════════════
 $("searchIn").addEventListener("input", () => {
   const q = $("searchIn").value.trim().toLowerCase();
   $("searchClr").classList.toggle("on", q.length > 0);
@@ -604,19 +672,22 @@ $("searchIn").addEventListener("input", () => {
     $("tab-notes").classList.add("on");
   }
 
-  const hits = notes.filter(
-    (n) =>
+  const hits = notes.filter((n) => {
+    const customName = getDisplayName(n.url).toLowerCase();
+    return (
       (n.title || "").toLowerCase().includes(q) ||
       (n.content || "").toLowerCase().includes(q) ||
       (n.selection || "").toLowerCase().includes(q) ||
-      (n.url !== "folder://notes" &&
-        n.url !== "general://notes" &&
-        (n.domain || "").toLowerCase().includes(q)),
-  );
+      customName.includes(q) ||
+      (n.domain || "").toLowerCase().includes(q)
+    );
+  });
 
   $("homeCnt").innerHTML = hits.length
-    ? `<div class="stats"><div class="chip"><div class="chip-dot"></div><strong>${hits.length}</strong>&nbsp;result${hits.length !== 1 ? "s" : ""} for "${esc(q)}"</div></div>
-       <div class="clist">${hits.map((n) => nCard(n, n.domain || "")).join("")}</div>`
+    ? `<div class="stats">
+         <div class="chip"><div class="chip-dot"></div><strong>${hits.length}</strong>&nbsp;result${hits.length !== 1 ? "s" : ""} for "${esc(q)}"</div>
+       </div>
+       <div class="clist">${hits.map((n) => nCard(n, getDisplayName(n.url))).join("")}</div>`
     : `<div class="empty"><div class="empty-ico">🔍</div><div class="empty-ttl">No results</div><div class="empty-sub">Nothing matched "<strong>${esc(q)}</strong>"</div></div>`;
 });
 
@@ -626,16 +697,16 @@ $("searchClr").onclick = () => {
   renderHome();
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 //  AI MODAL
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 function openAI() {
   if (!curUser) {
     toast("Sign in first");
     return;
   }
   $("aiMo").classList.add("on");
-  setTimeout(() => $("cin").focus(), 300);
+  setTimeout(() => $("cin").focus(), 320);
 }
 function closeAI() {
   $("aiMo").classList.remove("on");
@@ -653,15 +724,11 @@ $("cin").addEventListener("input", function () {
   this.style.height = Math.min(this.scrollHeight, 88) + "px";
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  SEND MESSAGE — uses AIAgent (ai_agent.js must be loaded first)
-// ═══════════════════════════════════════════════════════════════════════════
 async function sendMsg() {
   if (aiRunning) return;
   const q = $("cin").value.trim();
   if (!q) return;
 
-  // Check key before anything else
   if (!AIAgent.getKey()) {
     toast("⚠️ Set a Gemini API key in Settings");
     closeAI();
@@ -674,7 +741,6 @@ async function sendMsg() {
   $("cin").style.height = "auto";
   aiRunning = true;
 
-  // Thinking indicator
   const tid = "t" + Date.now();
   $("cbox").insertAdjacentHTML(
     "beforeend",
@@ -686,14 +752,12 @@ async function sendMsg() {
     const result = await AIAgent.chat(q, notes);
     $(tid)?.remove();
 
-    // Render markdown answer in its own bubble
     const bubble = document.createElement("div");
     bubble.className = "cm a";
     bubble.innerHTML = AIAgent.renderMarkdown(result.answer);
     $("cbox").appendChild(bubble);
     $("cbox").scrollTop = $("cbox").scrollHeight;
 
-    // Merge tags back into local note cache
     if (result.tags && Object.keys(result.tags).length > 0) {
       notes = notes.map((n) => {
         const newTags = result.tags[n.id];
@@ -727,9 +791,9 @@ function addMsg(role, txt) {
   $("cbox").scrollTop = $("cbox").scrollHeight;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 //  API KEY MODAL
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 function openAPI() {
   const ks = JSON.parse(localStorage.getItem(KKEY) || "{}");
   $("apiKIn").value = ks[curProv] || "";
@@ -758,9 +822,9 @@ function saveKey() {
   renderSettings();
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 //  THEME MODAL
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 $("themeBtn").onclick = () => {
   renderTGrid();
   $("themeMo").classList.add("on");
@@ -769,9 +833,9 @@ function closeTh() {
   $("themeMo").classList.remove("on");
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 //  ACCOUNT MODAL
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 $("acctBtn").onclick = () => {
   renderAcct();
   $("acctMo").classList.add("on");
@@ -783,23 +847,23 @@ function closeAcct() {
 function renderAcct() {
   if (!curUser) {
     $("acctPnl").innerHTML = `
-      <div style="text-align:center;font-size:36px;padding:8px 0">👤</div>
+      <div style="text-align:center;font-size:42px;padding:8px 0">👤</div>
       <div class="ae" style="color:var(--mut)">Not signed in</div>
       <a class="abtn pri" href="${API}/login?mobile=1" target="_blank" rel="noopener"
          onclick="startAuthPoll();closeAcct()"
-         style="display:flex;align-items:center;justify-content:center;text-decoration:none">
+         style="display:flex;align-items:center;justify-content:center;text-decoration:none;">
         Sign in with Google
       </a>`;
     return;
   }
   $("acctPnl").innerHTML = `
-    <div class="av">${curUser.email[0].toUpperCase()}</div>
+    <div class="av">${(curUser.email || "?")[0].toUpperCase()}</div>
     <div class="ae">${esc(curUser.email)}</div>
     <div class="apl">
       ${
         curUser.is_pro
           ? '<span class="pro-badge">✦ Pro Plan</span>'
-          : `<span style="font-size:12px;color:var(--mut)">Free Plan — <a href="${API}/pricing" target="_blank" style="color:var(--acc);text-decoration:none">Upgrade →</a></span>`
+          : `<span style="font-size:12px;color:var(--mut)">Free Plan — <a href="${API}/pricing" target="_blank" style="color:var(--acc);text-decoration:none;">Upgrade →</a></span>`
       }
     </div>
     <div class="adiv"></div>
@@ -824,9 +888,9 @@ async function doLogout() {
   toast("Signed out");
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 //  SETTINGS
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 function renderSettings() {
   const ks = JSON.parse(localStorage.getItem(KKEY) || "{}");
   const hasK = !!(ks.gemini || ks.openai || ks.claude);
@@ -836,19 +900,25 @@ function renderSettings() {
     <div class="sw-ttl">Settings</div>
 
     <div class="sl">Account</div>
-    <div class="sc2" style="margin-bottom:20px">
+    <div class="sc2">
       <div class="sr" onclick="renderAcct();$('acctMo').classList.add('on')">
         <div class="si2">👤</div>
         <div class="si2-inf">
           <div class="si2-t">${curUser ? esc(curUser.email) : "Not signed in"}</div>
-          <div class="si2-s">${curUser ? (curUser.is_pro ? '<span class="sdot ok"></span>Pro Plan' : "Free Plan — tap to upgrade") : "Tap to sign in"}</div>
+          <div class="si2-s">${
+            curUser
+              ? curUser.is_pro
+                ? '<span class="sdot ok"></span>Pro Plan'
+                : "Free Plan — tap to upgrade"
+              : "Tap to sign in"
+          }</div>
         </div>
         <span class="schev">›</span>
       </div>
     </div>
 
     <div class="sl">Appearance</div>
-    <div class="sc2" style="margin-bottom:20px">
+    <div class="sc2">
       <div class="sr" onclick="renderTGrid();$('themeMo').classList.add('on')">
         <div class="si2">🎨</div>
         <div class="si2-inf">
@@ -860,7 +930,7 @@ function renderSettings() {
     </div>
 
     <div class="sl">AI</div>
-    <div class="sc2" style="margin-bottom:20px">
+    <div class="sc2">
       <div class="sr" onclick="openAPI()">
         <div class="si2">🔑</div>
         <div class="si2-inf">
@@ -898,7 +968,7 @@ function renderSettings() {
         <span class="schev">›</span>
       </div>
     </div>
-    <div style="text-align:center;padding:20px 0 4px;font-size:11px;color:var(--mut2)">ContextNote Mobile v1.4 PWA</div>`;
+    <div style="text-align:center;padding:20px 0 4px;font-size:11px;color:var(--mut2)">ContextNote Mobile v1.5 PWA</div>`;
 }
 
 async function syncNow() {
@@ -909,7 +979,8 @@ async function syncNow() {
   toast("Syncing…");
   notes = [];
   localStorage.removeItem(NKEY);
-  $("homeCnt").innerHTML = '<div class="spin"></div>';
+  $("homeCnt").innerHTML =
+    '<div class="spin-wrap"><div class="spin"></div></div>';
   await loadNotes();
   renderSettings();
   toast("✓ Synced");
@@ -924,9 +995,9 @@ function clearCache() {
   toast("Cache cleared");
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 //  SERVICE WORKER
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () =>
     navigator.serviceWorker
@@ -936,8 +1007,8 @@ if ("serviceWorker" in navigator) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 //  INIT
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 renderTGrid();
 checkAuth();
