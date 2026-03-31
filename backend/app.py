@@ -605,10 +605,9 @@ def delete_folder(folder_name):
         return jsonify({"error": "Login required"}), 401
 
     try:
-        # Decode URL encoded folder name
         folder_name = unquote(folder_name)
 
-        # Find notes belonging to this folder
+        # Get notes in this folder
         notes = (
             Note.query
             .join(Website)
@@ -619,14 +618,16 @@ def delete_folder(folder_name):
             .all()
         )
 
-        # Remove folder reference (do NOT delete notes)
+        deleted_count = 0
+
         for note in notes:
-            note.folder = None
+            db.session.delete(note)
+            deleted_count += 1
 
         db.session.commit()
 
         return jsonify({
-            "message": "Folder deleted successfully"
+            "message": f"Folder and {deleted_count} notes deleted"
         }), 200
 
     except Exception as e:
@@ -636,7 +637,6 @@ def delete_folder(folder_name):
         return jsonify({
             "error": str(e)
         }), 500
-
 @app.route('/api/folders/rename', methods=['PUT'])
 def rename_folder():
 
