@@ -319,7 +319,7 @@ def pricing():
     user = db.session.get(User, session['user_id'])
     if user.is_pro:
         return "<h2>You are already a Pro user! Close this tab and enjoy the extension.</h2>"
-    return render_template('pricing.html', email=user.email)
+    return render_template('pricing.html', email=user.email, razorpay_key_id=RAZORPAY_KEY_ID)
 
 @app.route('/create-order', methods=['POST'])
 def create_order():
