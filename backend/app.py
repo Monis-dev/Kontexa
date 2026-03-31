@@ -1,5 +1,8 @@
 import os
 import stripe
+import razorpay
+import hmac
+import hashlib
 from datetime import datetime
 
 from urllib.parse import unquote
@@ -42,6 +45,12 @@ STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "whsec_123...")
 PRICE_MONTHLY_ID = os.getenv("STRIPE_PRICE_MONTHLY", "price_123...")
 PRICE_LIFETIME_ID = os.getenv("STRIPE_PRICE_LIFETIME", "price_456...")
 
+# RazorPay
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
+RAZORPAY_SECRET_KEY = os.getenv("RAZORPAY_SECRET_KEY")
+client = razorpay.Client(
+    auth=(RAZORPAY_KEY_ID, RAZORPAY_SECRET_KEY)
+)
 
 MOBILE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mobile')
 # ─────────────────────────────────────────────────────────────────────────────
@@ -319,38 +328,66 @@ def pricing():
         return "<h2>You are already a Pro user! Close this tab and enjoy the extension.</h2>"
     return render_template('pricing.html', email=user.email)
 
-@app.route('/create-checkout-session', methods=['POST'])
-def create_checkout_session():
-    print("--- CHECKOUT BUTTON CLICKED ---")
+@app.route('/create-order', methods=['POST'])
+def create_order():
     if 'user_id' not in session:
-        return redirect(url_for('login'))
+        return jsonify({"error": "Login required"}), 401
+    user_id = session['user_id']
+    data = request.json
+    plan_type = data.get("plan_type")
+    if plan_type == "lifetime":
+        amount = 4000  # $40 → cents
+        currency = "USD"
+    elif plan_type == "monthly":
+        amount = 200  # $2 → cents
+        currency = "USD"
+    else:
+        return jsonify({"error": "Invalid plan"}), 400
+    order = client.order.create({
+        "amount": amount,
+        "currency": currency,
+        "payment_capture": 1,
+        "notes": {
+            "user_id": str(user_id),
+            "plan_type": plan_type
+        }
+    })
+    return jsonify(order)
 
-    user_id    = session['user_id']
-    user_email = session['user_email']
-    plan_type  = request.form.get('plan_type')
-    price_id   = os.getenv("STRIPE_PRICE_LIFETIME")
-    mode       = 'payment'
-    print(f"User: {user_email} | Plan: {plan_type} | Price: {price_id}")
+@app.route('/verify-payment', methods=['POST'])
+def verify_payment():
+
+    data = request.json
+
+    razorpay_order_id = data['razorpay_order_id']
+    razorpay_payment_id = data['razorpay_payment_id']
+    razorpay_signature = data['razorpay_signature']
 
     try:
-        checkout_session = stripe.checkout.Session.create(
-            customer_email=user_email,
-            client_reference_id=str(user_id),
-            payment_method_types=['card'],
-            line_items=[{'price': price_id, 'quantity': 1}],
-            mode=mode,
-            success_url=request.host_url + 'success',
-            cancel_url=request.host_url + 'pricing',
-        )
-        return redirect(checkout_session.url, code=303)
-    except Exception as e:
-        print(f"STRIPE ERROR: {str(e)}")
-        return f"""
-        <div style="font-family:sans-serif;padding:40px;text-align:center;">
-            <h2 style="color:red;">Stripe Error</h2><p><b>{str(e)}</b></p>
-            <a href="/pricing">Go Back</a>
-        </div>""", 400
 
+        client.utility.verify_payment_signature({
+            'razorpay_order_id': razorpay_order_id,
+            'razorpay_payment_id': razorpay_payment_id,
+            'razorpay_signature': razorpay_signature
+        })
+
+        order = client.order.fetch(razorpay_order_id)
+
+        user_id = order["notes"]["user_id"]
+
+        user = db.session.get(User, int(user_id))
+
+        if user:
+            user.is_pro = True
+            db.session.commit()
+
+        return jsonify({"status": "success"})
+
+    except Exception as e:
+
+        print("VERIFY ERROR:", e)
+
+        return jsonify({"status": "failed"}), 400
 @app.route('/success')
 def success():
     return """
@@ -359,32 +396,6 @@ def success():
         <p>Your account has been upgraded to ContextNote Pro.</p>
         <p><b>Close this tab and click 'Account → Sync' in your extension to activate.</b></p>
     </div>"""
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    payload    = request.data
-    sig_header = request.headers.get('Stripe-Signature')
-    try:
-        event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
-    except ValueError:
-        return 'Invalid payload', 400
-    except stripe.error.SignatureVerificationError:
-        return 'Invalid signature', 400
-
-    if event['type'] == 'checkout.session.completed':
-        session_data = event['data']['object']
-        user_id = session_data.get('client_reference_id')
-        print(f"WEBHOOK: Payment OK for user_id={user_id}")
-        if user_id:
-            user = db.session.get(User, int(user_id))
-            if user:
-                user.is_pro = True
-                db.session.commit()
-                print(f"Upgraded: {user.email}")
-    elif event['type'] in ['customer.subscription.deleted', 'invoice.payment_failed']:
-        pass
-
-    return '', 200
 
 
 # ─── Notes API ────────────────────────────────────────────────────────────────
