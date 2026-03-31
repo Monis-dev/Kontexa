@@ -186,6 +186,8 @@
           const res = await fetch("/create-order", {
             method: "POST",
 
+            credentials: "include",
+
             headers: {
               "Content-Type": "application/json",
             },
@@ -219,6 +221,8 @@
               // Verify payment
               const verifyRes = await fetch("/verify-payment", {
                 method: "POST",
+
+                credentials: "include",
 
                 headers: {
                   "Content-Type": "application/json",
