@@ -40,9 +40,9 @@ db = SQLAlchemy(app)
 
 # RazorPay
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
-RAZORPAY_SECRET_KEY = os.getenv("RAZORPAY_SECRET_KEY")
+RAZORPAY_SECRET = os.getenv("RAZORPAY_SECRET_KEY")
 client = razorpay.Client(
-    auth=(RAZORPAY_KEY_ID, RAZORPAY_SECRET_KEY)
+    auth=(RAZORPAY_KEY_ID, RAZORPAY_SECRET)
 )
 
 MOBILE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mobile')
