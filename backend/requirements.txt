@@ -3,7 +3,7 @@ Flask-SQLAlchemy==3.1.1
 flask-cors==6.0.2
 Authlib==1.6.8
 python-dotenv==1.2.1
-stripe==14.4.1
+razorpay==2.0.1
 requests==2.32.5
 psycopg2-binary==2.9.11
 gunicorn==23.0.0
