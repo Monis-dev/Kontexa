@@ -329,11 +329,11 @@ def create_order():
     data = request.json
     plan_type = data.get("plan_type")
     if plan_type == "lifetime":
-        amount = 4000  # $40 → cents
-        currency = "USD"
+        amount = 200000  # $40 → cents
+        currency = "INR"
     elif plan_type == "monthly":
-        amount = 200  # $2 → cents
-        currency = "USD"
+        amount = 20000  # $2 → cents
+        currency = "INR"
     else:
         return jsonify({"error": "Invalid plan"}), 400
     order = client.order.create({

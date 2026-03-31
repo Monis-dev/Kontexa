@@ -133,11 +133,12 @@
       <h1>Supercharge Your Research</h1>
       <p class="subtitle">Logged in as: <b>{{ email }}</b></p>
 
-      <div class="grid">
+      <div class="grid" style="grid-template-columns: 1fr 1fr 1fr">
         <!-- Free Tier -->
         <div class="card">
           <h2>Free Edition</h2>
           <div class="price">$0<span>/forever</span></div>
+
           <ul>
             <li>Unlimited local highlights</li>
             <li>Save text notes & screenshots</li>
@@ -145,25 +146,29 @@
             <li>Beautiful local dashboard</li>
             <li>Color themes</li>
           </ul>
+
           <button class="btn-outline" disabled>Your Current Plan</button>
         </div>
 
-        <!-- Lifetime Pro -->
+        <!-- Monthly Plan -->
         <div class="card pro">
-          <div class="badge">Pay Once, Use Forever</div>
-          <h2>Pro Edition</h2>
-          <div class="price">$25<span>/one-time</span></div>
+          <div class="badge">⭐ Most Popular</div>
+
+          <h2>Pro Monthly</h2>
+
+          <div class="price">$2<span>/month</span></div>
+
           <ul>
             <li><b>Everything in Free, plus:</b></li>
-            <li>☁️ Cloud Sync across all your devices</li>
-            <li>⏱️ Automatically save YouTube Timestamps and TimeScript</li>
-            <li>📁 Organize research into Custom Folders</li>
-            <li>💬 Chat with your notes (AI Assistant)</li>
-            <li>✨ Generate AI Page Summaries</li>
-            <li>🔑 Bring Your Own API Key (Unlimited AI)</li>
+            <li>☁️ Cloud Sync</li>
+            <li>📁 Unlimited folders</li>
+            <li>💬 Chat with notes (AI)</li>
+            <li>✨ AI page summaries</li>
+            <li>🔑 Bring your own API key</li>
           </ul>
-          <button class="btn-primary" onclick="startPayment('lifetime')">
-            Upgrade to Pro
+
+          <button class="btn-primary" onclick="startPayment('monthly')">
+            Start Monthly Plan
           </button>
 
           <p
@@ -174,7 +179,39 @@
               margin-top: 15px;
             "
           >
-            Secure payment via Razorpay
+            Cancel anytime
+          </p>
+        </div>
+
+        <!-- Lifetime Plan -->
+        <div class="card">
+          <div class="badge">🚀 Best Value</div>
+
+          <h2>Pro Lifetime</h2>
+
+          <div class="price">$40<span>/one-time</span></div>
+
+          <ul>
+            <li><b>Everything in Monthly, plus:</b></li>
+            <li>♾ Lifetime access</li>
+            <li>🔓 No recurring payments</li>
+            <li>🚀 Priority feature access</li>
+            <li>💎 One-time payment</li>
+          </ul>
+
+          <button class="btn-primary" onclick="startPayment('lifetime')">
+            Buy Lifetime Access
+          </button>
+
+          <p
+            style="
+              text-align: center;
+              font-size: 12px;
+              color: #64748b;
+              margin-top: 15px;
+            "
+          >
+            Pay once, use forever
           </p>
         </div>
       </div>
