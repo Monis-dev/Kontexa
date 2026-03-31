@@ -381,6 +381,25 @@ def verify_payment():
         print("VERIFY ERROR:", e)
 
         return jsonify({"status": "failed"}), 400
+    
+@app.route("/test-razorpay")
+def test_razorpay():
+
+    try:
+
+        order = client.order.create({
+            "amount": 10000,
+            "currency": "INR",
+            "payment_capture": 1
+        })
+
+        return jsonify(order)
+
+    except Exception as e:
+
+        return str(e)
+    
+
 @app.route('/success')
 def success():
     return """
