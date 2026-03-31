@@ -11,6 +11,9 @@
     <link rel="stylesheet" href="dashboard.css" />
   </head>
   <body>
+    <!-- ═══════════════════════════════════════════
+         TOP BAR — Logo · Search · Account only
+    ════════════════════════════════════════════ -->
     <header class="topbar">
       <div class="tl">
         <button class="hbtn open" id="hbtn" aria-label="Toggle sidebar">
@@ -43,42 +46,7 @@
       </div>
 
       <div class="top-actions">
-        <button class="icon-btn" id="aiBtn" title="Ask AI about your notes">
-          <svg viewBox="0 0 24 24" style="width: 20px; height: 20px">
-            <path d="M12 2a10 10 0 100 20 10 10 0 000-20z" />
-            <path d="M8 12h8M12 8v8" />
-          </svg>
-        </button>
-        <button class="icon-btn" id="infoBtn" title="How your data is stored">
-          ?
-        </button>
-        <button class="icon-btn" id="apiSettingsBtn" title="AI API Settings">
-          <svg viewBox="0 0 24 24" style="width: 20px; height: 20px">
-            <circle cx="12" cy="12" r="3" />
-            <path
-              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
-            />
-          </svg>
-        </button>
-        <!-- Theme Picker -->
-        <div class="theme-wrap">
-          <button class="theme-btn" id="themeBtn" title="Change color theme">
-            <!-- FIX: Changed fill:black to fill: var(--ink) -->
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" style="fill: var(--ink);">
-              <path
-                d="M290.4 70C288.9 66.4 285.4 64 281.5 64L262.5 64C258.6 64 255 66.4 253.6 70L232.9 121.7C229.7 129.7 218.3 129.7 215.1 121.7L194.4 70C192.9 66.4 189.4 64 185.5 64L176 64C149.5 64 128 85.5 128 112L128 320L512 320L512 112C512 85.5 490.5 64 464 64L358.5 64C354.6 64 351 66.4 349.6 70L328.9 121.7C325.7 129.7 314.3 129.7 311.1 121.7L290.4 70zM128 368L128 384C128 419.3 156.7 448 192 448L256 448L256 512C256 547.3 284.7 576 320 576C355.3 576 384 547.3 384 512L384 448L448 448C483.3 448 512 419.3 512 384L512 368L128 368zM320 528C311.2 528 304 520.8 304 512C304 503.2 311.2 496 320 496C328.8 496 336 503.2 336 512C336 520.8 328.8 528 320 528z"
-              />
-            </svg>
-          </button>
-          <div class="theme-panel" id="themePanel">
-            <span class="theme-panel-title">Color Theme</span>
-            <!-- Added id="themeGrid" and let JS build the buttons -->
-            <div class="palette-grid" id="themeGrid">
-              <!-- JS will inject themes here -->
-            </div>
-          </div>
-        </div>
-
+        <!-- Account / Sync -->
         <div class="synw">
           <button class="synbtn" id="synbtn">
             <svg viewBox="0 0 24 24">
@@ -93,11 +61,107 @@
             <div class="sitem" id="loginBtn">🔑 Sync via Google</div>
           </div>
         </div>
+
+        <!-- Settings Drawer Trigger -->
+        <button
+          class="icon-btn panel-trigger"
+          id="settingsPanelBtn"
+          title="Settings & Tools"
+          aria-label="Open settings panel"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+            />
+          </svg>
+        </button>
       </div>
     </header>
 
+    <!-- ═══════════════════════════════════════════
+         OVERLAY (sidebar + settings panel)
+    ════════════════════════════════════════════ -->
     <div class="ovl" id="ovl"></div>
 
+    <!-- ═══════════════════════════════════════════
+         RIGHT SETTINGS PANEL
+    ════════════════════════════════════════════ -->
+    <aside class="settings-panel" id="settingsPanel">
+      <div class="sp-header">
+        <span class="sp-title">Settings & Tools</span>
+        <button
+          class="sp-close"
+          id="settingsPanelClose"
+          aria-label="Close settings panel"
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- AI Assistant -->
+      <div class="sp-section">
+        <span class="sp-section-label">AI Assistant</span>
+        <button class="sp-item sp-item-featured" id="aiBtn">
+          <div class="sp-item-icon ai-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18">
+              <path d="M12 2a10 10 0 100 20 10 10 0 000-20z" />
+              <path d="M8 12h8M12 8v8" />
+            </svg>
+          </div>
+          <div class="sp-item-text">
+            <span class="sp-item-name">Ask AI</span>
+            <span class="sp-item-desc">Chat with your notes</span>
+          </div>
+          <svg class="sp-item-arrow" viewBox="0 0 24 24" width="14" height="14">
+            <path d="m9 18 6-6-6-6" />
+          </svg>
+        </button>
+        <button class="sp-item" id="apiSettingsBtn">
+          <div class="sp-item-icon">
+            <svg viewBox="0 0 24 24" width="16" height="16">
+              <rect x="3" y="11" width="18" height="11" rx="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          </div>
+          <div class="sp-item-text">
+            <span class="sp-item-name">API Key</span>
+            <span class="sp-item-desc">Configure Gemini key</span>
+          </div>
+        </button>
+      </div>
+
+      <!-- Appearance -->
+      <div class="sp-section">
+        <span class="sp-section-label">Appearance</span>
+        <div class="sp-theme-grid" id="themeGrid">
+          <!-- JS injects theme swatches here -->
+        </div>
+      </div>
+
+      <!-- Storage Info -->
+      <div class="sp-section">
+        <span class="sp-section-label">About</span>
+        <button class="sp-item" id="infoBtn">
+          <div class="sp-item-icon">
+            <svg viewBox="0 0 24 24" width="16" height="16">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4M12 8h.01" />
+            </svg>
+          </div>
+          <div class="sp-item-text">
+            <span class="sp-item-name">Data Storage Guide</span>
+            <span class="sp-item-desc">How your notes are stored</span>
+          </div>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ═══════════════════════════════════════════
+         MAIN BODY — Sidebar + Content
+    ════════════════════════════════════════════ -->
     <div class="body">
       <nav class="side" id="side">
         <div class="shd">
@@ -105,6 +169,7 @@
           <div class="smeta" id="smeta">Loading…</div>
         </div>
         <div class="sscroll" id="snav"></div>
+
         <div class="shd" style="margin-top: 10px">
           <span class="slbl"
             >Folders
@@ -112,12 +177,11 @@
               id="proBadge"
               style="display: none; color: var(--acc); font-size: 9px"
               >PRO</span
-            ></span
-          >
+            >
+          </span>
         </div>
-        <div class="sscroll" id="fnav" style="min-height: 50px">
-          <!-- Folders injected here -->
-        </div>
+        <div class="sscroll" id="fnav" style="min-height: 50px"></div>
+
         <div style="padding: 0 14px 14px">
           <button
             id="createFolderBtn"
@@ -157,10 +221,28 @@
             class="sk"
             style="height: 16px; width: 100px; margin-bottom: 28px"
           ></div>
+          <div style="display: flex; gap: 14px">
+            <div
+              class="sk"
+              style="height: 180px; width: 280px; border-radius: 12px"
+            ></div>
+            <div
+              class="sk"
+              style="height: 140px; width: 280px; border-radius: 12px"
+            ></div>
+            <div
+              class="sk"
+              style="height: 220px; width: 280px; border-radius: 12px"
+            ></div>
+          </div>
         </div>
       </main>
       <main class="main" id="singlePageView" style="display: none"></main>
     </div>
+
+    <!-- ═══════════════════════════════════════════
+         MODALS
+    ════════════════════════════════════════════ -->
 
     <!-- Edit Modal -->
     <div class="mbg" id="modal">
@@ -182,7 +264,7 @@
         <div class="info-box">
           <strong><span>🏠</span> Local by Default (Offline)</strong>
           If you don't log in, your notes live entirely on your computer's hard
-          drive. They are fast, completely private, and available offline.
+          drive. Fast, private, and available offline.
         </div>
         <div
           class="info-box"
@@ -235,14 +317,16 @@
             id="logoutKeepBtn"
             style="background: var(--ink); border-color: var(--ink)"
           >
-            Log out & <b>Keep</b> Notes on this device
+            Log out &amp; <b>Keep</b> Notes on this device
           </button>
           <button class="btn danger" id="logoutWipeBtn">
-            Log out & <b>Delete</b> Notes from this device
+            Log out &amp; <b>Delete</b> Notes from this device
           </button>
         </div>
       </div>
     </div>
+
+    <!-- Paywall Modal -->
     <div
       class="mbg"
       id="paywallModal"
@@ -261,12 +345,10 @@
           Upgrade to ContextNote Pro
         </h3>
         <p style="color: var(--mut); margin-bottom: 24px; line-height: 1.6">
-          You have successfully logged in, but your account is on the
-          <b>Free Tier</b>. <br /><br />
+          Your account is on the <b>Free Tier</b>.<br /><br />
           To enable <b>Cloud Sync, Screenshots, and Multi-Device Support</b>,
-          you need to upgrade.
+          upgrade now.
         </p>
-
         <div
           style="
             background: #f8fafc;
@@ -279,11 +361,10 @@
           "
         >
           ✅ Unlimited Cloud Storage<br />
-          ✅ Sync across Laptop & Desktop<br />
-          ✅ Save Screenshots & YouTube Timestamps<br />
+          ✅ Sync across Laptop &amp; Desktop<br />
+          ✅ Save Screenshots &amp; YouTube Timestamps<br />
           ✅ AI Summarization (Coming Soon)
         </div>
-
         <div class="macts" style="flex-direction: column; gap: 10px">
           <button
             class="btn pri"
@@ -298,20 +379,36 @@
         </div>
       </div>
     </div>
+
+    <!-- AI Chat Modal -->
     <div class="mbg" id="aiModal">
-      <div class="modal">
-        <h3>✨ AI Research Assistant</h3>
-        <!-- The ChatBox must be inside the modal -->
+      <div class="modal ai-modal-inner">
+        <div class="ai-modal-header">
+          <div class="ai-modal-title">
+            <div class="ai-title-icon">
+              <svg viewBox="0 0 24 24" width="16" height="16">
+                <path d="M12 2a10 10 0 100 20 10 10 0 000-20z" />
+                <path d="M8 12h8M12 8v8" />
+              </svg>
+            </div>
+            AI Research Assistant
+          </div>
+          <button
+            class="btn"
+            id="closeAiBtn"
+            style="padding: 4px 10px; border: none; background: var(--bg)"
+          >
+            ✕
+          </button>
+        </div>
         <div id="aiChatBox">
           <div class="chat-msg chat-ai">
-            Ask me anything about your notes on this page...
+            Ask me anything about your notes on this page…
           </div>
         </div>
-
         <div class="ai-bottom">
-          <input type="text" id="aiInput" placeholder="Ask a question..." />
+          <input type="text" id="aiInput" placeholder="Ask a question…" />
           <button class="btn pri" id="aiSendBtn">Send</button>
-          <button class="btn" id="closeAiBtn">Close</button>
         </div>
       </div>
     </div>
@@ -322,7 +419,7 @@
         <h3>AI API Settings</h3>
         <p style="font-size: 13px; color: var(--mut); margin-bottom: 15px">
           Enter your Google Gemini API Key to enable AI features directly from
-          your browser. Your key is stored locally on your machine.
+          your browser. Your key is stored locally.
         </p>
         <input type="password" id="apiKeyInput" placeholder="AIza..." />
         <div class="macts">
@@ -331,6 +428,8 @@
         </div>
       </div>
     </div>
+
+    <!-- Move to Folder Modal -->
     <div class="mbg" id="moveModal">
       <div class="modal">
         <h3>Move to Folder</h3>
@@ -349,7 +448,6 @@
           "
         >
           <option value="">[ Remove from Folder ]</option>
-          <!-- Options injected here -->
         </select>
         <div class="macts">
           <button class="btn" id="cancelMove">Cancel</button>
@@ -360,86 +458,27 @@
 
     <!-- View Full Note Modal -->
     <div class="mbg" id="viewModal">
-      <div
-        class="modal"
-        style="
-          max-width: 600px;
-          max-height: 85vh;
-          display: flex;
-          flex-direction: column;
-        "
-      >
-        <div
-          style="
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 15px;
-            flex-shrink: 0;
-          "
-        >
-          <h3
-            id="vTitle"
-            style="
-              margin: 0;
-              font-size: 20px;
-              line-height: 1.3;
-              color: var(--ink);
-            "
-          ></h3>
+      <div class="modal view-modal-inner">
+        <div class="view-modal-header">
+          <h3 id="vTitle"></h3>
           <button
             class="btn"
             id="closeView"
             style="
               padding: 4px 8px;
               border: none;
-              background: var(--bg);
+              background: transparent;
               font-size: 18px;
+              flex-shrink: 0;
             "
           >
             &times;
           </button>
         </div>
-
-        <div style="overflow-y: auto; padding-right: 8px; flex: 1">
-          <div
-            id="vMeta"
-            style="
-              margin-bottom: 16px;
-              display: flex;
-              gap: 8px;
-              flex-wrap: wrap;
-            "
-          ></div>
-
-          <div
-            id="vSelection"
-            style="
-              font-family: &quot;Lora&quot;, serif;
-              font-style: italic;
-              color: #92400e;
-              background: var(--hbg);
-              border-left: 4px solid var(--hbdr);
-              padding: 12px 16px;
-              border-radius: 0 8px 8px 0;
-              margin-bottom: 16px;
-              display: none;
-              line-height: 1.6;
-            "
-          ></div>
-
-          <div
-            id="vContent"
-            style="
-              font-size: 15px;
-              color: var(--ink2);
-              line-height: 1.6;
-              white-space: pre-wrap;
-              margin-bottom: 16px;
-              display: none;
-            "
-          ></div>
-
+        <div class="view-modal-body">
+          <div id="vMeta"></div>
+          <div id="vSelection"></div>
+          <div id="vContent"></div>
           <div
             id="vImageWrap"
             style="
@@ -467,7 +506,7 @@
         <textarea
           id="anContent"
           rows="5"
-          placeholder="Your note content... (Ctrl+Enter to save)"
+          placeholder="Your note content… (Ctrl+Enter to save)"
         ></textarea>
         <div id="anUrlRow" style="margin-top: 4px; margin-bottom: 4px">
           <label
@@ -483,7 +522,7 @@
           <input
             type="text"
             id="anUrl"
-            placeholder="https://..."
+            placeholder="https://…"
             style="margin-bottom: 0"
           />
         </div>
@@ -495,6 +534,7 @@
     </div>
 
     <div class="toast" id="toast"></div>
+
     <script src="../pro.js"></script>
     <script src="../ai_service.js"></script>
     <script src="../themes.js"></script>

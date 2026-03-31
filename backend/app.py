@@ -598,6 +598,45 @@ def update_note_tags():
     db.session.commit()
     return jsonify({"message": f"Updated tags for {updated_count} notes"}), 200
 
+@app.route('/api/folders/<string:folder_name>', methods=['DELETE'])
+def delete_folder(folder_name):
+
+    if 'user_id' not in session:
+        return jsonify({"error": "Login required"}), 401
+
+    try:
+        # Decode URL encoded folder name
+        folder_name = unquote(folder_name)
+
+        # Find notes belonging to this folder
+        notes = (
+            Note.query
+            .join(Website)
+            .filter(
+                Website.user_id == session['user_id'],
+                Note.folder == folder_name
+            )
+            .all()
+        )
+
+        # Remove folder reference (do NOT delete notes)
+        for note in notes:
+            note.folder = None
+
+        db.session.commit()
+
+        return jsonify({
+            "message": "Folder deleted successfully"
+        }), 200
+
+    except Exception as e:
+
+        db.session.rollback()
+
+        return jsonify({
+            "error": str(e)
+        }), 500
+
 @app.route('/api/folders/rename', methods=['PUT'])
 def rename_folder():
 

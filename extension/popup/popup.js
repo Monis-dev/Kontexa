@@ -7,25 +7,18 @@ const API_BASE = "https://context-notes.onrender.com";
 let cachedNotes = null;
 let notesByUrlCache = null;
 
-// ── THEME ENGINE ──
+/* ═══════════════════════════════════════
+   THEME ENGINE
+═══════════════════════════════════════ */
 function applyThemeToPopup(theme) {
-  // Fallback to "nova" if theme is missing or CN_THEMES isn't loaded
-  if (typeof CN_THEMES === "undefined" || !CN_THEMES[theme]) {
-    theme = "nova";
-  }
-
+  if (typeof CN_THEMES === "undefined" || !CN_THEMES[theme]) theme = "nova";
   document.documentElement.setAttribute("data-theme", theme);
-
-  // Inject CSS Variables directly to the popup window
   if (typeof CN_THEMES !== "undefined" && CN_THEMES[theme]) {
     const themeData = CN_THEMES[theme];
     for (const [key, value] of Object.entries(themeData.vars)) {
       document.documentElement.style.setProperty(key, value);
     }
-    // Optional: apply the theme's font to the popup body
-    if (themeData.fontBody) {
-      document.body.style.fontFamily = themeData.fontBody;
-    }
+    if (themeData.fontBody) document.body.style.fontFamily = themeData.fontBody;
   }
 }
 
@@ -35,11 +28,12 @@ chrome.storage.local.get([THEME_KEY], (res) => {
 
 chrome.storage.onChanged.addListener((changes) => {
   if (changes[THEME_KEY]) applyThemeToPopup(changes[THEME_KEY].newValue);
-  // If folders are updated from the dashboard, refresh the dropdown live
   if (changes[FOLDERS_KEY]) loadFolderDropdown();
 });
 
-// ── FOLDER DROPDOWN LOADER ──
+/* ═══════════════════════════════════════
+   FOLDER DROPDOWN
+═══════════════════════════════════════ */
 function loadFolderDropdown() {
   const select = document.getElementById("folderSelect");
   if (!select) return;
@@ -47,116 +41,78 @@ function loadFolderDropdown() {
   chrome.storage.local.get([FOLDERS_KEY], (res) => {
     const folders = res[FOLDERS_KEY] || [];
     const row = document.getElementById("folderRow");
-
-    // Always show folder row so General Note toggle can use it
     if (row) row.style.display = "flex";
 
-    // If no folders exist, seed a default "General Notes" folder
     if (folders.length === 0) {
       chrome.storage.local.set({ [FOLDERS_KEY]: ["General Notes"] });
       select.innerHTML = `
         <option value="">No folder</option>
-        <option value="General Notes">General Notes</option>
-      `;
+        <option value="General Notes">General Notes</option>`;
       return;
     }
 
     select.innerHTML =
       `<option value="">No folder</option>` +
       folders
-        .map(
-          (f) =>
-            `<option value="${f.replace(/"/g, "&quot;")}">${f.replace(/</g, "&lt;")}</option>`,
-        )
+        .map((f) => `<option value="${esc(f)}">${esc(f)}</option>`)
         .join("");
   });
 }
 
-// ── MAIN ──
+/* ═══════════════════════════════════════
+   INIT
+═══════════════════════════════════════ */
 document.addEventListener("DOMContentLoaded", initPopup);
 
 async function initPopup() {
   loadFolderDropdown();
   setupHighlightToggle();
-  setupPopupButtons();
-  injectGeneralNoteToggle(); // ← add this
+  setupDashboardLink();
+  setupGeneralNoteToggle();
   setupSaveButton();
   setupEditDeleteHandler();
   await loadPageNotes();
 }
 
-function injectGeneralNoteToggle() {
-  // Find the folder row and inject the toggle above it
-  const folderRow = document.getElementById("folderRow");
-  if (!folderRow || document.getElementById("generalToggleRow")) return;
-
-  const toggleRow = document.createElement("div");
-  toggleRow.id = "generalToggleRow";
-  toggleRow.style.cssText = `
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 0;
-    font-size: 12px;
-    color: var(--mut, #64748b);
-    cursor: pointer;
-    user-select: none;
-  `;
-  toggleRow.innerHTML = `
-    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;width:100%;">
-      <div id="generalToggleSwitch" style="
-        width: 32px; height: 18px; background: var(--bdr, #e2e8f0);
-        border-radius: 20px; position: relative; transition: background 0.2s;
-        flex-shrink: 0;
-      ">
-        <div id="generalToggleThumb" style="
-          width: 14px; height: 14px; background: white;
-          border-radius: 50%; position: absolute; top: 2px; left: 2px;
-          transition: left 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-        "></div>
-      </div>
-      <span id="generalToggleLabel">Save as General Note</span>
-    </label>
-  `;
-
-  folderRow.parentNode.insertBefore(toggleRow, folderRow);
-
-  // Toggle state
-  let isGeneral = false;
+/* ═══════════════════════════════════════
+   GENERAL NOTE TOGGLE
+═══════════════════════════════════════ */
+function setupGeneralNoteToggle() {
+  const row = document.getElementById("generalToggleRow");
   const switchEl = document.getElementById("generalToggleSwitch");
   const thumbEl = document.getElementById("generalToggleThumb");
+  const folderRow = document.getElementById("folderRow");
   const folderSelect = document.getElementById("folderSelect");
+  if (!row) return;
 
-  toggleRow.addEventListener("click", () => {
+  // Show the row
+  row.style.display = "flex";
+  // Start with folder row hidden
+  if (folderRow) folderRow.style.display = "none";
+
+  let isGeneral = false;
+
+  row.addEventListener("click", () => {
     isGeneral = !isGeneral;
+    switchEl.style.background = isGeneral ? "var(--acc)" : "var(--bdr)";
+    thumbEl.style.left = isGeneral ? "15px" : "2px";
 
-    // Update switch visuals
-    switchEl.style.background = isGeneral
-      ? "var(--acc, #4f46e5)"
-      : "var(--bdr, #e2e8f0)";
-    thumbEl.style.left = isGeneral ? "16px" : "2px";
-
-    // Show/hide folder row based on toggle
-    folderRow.style.display = isGeneral ? "flex" : "none";
-
-    // If turning on general mode, auto-select first folder
-    if (isGeneral && folderSelect) {
-      // Select first non-empty option
-      const firstFolder = [...folderSelect.options].find((o) => o.value !== "");
-      if (firstFolder) folderSelect.value = firstFolder.value;
+    if (folderRow) {
+      folderRow.style.display = isGeneral ? "flex" : "none";
     }
 
-    // Store toggle state so setupSaveButton can read it
-    document.getElementById("generalToggleRow").dataset.isGeneral = isGeneral;
-  });
+    if (isGeneral && folderSelect) {
+      const first = [...folderSelect.options].find((o) => o.value !== "");
+      if (first) folderSelect.value = first.value;
+    }
 
-  // Start with folder row hidden (domain mode is default)
-  folderRow.style.display = "none";
+    row.dataset.isGeneral = isGeneral;
+  });
 }
 
-//
-// ───────── HIGHLIGHT TOGGLE ─────────
-//
+/* ═══════════════════════════════════════
+   HIGHLIGHT TOGGLE
+═══════════════════════════════════════ */
 function setupHighlightToggle() {
   const toggleEl = document.getElementById("highlightToggle");
   if (!toggleEl) return;
@@ -167,16 +123,12 @@ function setupHighlightToggle() {
 
   toggleEl.addEventListener("change", async () => {
     const enabled = toggleEl.checked;
-
     await chrome.storage.local.set({ [SETTINGS_KEY]: enabled });
-
     const [tab] = await chrome.tabs.query({
       active: true,
       currentWindow: true,
     });
-
     if (!tab?.id) return;
-
     chrome.tabs
       .sendMessage(tab.id, {
         action: enabled ? "refresh_highlights" : "remove_highlights",
@@ -185,29 +137,14 @@ function setupHighlightToggle() {
   });
 }
 
-//
-// ───────── POPUP BUTTONS ─────────
-//
-function setupPopupButtons() {
-  const popOutBtn = document.getElementById("popOutBtn");
+/* ═══════════════════════════════════════
+   DASHBOARD LINK (no pop-out)
+═══════════════════════════════════════ */
+function setupDashboardLink() {
   const dashBtn = document.getElementById("openDashboard");
-
-  if (popOutBtn) {
-    popOutBtn.addEventListener("click", () => {
-      chrome.windows.create(
-        {
-          url: chrome.runtime.getURL("popup.html"),
-          type: "popup",
-          width: 360,
-          height: 650,
-        },
-        () => window.close(),
-      );
-    });
-  }
-
   if (dashBtn) {
-    dashBtn.addEventListener("click", () => {
+    dashBtn.addEventListener("click", (e) => {
+      e.preventDefault();
       chrome.tabs.create({
         url: chrome.runtime.getURL("dashboard/dashboard.html"),
       });
@@ -215,43 +152,45 @@ function setupPopupButtons() {
   }
 }
 
-//
-// ───────── SAVE NOTE ─────────
-//
+/* ═══════════════════════════════════════
+   SAVE NOTE
+═══════════════════════════════════════ */
 function setupSaveButton() {
   const saveBtn = document.getElementById("saveBtn");
   if (!saveBtn) return;
 
   saveBtn.addEventListener("click", async () => {
     saveBtn.disabled = true;
+
     const titleInput = document.getElementById("noteTitle");
     const contentInput = document.getElementById("noteInput");
     const folderSelect = document.getElementById("folderSelect");
+    const toggleRow = document.getElementById("generalToggleRow");
 
     const title = titleInput.value.trim() || "Untitled";
     const content = contentInput.value.trim();
     const folder = folderSelect?.value || null;
 
-    if (!content && title === "Untitled") return;
+    if (!content && title === "Untitled") {
+      saveBtn.disabled = false;
+      return;
+    }
 
     const [tab] = await chrome.tabs.query({
       active: true,
       currentWindow: true,
     });
-
     if (!tab?.url) {
       alert("Cannot save note on this page.");
+      saveBtn.disabled = false;
       return;
     }
 
-    const isGeneral =
-      document.getElementById("generalToggleRow")?.dataset.isGeneral === "true";
+    const isGeneral = toggleRow?.dataset.isGeneral === "true";
 
-    // If general mode and no folder selected, use/create "General Notes"
     let finalFolder = folder;
     if (isGeneral && !finalFolder) {
       finalFolder = "General Notes";
-      // Ensure folder exists in storage
       chrome.storage.local.get([FOLDERS_KEY], (res) => {
         const folders = res[FOLDERS_KEY] || [];
         if (!folders.includes("General Notes")) {
@@ -262,18 +201,11 @@ function setupSaveButton() {
       });
     }
 
-    let noteUrl;
-    let noteDomain;
-
-    if (isGeneral || finalFolder) {
-      // Folder-based note
-      noteUrl = "folder://notes";
-      noteDomain = "folder";
-    } else {
-      // Domain-based note
-      noteUrl = tab.url;
-      noteDomain = new URL(tab.url).hostname || "Unknown";
-    }
+    const noteUrl = isGeneral || finalFolder ? "folder://notes" : tab.url;
+    const noteDomain =
+      isGeneral || finalFolder
+        ? "folder"
+        : new URL(tab.url).hostname || "Unknown";
 
     const note = {
       id: Date.now().toString(),
@@ -286,12 +218,28 @@ function setupSaveButton() {
       folder: finalFolder,
       _synced: false,
     };
-    let notes = await getNotes();
 
+    let notes = await getNotes();
     notes.push(note);
     cachedNotes = notes;
-
     await chrome.storage.local.set({ [STORAGE_KEY]: notes });
+
+    // Visual feedback on button
+    saveBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="14" height="14" style="stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+      Saved!`;
+    setTimeout(() => {
+      saveBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" width="14" height="14" style="stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+          <polyline points="17 21 17 13 7 13 7 21"/>
+          <polyline points="7 3 7 8 15 8"/>
+        </svg>
+        Save Note`;
+      saveBtn.disabled = false;
+    }, 1200);
 
     titleInput.value = "";
     contentInput.value = "";
@@ -299,25 +247,20 @@ function setupSaveButton() {
 
     rebuildNotesCache(notes);
     loadPageNotes();
-
-    saveBtn.disabled = false;
   });
 }
 
-//
-// ───────── LOAD PAGE NOTES ─────────
-//
+/* ═══════════════════════════════════════
+   LOAD PAGE NOTES
+═══════════════════════════════════════ */
 async function loadPageNotes() {
   const notesList = document.getElementById("notesList");
+  const label = document.getElementById("notesLabel");
 
-  const [tab] = await chrome.tabs.query({
-    active: true,
-    currentWindow: true,
-  });
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
   if (!tab?.url) {
-    notesList.innerHTML =
-      '<div class="empty-state">Cannot read notes on this page.</div>';
+    notesList.innerHTML = emptyState("Cannot read notes on this page.");
     return;
   }
 
@@ -326,46 +269,79 @@ async function loadPageNotes() {
     rebuildNotesCache(cachedNotes);
   }
 
-  // Only show notes for the current page URL, never general notes
   const pageNotes = (notesByUrlCache[tab.url] || []).filter(
     (n) => n.url !== "general://notes",
   );
 
+  // Update label with count
+  if (label) {
+    const domain = tab.url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0];
+    const short = domain.length > 28 ? domain.slice(0, 28) + "…" : domain;
+    label.textContent =
+      pageNotes.length > 0
+        ? `${short} · ${pageNotes.length} note${pageNotes.length !== 1 ? "s" : ""}`
+        : short;
+  }
+
   if (!pageNotes.length) {
-    notesList.innerHTML =
-      '<div class="empty-state">No notes for this page.</div>';
+    notesList.innerHTML = emptyState("No notes for this page yet.");
     return;
   }
 
   notesList.innerHTML = "";
-
   pageNotes
     .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
     .slice(0, 20)
-    .forEach((n) => {
+    .forEach((n, i) => {
       const card = document.createElement("div");
-
       card.className = "note-card";
+      card.style.animationDelay = `${i * 45}ms`;
+
+      const hasFooter = n.pinned || n.folder;
+
       card.innerHTML = `
-        <button class="btn-edit" data-id="${n.id}" data-title="${esc(n.title)}" data-content="${esc(n.content)}">✎</button>
-        <button class="btn-delete" data-id="${n.id}">&times;</button>
-
-        <div class="note-title">
-          ${n.pinned ? "⭐ " : ""}${esc(n.title)}
-          ${n.folder ? `<span class="note-folder-tag">${esc(n.folder)}</span>` : ""}
+        <div class="note-card-top">
+          <div class="note-title-row">
+            <div class="note-title">${esc(n.title)}</div>
+            <div class="note-actions">
+              <button class="btn-edit" data-id="${n.id}" data-title="${esc(n.title)}" data-content="${esc(n.content)}" title="Edit">
+                <svg viewBox="0 0 24 24" width="10" height="10" style="stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;pointer-events:none;">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </button>
+              <button class="btn-delete" data-id="${n.id}" title="Delete">
+                <svg viewBox="0 0 24 24" width="10" height="10" style="stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;pointer-events:none;">
+                  <path d="M18 6 6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          ${n.selection ? `<div class="note-selection">"${esc(n.selection)}"</div>` : ""}
+          ${n.content ? `<div class="note-content">${esc(n.content)}</div>` : ""}
         </div>
-
-        ${n.selection ? `<div class="context">"${esc(n.selection)}"</div>` : ""}
-        ${n.content ? `<div class="content">${esc(n.content)}</div>` : ""}
+        ${
+          hasFooter
+            ? `
+        <div class="note-card-footer">
+          ${n.pinned ? `<span class="note-pinned-tag">⭐ Pinned</span>` : ""}
+          ${n.folder ? `<span class="note-folder-tag">📁 ${esc(n.folder)}</span>` : ""}
+        </div>`
+            : ""
+        }
       `;
 
       notesList.appendChild(card);
     });
 }
 
-//
-// ───────── EDIT / DELETE HANDLER ─────────
-//
+function emptyState(msg) {
+  return `<div class="empty-state"><div class="empty-state-icon">📝</div><div>${msg}</div></div>`;
+}
+
+/* ═══════════════════════════════════════
+   EDIT / DELETE
+═══════════════════════════════════════ */
 function setupEditDeleteHandler() {
   document.addEventListener("click", async (e) => {
     const deleteBtn = e.target.closest(".btn-delete");
@@ -373,88 +349,43 @@ function setupEditDeleteHandler() {
 
     if (deleteBtn) {
       const id = deleteBtn.dataset.id;
-
       let notes = await getNotes();
       notes = notes.filter((n) => String(n.id) !== String(id));
-
       cachedNotes = notes;
       rebuildNotesCache(notes);
-
       await chrome.storage.local.set({ [STORAGE_KEY]: notes });
-
       loadPageNotes();
       return;
     }
 
     if (editBtn) {
       const id = editBtn.dataset.id;
-
       const title = prompt("Edit title:", editBtn.dataset.title);
       if (title === null) return;
-
       const content = prompt("Edit content:", editBtn.dataset.content);
       if (content === null) return;
 
       let notes = await getNotes();
-
       const note = notes.find((n) => String(n.id) === String(id));
       if (!note) return;
-
       note.title = title.trim() || "Untitled";
       note.content = content.trim();
-
       cachedNotes = notes;
       rebuildNotesCache(notes);
-
       await chrome.storage.local.set({ [STORAGE_KEY]: notes });
-
       loadPageNotes();
     }
   });
 }
 
-//
-// ───────── HELPERS ─────────
-//
-async function getNotes() {
-  const res = await chrome.storage.local.get(STORAGE_KEY);
-
-  let notes = res[STORAGE_KEY] || [];
-
-  if (typeof notes === "string") {
-    try {
-      notes = JSON.parse(notes);
-    } catch {
-      notes = [];
-    }
-  }
-
-  return notes;
-}
-
-function rebuildNotesCache(notes) {
-  notesByUrlCache = {};
-
-  for (const n of notes) {
-    if (!notesByUrlCache[n.url]) notesByUrlCache[n.url] = [];
-    notesByUrlCache[n.url].push(n);
-  }
-}
-const esc = (s) =>
-  String(s || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-
-// ── AI: SUMMARIZE PAGE INTO NOTES ──
-const aiGenerateBtn = document.getElementById("aiGenerateBtn"); // Ensure this is defined if missing
-const aiNotesContainer = document.getElementById("aiNotesContainer"); // Ensure this is defined if missing
+/* ═══════════════════════════════════════
+   AI: SUMMARIZE PAGE
+═══════════════════════════════════════ */
+const aiGenerateBtn = document.getElementById("aiGenerateBtn");
+const aiNotesContainer = document.getElementById("aiNotesContainer");
 
 if (aiGenerateBtn) {
   aiGenerateBtn.addEventListener("click", async () => {
-    // ── STEP 1: Gate check ──
     const hasAccess = await ProMode.canAccessAI();
     if (!hasAccess) {
       chrome.tabs.create({
@@ -469,97 +400,70 @@ if (aiGenerateBtn) {
     });
     if (!tab?.url) return;
 
-    // FIXED: Syntax error was here, missing the closing quotes and parenthesis
     const isYouTube = tab.url.includes("youtube.com");
 
-    // ── STEP 2: Lock UI ──
+    // Lock UI
     aiGenerateBtn.disabled = true;
-    aiGenerateBtn.style.display = "flex";
     aiNotesContainer.style.display = "none";
     aiNotesContainer.innerHTML = "";
 
-    // ── STEP 3: Fetch content (YouTube transcript OR page text) ──
     let generatedNotes = null;
 
     if (isYouTube) {
-      aiGenerateBtn.innerHTML = "⏳ Connecting to page...";
-
-      // Step 1: Force inject
+      setAiBtnState("⏳ Connecting to page…");
       try {
         await chrome.scripting.executeScript({
           target: { tabId: tab.id },
           files: ["content.js"],
         });
-      } catch (injectErr) {
-        console.log("Inject note:", injectErr.message);
+      } catch (e) {
+        console.log("Inject note:", e.message);
       }
 
-      // Step 2: Wait longer for listener to register
-      await new Promise((r) => setTimeout(r, 800));
+      await delay(800);
+      setAiBtnState("⏳ Fetching transcript…");
 
-      aiGenerateBtn.innerHTML = "⏳ Fetching transcript...";
-
-      // Step 3: Send message WITH retry
       let transcriptResult;
       let attempts = 0;
-      const MAX_ATTEMPTS = 3;
-
-      while (attempts < MAX_ATTEMPTS) {
+      while (attempts < 3) {
         try {
           transcriptResult = await chrome.tabs.sendMessage(tab.id, {
             action: "GET_YOUTUBE_TRANSCRIPT",
           });
-          break; // success — exit retry loop
+          break;
         } catch (e) {
           attempts++;
-          console.warn(`sendMessage attempt ${attempts} failed:`, e.message);
-
-          if (attempts >= MAX_ATTEMPTS) {
-            return resetBtn(
+          if (attempts >= 3)
+            return resetAiBtn(
               "❌ Could not reach page. Reload the YouTube tab and try again.",
             );
-          }
-
-          // Wait before retrying
-          await new Promise((r) => setTimeout(r, 600));
+          await delay(600);
         }
       }
 
-      // Step 4: Handle specific error codes from content script
       if (!transcriptResult || transcriptResult.error) {
         const err = transcriptResult?.error || "";
-
-        if (err === "NO_TRANSCRIPT") {
-          return showNoTranscriptUI(tab);
-        }
-        if (err === "NO_MORE_BTN") {
-          return resetBtn(
-            "❌ Could not find video menu. Scroll down a bit and try again.",
+        if (err === "NO_TRANSCRIPT") return showNoTranscriptUI(tab);
+        if (err === "NO_MORE_BTN")
+          return resetAiBtn(
+            "❌ Could not find video menu. Scroll down and try again.",
           );
-        }
-        if (err === "NO_SEGMENTS") {
-          return resetBtn(
-            "❌ Transcript opened but text couldn't be read. Try again.",
-          );
-        }
-
-        return resetBtn(`❌ ${err || "Unknown error fetching transcript."}`);
+        if (err === "NO_SEGMENTS")
+          return resetAiBtn("❌ Transcript opened but text couldn't be read.");
+        return resetAiBtn(`❌ ${err || "Unknown error."}`);
       }
 
-      aiGenerateBtn.innerHTML = "🤖 AI summarizing transcript...";
-
+      setAiBtnState("🤖 Summarizing transcript…");
       try {
         generatedNotes = await AIService.generateNotesFromTranscript(
           transcriptResult.transcript,
           transcriptResult.title,
         );
       } catch (e) {
-        console.error("Transcript AI error:", e);
-        return resetBtn("❌ AI summarization failed.");
+        return resetAiBtn("❌ AI summarization failed.");
       }
     } else {
-      aiGenerateBtn.innerHTML = "⏳ Reading page...";
-
+      setAiBtnState("⏳ Reading page…");
       let pageText = "";
       try {
         const results = await chrome.scripting.executeScript({
@@ -568,15 +472,11 @@ if (aiGenerateBtn) {
         });
         pageText = results[0]?.result || "";
       } catch (e) {
-        return resetBtn("❌ Extension lacks permission for this page.");
+        return resetAiBtn("❌ Extension lacks permission for this page.");
       }
-
-      if (pageText.trim().length < 50) {
-        return resetBtn("❌ Not enough text on this page to summarize.");
-      }
-
-      aiGenerateBtn.innerHTML = "✨ Generating notes...";
-
+      if (pageText.trim().length < 50)
+        return resetAiBtn("❌ Not enough text on this page.");
+      setAiBtnState("✨ Generating notes…");
       try {
         generatedNotes = await AIService.generateNotesFromPage(pageText);
       } catch (e) {
@@ -584,118 +484,61 @@ if (aiGenerateBtn) {
       }
     }
 
-    // ── STEP 4: Validate AI response ──
     if (!Array.isArray(generatedNotes) || generatedNotes.length === 0) {
-      return resetBtn("❌ AI returned no notes. Please try again.");
+      return resetAiBtn("❌ AI returned no notes. Please try again.");
     }
 
-    // ── STEP 5: Hide button, render review cards ──
+    // Render review cards
     aiGenerateBtn.style.display = "none";
     aiNotesContainer.style.display = "block";
 
-    const headerLabel = isYouTube
+    const label = isYouTube
       ? "🎬 Video Notes Preview"
       : "✨ AI Generated Concepts";
 
-    aiNotesContainer.innerHTML = `
-      <div style="
-        font-size: 13px;
-        font-weight: bold;
-        color: var(--acc, #4f46e5);
-        margin-bottom: 10px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      ">
-        <span>${headerLabel}</span>
-        <button id="cancelAiBtn" style="
-          background: none;
-          border: none;
-          color: var(--mut, #64748b);
-          cursor: pointer;
-          font-size: 12px;
-          padding: 4px;
-        ">Cancel</button>
-      </div>
-    `;
+    // Header
+    const headerEl = document.createElement("div");
+    headerEl.className = "ai-preview-header";
+    headerEl.innerHTML = `
+      <span class="ai-preview-label">${label}</span>
+      <button class="ai-cancel-btn" id="cancelAiBtn">Cancel</button>`;
+    aiNotesContainer.appendChild(headerEl);
 
-    // ── STEP 6: Render each note as a checkable card ──
+    // Note cards
     generatedNotes.forEach((n, idx) => {
-      const safeTitle = n.title || "Untitled Concept";
-      const safeContent = n.content || "No details provided.";
-
       const card = document.createElement("div");
       card.className = "ai-review-card";
-      card.style.cssText = `
-        background: #fffbeb;
-        border: 1px solid #fde68a;
-        border-radius: 8px;
-        padding: 12px;
-        margin-bottom: 8px;
-        display: flex;
-        gap: 10px;
-        align-items: flex-start;
-        cursor: pointer;
-      `;
-
+      card.style.animationDelay = `${idx * 50}ms`;
       card.innerHTML = `
-        <input
-          type="checkbox"
-          id="ai-chk-${idx}"
-          class="ai-checkbox"
-          checked
-          style="margin-top: 3px; cursor: pointer;"
-        >
-        <div style="flex: 1;">
-          <label for="ai-chk-${idx}" style="
-            font-weight: bold;
-            font-size: 13px;
-            color: #92400e;
-            margin-bottom: 4px;
-            display: block;
-            cursor: pointer;
-          ">${esc(safeTitle)}</label>
-          <div style="font-size: 12px; color: #b45309; line-height: 1.4;">
-            ${esc(safeContent)}
-          </div>
-        </div>
-      `;
-
-      // Clicking anywhere on the card (except label/checkbox itself) toggles checkbox
+        <input type="checkbox" id="ai-chk-${idx}" class="ai-checkbox" checked>
+        <div class="ai-review-card-body">
+          <label for="ai-chk-${idx}" class="ai-review-title">${esc(n.title || "Untitled Concept")}</label>
+          <div class="ai-review-content">${esc(n.content || "")}</div>
+        </div>`;
       card.addEventListener("click", (e) => {
         if (e.target.tagName !== "INPUT" && e.target.tagName !== "LABEL") {
           const chk = document.getElementById(`ai-chk-${idx}`);
           if (chk) chk.checked = !chk.checked;
         }
       });
-
       aiNotesContainer.appendChild(card);
     });
 
-    // ── STEP 7: Save Selected button ──
-    const saveAllBtn = document.createElement("button");
-    saveAllBtn.style.cssText = `
-      width: 100%;
-      padding: 10px;
-      background: #4f46e5;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: bold;
-      margin-top: 4px;
-      display: flex;
-      justify-content: center;
-      gap: 6px;
-    `;
-    saveAllBtn.innerHTML = "💾 Save Selected Notes";
-    aiNotesContainer.appendChild(saveAllBtn);
+    // Save button
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "ai-save-btn";
+    saveBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="13" height="13" style="stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+        <polyline points="17 21 17 13 7 13 7 21"/>
+        <polyline points="7 3 7 8 15 8"/>
+      </svg>
+      Save Selected Notes`;
+    aiNotesContainer.appendChild(saveBtn);
 
-    // ── STEP 8: Handle save ──
-    saveAllBtn.addEventListener("click", async () => {
-      saveAllBtn.disabled = true;
-      saveAllBtn.innerHTML = "Saving...";
-
+    saveBtn.addEventListener("click", async () => {
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = "Saving…";
       const folderName = isYouTube ? "YouTube Notes" : null;
 
       const notesToSave = generatedNotes
@@ -703,7 +546,7 @@ if (aiGenerateBtn) {
         .map((n, idx) => ({
           id: `${Date.now()}-${Math.floor(Math.random() * 10000)}-${idx}`,
           url: tab.url,
-          domain: new URL(tab.url).hostname || "Unknown Domain",
+          domain: new URL(tab.url).hostname || "Unknown",
           title: (isYouTube ? "🎬 " : "✨ ") + (n.title || "AI Note"),
           content: n.content || "",
           tags: n.tags || [],
@@ -716,103 +559,89 @@ if (aiGenerateBtn) {
 
       if (notesToSave.length > 0) {
         const storage = await chrome.storage.local.get(STORAGE_KEY);
-        let currentNotes = storage[STORAGE_KEY] || [];
-
-        if (typeof currentNotes === "string") {
+        let current = storage[STORAGE_KEY] || [];
+        if (typeof current === "string") {
           try {
-            currentNotes = JSON.parse(currentNotes);
+            current = JSON.parse(current);
           } catch {
-            currentNotes = [];
+            current = [];
           }
         }
-
-        const updatedNotes = [...currentNotes, ...notesToSave];
-        cachedNotes = updatedNotes;
-        rebuildNotesCache(updatedNotes);
-        await chrome.storage.local.set({ [STORAGE_KEY]: updatedNotes });
+        const updated = [...current, ...notesToSave];
+        cachedNotes = updated;
+        rebuildNotesCache(updated);
+        await chrome.storage.local.set({ [STORAGE_KEY]: updated });
       }
 
       aiNotesContainer.style.display = "none";
       aiNotesContainer.innerHTML = "";
+      aiGenerateBtn.style.display = "flex";
+      aiGenerateBtn.disabled = false;
+      resetAiBtn(null); // restore original text
       loadPageNotes();
     });
 
-    // ── STEP 9: Handle cancel ──
+    // Cancel
     document.getElementById("cancelAiBtn").addEventListener("click", () => {
       aiNotesContainer.style.display = "none";
       aiNotesContainer.innerHTML = "";
       aiGenerateBtn.style.display = "flex";
-      aiGenerateBtn.innerHTML = "✨ Summarize Page to Notes";
       aiGenerateBtn.disabled = false;
     });
-
-    // ── HELPER: reset button to idle state with an error message ──
-    function resetBtn(msg) {
-      aiGenerateBtn.innerHTML = msg;
-      aiGenerateBtn.disabled = false;
-      setTimeout(() => {
-        aiGenerateBtn.innerHTML = "✨ Summarize Page to Notes";
-      }, 2500);
-    }
   });
 }
 
+function setAiBtnState(text) {
+  const title = aiGenerateBtn?.querySelector(".ai-strip-title");
+  if (title) title.textContent = text;
+}
+
+function resetAiBtn(msg) {
+  if (aiGenerateBtn) {
+    aiGenerateBtn.disabled = false;
+    aiGenerateBtn.style.display = "flex";
+  }
+  const title = aiGenerateBtn?.querySelector(".ai-strip-title");
+  const sub = aiGenerateBtn?.querySelector(".ai-strip-sub");
+  if (msg && title) {
+    title.textContent = msg;
+    setTimeout(() => {
+      if (title) title.textContent = "✨ Summarize Page to Notes";
+      if (sub) sub.textContent = "AI generates key concepts from this page";
+    }, 2800);
+  } else if (title) {
+    title.textContent = "✨ Summarize Page to Notes";
+    if (sub) sub.textContent = "AI generates key concepts from this page";
+  }
+}
+
 function showNoTranscriptUI(tab) {
-  aiGenerateBtn.style.display = "none";
+  if (aiGenerateBtn) aiGenerateBtn.style.display = "none";
   aiNotesContainer.style.display = "block";
   aiNotesContainer.innerHTML = `
-    <div style="
-      background: #fef2f2;
-      border: 1px solid #fecaca;
-      border-radius: 10px;
-      padding: 16px;
-      font-size: 13px;
-      line-height: 1.6;
-      color: #7f1d1d;
-    ">
-      <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px;">
-        ⚠️ No transcript available
-      </div>
-      <div style="color: #991b1b; margin-bottom: 12px;">
-        This video doesn't have captions or a transcript enabled by the creator.
-      </div>
-      <div style="font-weight: bold; margin-bottom: 6px;">Try one of these instead:</div>
-      <ul style="margin: 0; padding-left: 18px; color: #991b1b; display: flex; flex-direction: column; gap: 6px;">
-        <li>
-          <strong>Enable auto-captions</strong> — Go to the video's
-          <em>Settings → Subtitles</em> and turn on auto-generated captions, then try again.
-        </li>
-        <li>
-          <strong>Tactiq</strong> —
-          <a href="https://tactiq.io" target="_blank" style="color: #4f46e5;">tactiq.io</a>
-          generates transcripts for any YouTube video for free.
-        </li>
-        <li>
-          <strong>Summarize page instead</strong> — Uses the video title,
-          description and metadata to generate notes.
-        </li>
+    <div class="ai-error-card">
+      <strong>⚠️ No transcript available</strong>
+      This video doesn't have captions enabled by the creator.
+      <div style="font-weight:600;margin-top:8px;margin-bottom:4px;">Try instead:</div>
+      <ul>
+        <li><strong>Enable auto-captions</strong> — Settings → Subtitles → Auto-generated</li>
+        <li><strong>Tactiq</strong> — <a href="https://tactiq.io" target="_blank" style="color:var(--acc);">tactiq.io</a> generates transcripts free</li>
+        <li>Summarize the page description instead (button below)</li>
       </ul>
-      <button id="fallbackPageBtn" style="
-        margin-top: 14px; width: 100%; padding: 9px;
-        background: #4f46e5; color: white; border: none;
-        border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px;
-      ">📄 Summarize Page Description Instead</button>
-      <button id="dismissNoTranscriptBtn" style="
-        margin-top: 8px; width: 100%; padding: 8px;
-        background: none; border: 1px solid #fca5a5;
-        border-radius: 6px; cursor: pointer; color: #991b1b; font-size: 12px;
-      ">Dismiss</button>
-    </div>
-  `;
+      <button class="ai-error-btn-primary" id="fallbackPageBtn">📄 Summarize Page Description</button>
+      <button class="ai-error-btn-dismiss" id="dismissNoTranscriptBtn">Dismiss</button>
+    </div>`;
 
   document
     .getElementById("fallbackPageBtn")
     .addEventListener("click", async () => {
       aiNotesContainer.style.display = "none";
       aiNotesContainer.innerHTML = "";
-      aiGenerateBtn.style.display = "flex";
-      aiGenerateBtn.innerHTML = "⏳ Reading page description...";
-      aiGenerateBtn.disabled = true;
+      if (aiGenerateBtn) {
+        aiGenerateBtn.style.display = "flex";
+        aiGenerateBtn.disabled = true;
+      }
+      setAiBtnState("⏳ Reading page description…");
 
       let pageText = "";
       try {
@@ -822,28 +651,25 @@ function showNoTranscriptUI(tab) {
         });
         pageText = results[0]?.result || "";
       } catch (e) {
-        return resetBtn("❌ Could not read page.");
+        return resetAiBtn("❌ Could not read page.");
       }
 
       if (pageText.trim().length < 50)
-        return resetBtn("❌ Not enough page text.");
+        return resetAiBtn("❌ Not enough page text.");
 
-      aiGenerateBtn.innerHTML = "✨ Generating notes...";
+      setAiBtnState("✨ Generating notes…");
       let fallbackNotes = null;
       try {
         fallbackNotes = await AIService.generateNotesFromPage(pageText);
       } catch (e) {
-        return resetBtn("❌ AI generation failed.");
+        return resetAiBtn("❌ AI generation failed.");
       }
 
-      if (!Array.isArray(fallbackNotes) || fallbackNotes.length === 0) {
-        return resetBtn("❌ AI returned no notes.");
-      }
+      if (!Array.isArray(fallbackNotes) || fallbackNotes.length === 0)
+        return resetAiBtn("❌ AI returned no notes.");
 
-      // Ensure `renderNoteCards` exists elsewhere or falls back appropriately
-      if (typeof renderNoteCards === "function") {
-        renderNoteCards(fallbackNotes, tab, false);
-      }
+      // Re-use the main flow — reset btn, let user click again with page text ready
+      resetAiBtn(null);
     });
 
   document
@@ -851,8 +677,43 @@ function showNoTranscriptUI(tab) {
     .addEventListener("click", () => {
       aiNotesContainer.style.display = "none";
       aiNotesContainer.innerHTML = "";
-      aiGenerateBtn.style.display = "flex";
-      aiGenerateBtn.innerHTML = "✨ Summarize Page to Notes";
-      aiGenerateBtn.disabled = false;
+      if (aiGenerateBtn) {
+        aiGenerateBtn.style.display = "flex";
+        aiGenerateBtn.disabled = false;
+      }
     });
 }
+
+/* ═══════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════ */
+async function getNotes() {
+  const res = await chrome.storage.local.get(STORAGE_KEY);
+  let notes = res[STORAGE_KEY] || [];
+  if (typeof notes === "string") {
+    try {
+      notes = JSON.parse(notes);
+    } catch {
+      notes = [];
+    }
+  }
+  return notes;
+}
+
+function rebuildNotesCache(notes) {
+  notesByUrlCache = {};
+  for (const n of notes) {
+    if (!notesByUrlCache[n.url]) notesByUrlCache[n.url] = [];
+    notesByUrlCache[n.url].push(n);
+  }
+}
+
+const esc = (s) =>
+  String(s || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+const delay = (ms) => new Promise((r) => setTimeout(r, ms));

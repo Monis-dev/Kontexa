@@ -3,12 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <link
-      id="popupFont"
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
     />
     <style>
-      /* ── PALETTE DEFINITIONS (Synced with Dashboard) ── */
+      /* ══════════════════════════════════════════
+         THEME VARIABLES (synced with dashboard)
+      ══════════════════════════════════════════ */
       :root,
       [data-theme="indigo"] {
         --bg: #f6f7f9;
@@ -25,6 +26,24 @@
         --hbdr: #f59e0b;
         --logo1: #6366f1;
         --logo2: #4f46e5;
+        --bdrs: #c8cdd6;
+      }
+      [data-theme="nova"] {
+        --bg: #f6f7f9;
+        --sur: #fff;
+        --bdr: #e4e7ec;
+        --ink: #101828;
+        --ink2: #344054;
+        --mut: #667085;
+        --mut2: #98a2b3;
+        --acc: #4f46e5;
+        --acc-bg: #eef2ff;
+        --acc-hover: #4338ca;
+        --hbg: #fffbeb;
+        --hbdr: #f59e0b;
+        --logo1: #6366f1;
+        --logo2: #4f46e5;
+        --bdrs: #c8cdd6;
       }
       [data-theme="emerald"] {
         --bg: #f3faf7;
@@ -41,6 +60,7 @@
         --hbdr: #10b981;
         --logo1: #34d399;
         --logo2: #059669;
+        --bdrs: #a7d7c5;
       }
       [data-theme="rose"] {
         --bg: #fff1f2;
@@ -57,6 +77,7 @@
         --hbdr: #fb7185;
         --logo1: #fb7185;
         --logo2: #e11d48;
+        --bdrs: #f4a7b5;
       }
       [data-theme="amber"] {
         --bg: #fffbeb;
@@ -73,6 +94,7 @@
         --hbdr: #f59e0b;
         --logo1: #fbbf24;
         --logo2: #d97706;
+        --bdrs: #f0cc6e;
       }
       [data-theme="slate"] {
         --bg: #0f172a;
@@ -89,6 +111,7 @@
         --hbdr: #38bdf8;
         --logo1: #38bdf8;
         --logo2: #0ea5e9;
+        --bdrs: #3d5068;
       }
       [data-theme="violet"] {
         --bg: #faf5ff;
@@ -105,15 +128,12 @@
         --hbdr: #8b5cf6;
         --logo1: #a78bfa;
         --logo2: #7c3aed;
+        --bdrs: #c4b5fd;
       }
 
-      /* ── DESIGN TOKENS ── */
-      :root {
-        --card-radius: 12px;
-        --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-        --card-border-left: none;
-      }
-
+      /* ══════════════════════════════════════════
+         BASE
+      ══════════════════════════════════════════ */
       *,
       *::before,
       *::after {
@@ -123,100 +143,85 @@
       }
 
       body {
-        width: 330px;
-        padding: 14px;
+        width: 340px;
         font-family: "Plus Jakarta Sans", sans-serif;
         background: var(--bg);
         color: var(--ink);
-        border-radius: 16px;
         overflow: hidden;
-        transition: background 0.3s, color 0.3s;
+        transition:
+          background 0.3s,
+          color 0.3s;
       }
 
-      /* ── HEADER ── */
-      .header-wrap {
+      /* ══════════════════════════════════════════
+         HEADER
+      ══════════════════════════════════════════ */
+      .header {
         display: flex;
-        justify-content: space-between;
         align-items: center;
-        margin-bottom: 12px;
+        justify-content: space-between;
+        padding: 13px 14px 11px;
+        background: var(--sur);
+        border-bottom: 1px solid var(--bdr);
+        transition:
+          background 0.3s,
+          border-color 0.3s;
       }
+
       .brand {
         display: flex;
         align-items: center;
         gap: 8px;
       }
       .brand-logo {
-        width: 26px;
-        height: 26px;
+        width: 27px;
+        height: 27px;
         border-radius: 7px;
         background: linear-gradient(135deg, var(--logo1), var(--logo2));
         display: grid;
         place-items: center;
         flex-shrink: 0;
-        transition: background 0.3s;
+        transition:
+          background 0.3s,
+          transform 0.2s;
+      }
+      .brand-logo:hover {
+        transform: scale(1.08);
       }
       .brand-logo svg {
         width: 13px;
         height: 13px;
         fill: #fff;
       }
-      h3 {
-        font-size: 16px;
-        margin: 0;
-        color: var(--ink);
+
+      .brand-name {
+        font-size: 15px;
         font-weight: 700;
-        letter-spacing: -0.2px;
+        letter-spacing: -0.3px;
+        color: var(--ink);
       }
-      h3 span {
+      .brand-name span {
         color: var(--acc);
       }
 
-      .popout-btn {
-        background: none;
-        border: 1.5px solid var(--bdr);
-        border-radius: 7px;
-        cursor: pointer;
-        padding: 5px 10px;
-        font-size: 12px;
+      /* Header right — highlight toggle only */
+      .header-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .toggle-label-sm {
+        font-size: 11px;
         font-weight: 600;
         color: var(--mut);
-        font-family: inherit;
-        transition: all 0.2s;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-      }
-      .popout-btn:hover {
-        background: var(--acc-bg);
-        border-color: var(--acc);
-        color: var(--acc);
-      }
-
-      /* ── HIGHLIGHT TOGGLE ── */
-      .toggle-container {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: var(--sur);
-        padding: 9px 12px;
-        border-radius: 10px;
-        border: 1.5px solid var(--bdr);
-        margin-bottom: 14px;
-        transition: background 0.3s, border-color 0.3s;
-      }
-      .toggle-label {
-        font-size: 12.5px;
-        font-weight: 600;
-        color: var(--ink2);
-        display: flex;
-        align-items: center;
-        gap: 6px;
+        white-space: nowrap;
       }
       .switch {
         position: relative;
         display: inline-block;
-        width: 36px;
-        height: 20px;
+        width: 32px;
+        height: 18px;
+        flex-shrink: 0;
       }
       .switch input {
         opacity: 0;
@@ -226,149 +231,519 @@
       .slider {
         position: absolute;
         cursor: pointer;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background-color: var(--bdr);
-        transition: 0.3s;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--bdr);
         border-radius: 20px;
+        transition: 0.25s;
       }
-      .slider:before {
+      .slider::before {
         position: absolute;
         content: "";
-        height: 14px;
-        width: 14px;
+        height: 12px;
+        width: 12px;
         left: 3px;
         bottom: 3px;
-        background-color: white;
-        transition: 0.3s;
+        background: white;
         border-radius: 50%;
+        transition: 0.25s;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
       }
-      input:checked + .slider { background-color: var(--acc); }
-      input:checked + .slider:before { transform: translateX(16px); }
+      input:checked + .slider {
+        background: var(--acc);
+      }
+      input:checked + .slider::before {
+        transform: translateX(14px);
+      }
 
-      /* ── NOTES LIST ── */
-      #notesList {
-        max-height: 220px;
+      /* ══════════════════════════════════════════
+         SCROLL BODY
+      ══════════════════════════════════════════ */
+      .body-scroll {
+        max-height: 540px;
         overflow-y: auto;
-        margin-bottom: 14px;
-        padding-right: 2px;
+        overflow-x: hidden;
+        padding: 12px 12px 0;
       }
-      #notesList::-webkit-scrollbar { width: 4px; }
-      #notesList::-webkit-scrollbar-thumb {
+      .body-scroll::-webkit-scrollbar {
+        width: 3px;
+      }
+      .body-scroll::-webkit-scrollbar-thumb {
         background: var(--bdr);
-        border-radius: 10px;
+        border-radius: 3px;
       }
 
-      .note-card {
-        position: relative;
-        background: var(--sur);
-        border-radius: var(--card-radius);
-        padding: 11px 12px;
-        margin-bottom: 10px;
-        box-shadow: var(--card-shadow);
-        border: 1.5px solid var(--bdr);
-        border-left: var(--card-border-left, 1.5px solid var(--bdr));
-        transition: background 0.3s, border-color 0.2s, box-shadow 0.2s;
-      }
-      .note-card:hover {
-        border-color: var(--acc);
-        box-shadow: var(--card-shadow), 0 4px 12px color-mix(in srgb, var(--acc) 10%, transparent);
-      }
-
-      .note-title {
-        font-size: 13.5px;
-        font-weight: 700;
-        color: var(--ink);
-        margin-bottom: 5px;
-        padding-right: 44px;
-        word-wrap: break-word;
-        line-height: 1.35;
-      }
-      .context {
-        font-size: 11px;
-        color: #92400e;
-        background: var(--hbg);
-        padding: 7px 9px;
-        margin-bottom: 7px;
-        border-radius: 6px;
-        border-left: 3px solid var(--hbdr);
-        line-height: 1.4;
-        font-style: italic;
-        display: block;
-        word-wrap: break-word;
-      }
-      .content {
-        font-size: 12.5px;
-        line-height: 1.5;
-        color: var(--ink2);
-        word-wrap: break-word;
-      }
-
-      /* Folder tag shown on note cards */
-      .note-folder-tag {
-        display: inline-block;
-        font-size: 10px;
-        font-weight: 600;
-        color: var(--acc);
+      /* ══════════════════════════════════════════
+         AI BUTTON
+      ══════════════════════════════════════════ */
+      .ai-strip {
+        display: flex;
+        align-items: center;
+        gap: 8px;
         background: var(--acc-bg);
-        border: 1px solid color-mix(in srgb, var(--acc) 25%, transparent);
-        border-radius: 4px;
-        padding: 1px 5px;
-        margin-left: 5px;
-        vertical-align: middle;
-        font-style: normal;
+        border: 1.5px solid color-mix(in srgb, var(--acc) 25%, transparent);
+        border-radius: 10px;
+        padding: 9px 12px;
+        margin-bottom: 10px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: inherit;
+        width: 100%;
+        text-align: left;
+      }
+      .ai-strip:hover {
+        background: color-mix(in srgb, var(--acc) 15%, transparent);
+        border-color: var(--acc);
+      }
+      .ai-strip:disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
       }
 
-      .btn-edit,
-      .btn-delete {
-        position: absolute;
+      .ai-strip-icon {
+        width: 28px;
+        height: 28px;
+        background: var(--acc);
+        border-radius: 7px;
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        transition: transform 0.2s;
+      }
+      .ai-strip:hover:not(:disabled) .ai-strip-icon {
+        transform: scale(1.08);
+      }
+      .ai-strip-icon svg {
+        stroke: #fff;
+        fill: none;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .ai-strip-text {
+        flex: 1;
+      }
+      .ai-strip-title {
+        font-size: 12.5px;
+        font-weight: 700;
+        color: var(--acc);
+        display: block;
+        line-height: 1.2;
+      }
+      .ai-strip-sub {
+        font-size: 10.5px;
+        color: var(--mut);
+        display: block;
+      }
+
+      /* ══════════════════════════════════════════
+         AI PREVIEW CONTAINER
+      ══════════════════════════════════════════ */
+      #aiNotesContainer {
+        margin-bottom: 10px;
+        display: none;
+      }
+
+      .ai-preview-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      .ai-preview-label {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--acc);
+      }
+      .ai-cancel-btn {
         background: none;
         border: none;
         cursor: pointer;
-        padding: 0;
-        color: var(--mut2);
+        font-size: 11px;
+        color: var(--mut);
+        font-family: inherit;
+        padding: 2px 6px;
+        border-radius: 4px;
         transition: color 0.15s;
       }
-      .btn-edit { top: 8px; right: 30px; font-size: 13px; }
-      .btn-edit:hover { color: var(--acc); }
-      .btn-delete { top: 6px; right: 8px; font-size: 17px; font-weight: 300; line-height: 1; }
-      .btn-delete:hover { color: #ef4444; }
+      .ai-cancel-btn:hover {
+        color: var(--ink);
+      }
 
-      /* ── INPUT AREA ── */
-      input[type="text"],
-      textarea,
-      select {
+      .ai-review-card {
+        background: var(--sur);
+        border: 1.5px solid var(--bdr);
+        border-radius: 9px;
+        padding: 10px 11px;
+        margin-bottom: 6px;
+        display: flex;
+        gap: 9px;
+        align-items: flex-start;
+        cursor: pointer;
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
+        animation: cardIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+      .ai-review-card:hover {
+        border-color: var(--acc);
+        box-shadow: 0 2px 10px color-mix(in srgb, var(--acc) 10%, transparent);
+      }
+
+      .ai-review-card input[type="checkbox"] {
+        margin-top: 2px;
+        flex-shrink: 0;
+        cursor: pointer;
+        accent-color: var(--acc);
+        width: 14px;
+        height: 14px;
+      }
+      .ai-review-card-body {
+        flex: 1;
+      }
+      .ai-review-title {
+        font-size: 12.5px;
+        font-weight: 700;
+        color: var(--ink);
+        margin-bottom: 3px;
+        display: block;
+        line-height: 1.3;
+      }
+      .ai-review-content {
+        font-size: 11.5px;
+        color: var(--ink2);
+        line-height: 1.5;
+      }
+
+      .ai-save-btn {
+        width: 100%;
+        padding: 9px;
+        background: var(--acc);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 13px;
+        font-family: inherit;
+        margin-top: 4px;
+        transition:
+          background 0.2s,
+          transform 0.1s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+      .ai-save-btn:hover {
+        background: var(--acc-hover);
+      }
+      .ai-save-btn:active {
+        transform: scale(0.98);
+      }
+
+      /* No transcript error */
+      .ai-error-card {
+        background: #fef2f2;
+        border: 1.5px solid #fecaca;
+        border-radius: 9px;
+        padding: 13px;
+        font-size: 12.5px;
+        color: #7f1d1d;
+        line-height: 1.6;
+        margin-bottom: 6px;
+      }
+      .ai-error-card strong {
+        font-size: 13px;
+        display: block;
+        margin-bottom: 6px;
+      }
+      .ai-error-card ul {
+        padding-left: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        margin-top: 6px;
+      }
+      .ai-error-btn-primary {
+        margin-top: 11px;
+        width: 100%;
+        padding: 8px;
+        background: var(--acc);
+        color: white;
+        border: none;
+        border-radius: 7px;
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 12.5px;
+        font-family: inherit;
+        transition: background 0.2s;
+      }
+      .ai-error-btn-primary:hover {
+        background: var(--acc-hover);
+      }
+      .ai-error-btn-dismiss {
+        margin-top: 6px;
+        width: 100%;
+        padding: 7px;
+        background: none;
+        border: 1px solid #fca5a5;
+        border-radius: 7px;
+        cursor: pointer;
+        color: #991b1b;
+        font-size: 11.5px;
+        font-family: inherit;
+      }
+
+      /* ══════════════════════════════════════════
+         NOTES LIST
+      ══════════════════════════════════════════ */
+      .section-label {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--mut2);
+        margin-bottom: 7px;
+        display: block;
+        padding: 0 1px;
+      }
+
+      #notesList {
+        margin-bottom: 10px;
+      }
+
+      .empty-state {
+        text-align: center;
+        font-size: 12px;
+        color: var(--mut2);
+        padding: 18px 0;
+        background: var(--sur);
+        border: 1.5px dashed var(--bdr);
+        border-radius: 10px;
+      }
+      .empty-state-icon {
+        font-size: 22px;
+        margin-bottom: 4px;
+        opacity: 0.5;
+      }
+
+      /* Note card — matches redesigned dashboard cards */
+      .note-card {
+        position: relative;
+        background: var(--sur);
+        border: 1.5px solid var(--bdr);
+        border-radius: 11px;
+        margin-bottom: 7px;
+        overflow: hidden;
+        transition:
+          border-color 0.18s,
+          box-shadow 0.18s,
+          transform 0.18s;
+        animation: cardIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+      .note-card:hover {
+        border-color: var(--acc);
+        box-shadow: 0 4px 14px color-mix(in srgb, var(--acc) 12%, transparent);
+        transform: translateY(-1px);
+      }
+
+      @keyframes cardIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px) scale(0.97);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      .note-card-top {
+        padding: 10px 11px 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      /* Title row with inline action buttons */
+      .note-title-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 6px;
+      }
+      .note-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--ink);
+        line-height: 1.35;
+        flex: 1;
+        /* clamp to 2 lines */
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      .note-actions {
+        display: flex;
+        gap: 3px;
+        flex-shrink: 0;
+        margin-top: 1px;
+      }
+      .btn-edit,
+      .btn-delete {
+        width: 22px;
+        height: 22px;
+        border-radius: 5px;
+        border: 1px solid var(--bdr);
+        background: var(--bg);
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        color: var(--mut2);
+        font-size: 11px;
+        line-height: 1;
+        transition: all 0.15s;
+      }
+      .btn-edit:hover {
+        border-color: var(--acc);
+        color: var(--acc);
+        background: var(--acc-bg);
+      }
+      .btn-delete:hover {
+        border-color: #ef4444;
+        color: #ef4444;
+        background: #fff5f5;
+      }
+
+      /* Highlighted selection */
+      .note-selection {
+        font-size: 11px;
+        color: #92400e;
+        background: var(--hbg);
+        border-left: 3px solid var(--hbdr);
+        padding: 6px 9px;
+        border-radius: 0 6px 6px 0;
+        line-height: 1.45;
+        font-style: italic;
+        /* clamp to 3 lines */
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      /* Body content */
+      .note-content {
+        font-size: 12px;
+        color: var(--ink2);
+        line-height: 1.55;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      /* Card footer — folder tag */
+      .note-card-footer {
+        padding: 5px 11px 8px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .note-folder-tag {
+        font-size: 9.5px;
+        font-weight: 700;
+        color: var(--acc);
+        background: var(--acc-bg);
+        border: 1px solid color-mix(in srgb, var(--acc) 28%, transparent);
+        border-radius: 4px;
+        padding: 1px 6px;
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+      }
+      .note-pinned-tag {
+        font-size: 9.5px;
+        font-weight: 700;
+        color: #92400e;
+        background: #fef3c7;
+        border: 1px solid #fde68a;
+        border-radius: 4px;
+        padding: 1px 6px;
+      }
+
+      /* ══════════════════════════════════════════
+         FORM / INPUT AREA
+      ══════════════════════════════════════════ */
+      .form-area {
+        padding: 10px 12px 12px;
+        border-top: 1px solid var(--bdr);
+        background: var(--sur);
+        transition:
+          background 0.3s,
+          border-color 0.3s;
+      }
+
+      .form-area input[type="text"],
+      .form-area textarea,
+      .form-area select {
         width: 100%;
         border: 1.5px solid var(--bdr);
         border-radius: 9px;
-        padding: 9px 11px;
-        box-sizing: border-box;
+        padding: 8px 11px;
         font-family: inherit;
-        margin-bottom: 8px;
-        background: var(--sur);
+        background: var(--bg);
         color: var(--ink);
-        transition: border-color 0.2s, box-shadow 0.2s, background 0.3s;
-      }
-      input[type="text"] { font-size: 13.5px; font-weight: 600; }
-      textarea { resize: none; min-height: 64px; font-size: 13px; }
-      input[type="text"]:focus,
-      textarea:focus,
-      select:focus {
+        transition:
+          border-color 0.2s,
+          box-shadow 0.2s,
+          background 0.3s;
         outline: none;
+        display: block;
+        margin-bottom: 8px;
+      }
+      .form-area input[type="text"] {
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .form-area textarea {
+        resize: none;
+        min-height: 58px;
+        font-size: 12.5px;
+        line-height: 1.55;
+      }
+      .form-area select {
+        font-size: 12.5px;
+        cursor: pointer;
+        margin-bottom: 8px;
+      }
+      .form-area input::placeholder,
+      .form-area textarea::placeholder {
+        color: var(--mut2);
+      }
+      .form-area input:focus,
+      .form-area textarea:focus,
+      .form-area select:focus {
         border-color: var(--acc);
         box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 12%, transparent);
       }
-      input::placeholder,
-      textarea::placeholder { color: var(--mut2); }
 
-      /* ── FOLDER ROW ── */
+      /* Folder row */
       #folderRow {
-        display: none; /* shown by JS only when folders exist */
+        display: none;
         align-items: center;
         gap: 8px;
         margin-bottom: 8px;
       }
       #folderRow label {
-        font-size: 12px;
+        font-size: 11.5px;
         font-weight: 600;
         color: var(--mut);
         white-space: nowrap;
@@ -377,102 +752,277 @@
         gap: 4px;
       }
       #folderRow select {
-        margin-bottom: 0;
         flex: 1;
-        font-size: 12.5px;
-        padding: 7px 10px;
-        cursor: pointer;
+        margin-bottom: 0;
       }
 
-      button#saveBtn {
+      /* General note toggle */
+      #generalToggleRow {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 0 8px;
+        cursor: pointer;
+        user-select: none;
+      }
+      #generalToggleRow label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        width: 100%;
+        font-size: 12px;
+        color: var(--mut);
+        font-weight: 600;
+      }
+      #generalToggleSwitch {
+        width: 30px;
+        height: 17px;
+        background: var(--bdr);
+        border-radius: 20px;
+        position: relative;
+        transition: background 0.22s;
+        flex-shrink: 0;
+      }
+      #generalToggleThumb {
+        width: 13px;
+        height: 13px;
+        background: white;
+        border-radius: 50%;
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        transition: left 0.22s;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+      }
+
+      /* Save button */
+      #saveBtn {
         width: 100%;
         background: var(--acc);
         color: white;
         border: none;
-        padding: 11px;
+        padding: 10px;
         border-radius: 9px;
         cursor: pointer;
         font-weight: 700;
-        font-size: 13.5px;
+        font-size: 13px;
         font-family: inherit;
         letter-spacing: 0.01em;
-        transition: background 0.2s, transform 0.1s;
+        transition:
+          background 0.2s,
+          transform 0.12s,
+          box-shadow 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
       }
-      button#saveBtn:hover { background: var(--acc-hover); }
-      button#saveBtn:active { transform: scale(0.98); }
+      #saveBtn:hover {
+        background: var(--acc-hover);
+        box-shadow: 0 4px 14px color-mix(in srgb, var(--acc) 30%, transparent);
+      }
+      #saveBtn:active {
+        transform: scale(0.97);
+      }
+      #saveBtn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
 
-      /* ── FOOTER ── */
+      /* ══════════════════════════════════════════
+         FOOTER
+      ══════════════════════════════════════════ */
       .footer {
         text-align: center;
-        margin-top: 13px;
+        padding: 10px 12px 12px;
         border-top: 1px solid var(--bdr);
-        padding-top: 11px;
+        background: var(--bg);
+        transition:
+          background 0.3s,
+          border-color 0.3s;
       }
       .footer a {
-        font-size: 12.5px;
+        font-size: 12px;
         color: var(--acc);
         text-decoration: none;
         font-weight: 600;
         transition: opacity 0.15s;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
       }
-      .footer a:hover { opacity: 0.75; }
-
-      .empty-state {
-        text-align: center;
-        font-size: 12.5px;
-        color: var(--mut2);
-        margin: 16px 0;
+      .footer a:hover {
+        opacity: 0.72;
       }
     </style>
   </head>
   <body>
-    <div class="header-wrap">
+    <!-- ═══════════════════════════════════
+         HEADER
+    ════════════════════════════════════ -->
+    <div class="header">
       <div class="brand">
         <div class="brand-logo">
           <svg viewBox="0 0 24 24">
-            <path d="M9 12h6M9 16h6M7 8h10M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"/>
+            <path
+              d="M9 12h6M9 16h6M7 8h10M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"
+            />
           </svg>
         </div>
-        <h3>Context<span>Note</span></h3>
+        <span class="brand-name">Context<span>Note</span></span>
       </div>
-      <button id="popOutBtn" class="popout-btn" title="Open sticky window">
-        📌 Pop Out
+
+      <div class="header-right">
+        <span class="toggle-label-sm">Highlights</span>
+        <label class="switch" title="Show webpage highlights">
+          <input type="checkbox" id="highlightToggle" />
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════
+         SCROLLABLE BODY
+    ════════════════════════════════════ -->
+    <div class="body-scroll">
+      <!-- AI Summarize Strip -->
+      <button id="aiGenerateBtn" class="ai-strip" style="margin-top: 10px">
+        <div class="ai-strip-icon">
+          <svg viewBox="0 0 24 24" width="14" height="14">
+            <path d="M12 2a10 10 0 100 20 10 10 0 000-20z" />
+            <path d="M8 12h8M12 8v8" />
+          </svg>
+        </div>
+        <div class="ai-strip-text">
+          <span class="ai-strip-title">✨ Summarize Page to Notes</span>
+          <span class="ai-strip-sub"
+            >AI generates key concepts from this page</span
+          >
+        </div>
+        <svg
+          viewBox="0 0 24 24"
+          width="14"
+          height="14"
+          style="
+            stroke: var(--acc);
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            flex-shrink: 0;
+          "
+        >
+          <path d="m9 18 6-6-6-6" />
+        </svg>
+      </button>
+
+      <!-- AI Review Container -->
+      <div id="aiNotesContainer"></div>
+
+      <!-- Notes List -->
+      <span class="section-label" id="notesLabel">This Page</span>
+      <div id="notesList">
+        <div class="empty-state">
+          <div class="empty-state-icon">📝</div>
+          <div>Loading notes…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════
+         FORM AREA (fixed at bottom)
+    ════════════════════════════════════ -->
+    <div class="form-area">
+      <input type="text" id="noteTitle" placeholder="Note title…" />
+      <textarea
+        id="noteInput"
+        placeholder="Description or note content…"
+        rows="3"
+      ></textarea>
+
+      <!-- General Note Toggle (injected by JS, but placeholder here) -->
+      <div id="generalToggleRow" style="display: none">
+        <label>
+          <div id="generalToggleSwitch">
+            <div id="generalToggleThumb"></div>
+          </div>
+          <span>Save as General Note</span>
+        </label>
+      </div>
+
+      <!-- Folder Row -->
+      <div id="folderRow">
+        <label for="folderSelect">
+          <svg
+            viewBox="0 0 24 24"
+            style="
+              width: 11px;
+              height: 11px;
+              stroke: var(--mut);
+              fill: none;
+              stroke-width: 2;
+              stroke-linecap: round;
+              stroke-linejoin: round;
+            "
+          >
+            <path
+              d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+            />
+          </svg>
+          Folder
+        </label>
+        <select id="folderSelect">
+          <option value="">No folder</option>
+        </select>
+      </div>
+
+      <button id="saveBtn">
+        <svg
+          viewBox="0 0 24 24"
+          width="14"
+          height="14"
+          style="
+            stroke: #fff;
+            fill: none;
+            stroke-width: 2.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+          "
+        >
+          <path
+            d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"
+          />
+          <polyline points="17 21 17 13 7 13 7 21" />
+          <polyline points="7 3 7 8 15 8" />
+        </svg>
+        Save Note
       </button>
     </div>
 
-    <div class="toggle-container">
-      <div class="toggle-label"><span>🖍️</span> Show Webpage Highlights</div>
-      <label class="switch">
-        <input type="checkbox" id="highlightToggle" />
-        <span class="slider"></span>
-      </label>
-    </div>
-
-    <button id="aiGenerateBtn" style="width: 100%; padding: 8px; background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; border-radius: 6px; cursor: pointer; font-weight: 600; margin-bottom: 12px; display:flex; align-items:center; justify-content:center; gap:6px;">
-      ✨ Summarize Page to Notes
-    </button>
-    <div id="aiNotesContainer" style="margin-bottom: 12px; display:none;"></div>
-    
-    <div id="notesList"><div class="empty-state">Loading notes...</div></div>
-
-    <input type="text" id="noteTitle" placeholder="Note Heading..." />
-    <textarea id="noteInput" placeholder="Description / Note details..."></textarea>
-
-    <!-- Folder row — hidden until folders exist -->
-    <div id="folderRow">
-      <label for="folderSelect">
-        <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:var(--mut);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-        Folder
-      </label>
-      <select id="folderSelect">
-        <option value="">No folder</option>
-      </select>
-    </div>
-
-    <button id="saveBtn">Save Note</button>
-
+    <!-- ═══════════════════════════════════
+         FOOTER
+    ════════════════════════════════════ -->
     <div class="footer">
-      <a href="#" id="openDashboard">Open Full Dashboard ↗</a>
+      <a href="#" id="openDashboard">
+        Open Dashboard
+        <svg
+          viewBox="0 0 24 24"
+          width="11"
+          height="11"
+          style="
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+          "
+        >
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+          <polyline points="15 3 21 3 21 9" />
+          <line x1="10" y1="14" x2="21" y2="3" />
+        </svg>
+      </a>
     </div>
 
     <script src="../pro.js"></script>
