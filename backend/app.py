@@ -1,5 +1,4 @@
 import os
-import stripe
 import razorpay
 import hmac
 import hashlib
