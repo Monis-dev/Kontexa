@@ -177,6 +177,67 @@ ${notesText || "No notes provided."}
       return null;
     }
   },
+  async generateNotesFromQuestion(question) {
+    const res = await chrome.storage.local.get(["gemini_key"]);
+    const apiKey = res.gemini_key;
+    if (!apiKey) return null;
+
+    const prompt = `
+You are a note generator. The user asked about a topic they have no saved notes on.
+
+Generate 3 helpful, accurate notes about this topic.
+
+Return ONLY a valid JSON array. No markdown, no backticks, no extra text.
+
+Each object must have EXACTLY these fields:
+- "title": short heading (5 words max)
+- "content": clear explanation (2-3 sentences, factual and accurate)
+- "tags": array of 2-3 lowercase single-word tags
+
+DO NOT include a "domain" field. DO NOT invent website URLs.
+
+FORMAT:
+[
+  {
+    "title": "Concept Name",
+    "content": "Clear explanation here.",
+    "tags": ["tag1", "tag2"]
+  }
+]
+
+User Question: ${question}
+`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.MODEL_NAME}:generateContent?key=${apiKey}`;
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.3 },
+        }),
+      });
+
+      if (!response.ok) return null;
+
+      const data = await response.json();
+      let raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      raw = raw.replace(/```json|```/g, "").trim();
+
+      try {
+        return JSON.parse(raw);
+      } catch (e) {
+        console.warn("generateNotesFromQuestion: JSON parse failed", raw);
+        return null;
+      }
+    } catch (error) {
+      console.error("AI Generation Error:", error);
+      return null;
+    }
+  },
+
   async generateTags(noteText) {
     if (!noteText || noteText.trim().length < 10) return [];
 
@@ -317,7 +378,44 @@ async function lazyTagNotes(notes) {
 
 function smartFilterNotes(notes, query) {
   query = query.toLowerCase();
-  const words = query.split(/\s+/).filter((w) => w.length > 1);
+  const STOP_WORDS = new Set([
+    "is",
+    "what",
+    "the",
+    "a",
+    "an",
+    "are",
+    "was",
+    "were",
+    "how",
+    "why",
+    "when",
+    "where",
+    "who",
+    "do",
+    "does",
+    "can",
+    "tell",
+    "me",
+    "about",
+    "give",
+    "show",
+    "explain",
+    "with",
+    "for",
+    "of",
+    "in",
+    "on",
+    "at",
+    "to",
+    "and",
+    "its",
+    "this",
+  ]);
+  const words = query
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !STOP_WORDS.has(w));
+  if (words.length === 0) return [];
 
   return notes
     .map((note) => {
@@ -350,7 +448,7 @@ function smartFilterNotes(notes, query) {
 
       return { note, score };
     })
-    .filter((item) => item.score > 0)
+    .filter((item) => item.score > 3)
     .sort((a, b) => b.score - a.score)
     .slice(0, 9)
     .map((item) => item.note);

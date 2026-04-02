@@ -1,0 +1,292 @@
+/* ══════════════════════════════════════════════════════
+   CONTEXTNOTE — ANIMATION ENHANCEMENTS
+   ADD these rules at the END of your dashboard.css
+   ══════════════════════════════════════════════════════ */
+
+/* ─── Card shine sweep on hover ─────────────────────── */
+.card {
+  isolation: isolate; /* needed for mix-blend-mode children */
+}
+.card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    120deg,
+    transparent 30%,
+    rgba(255,255,255,0.07) 50%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+  transition: transform 0s;
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 1;
+}
+.card:hover::after {
+  transform: translateX(100%);
+  transition: transform 0.55s ease;
+}
+
+/* ─── Card pin star animation ───────────────────────── */
+.btn-pin svg {
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+              fill 0.2s, stroke 0.2s;
+}
+.btn-pin:hover svg {
+  transform: scale(1.4) rotate(20deg);
+}
+
+/* ─── Delete button shudder ─────────────────────────── */
+.act.del:hover {
+  animation: shudder 0.35s ease both;
+}
+@keyframes shudder {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-3px) rotate(-4deg); }
+  40% { transform: translateX(3px) rotate(4deg); }
+  60% { transform: translateX(-2px) rotate(-2deg); }
+  80% { transform: translateX(2px) rotate(2deg); }
+}
+
+/* ─── Topbar gradient line pulse ────────────────────── */
+.topbar::after {
+  animation: topbarLinePulse 4s ease-in-out infinite;
+}
+@keyframes topbarLinePulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.7; }
+}
+
+/* ─── Modal backdrop blur animate in ───────────────── */
+.mbg {
+  animation: none;
+}
+.mbg.on {
+  animation: backdropIn 0.3s ease both;
+}
+@keyframes backdropIn {
+  from { backdrop-filter: blur(0px); background: rgba(10,14,26,0); }
+  to { backdrop-filter: blur(6px); background: rgba(10,14,26,0.55); }
+}
+
+/* ─── Note count badge pop on update ───────────────── */
+@keyframes badgePop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.4); }
+  70% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+.bdg.pop {
+  animation: badgePop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* ─── Sidebar nav item hover glow ──────────────────── */
+.na::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--acc), var(--logo2, #8b5cf6));
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+.na:hover::before { opacity: 0.06; }
+.na.on::before { opacity: 0.0; } /* already has gradient bg */
+
+/* ─── Search bar focus glow animation ───────────────── */
+.sb input:focus {
+  animation: searchGlow 0.3s ease both;
+}
+@keyframes searchGlow {
+  from { box-shadow: 0 0 0 0px color-mix(in srgb, var(--acc) 12%, transparent); }
+  to { box-shadow: 0 0 0 4px color-mix(in srgb, var(--acc) 12%, transparent); }
+}
+
+/* ─── Settings panel open animation ─────────────────── */
+.settings-panel.open .sp-section {
+  animation: spSectionIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.settings-panel.open .sp-section:nth-child(1) { animation-delay: 0.05s; }
+.settings-panel.open .sp-section:nth-child(2) { animation-delay: 0.12s; }
+.settings-panel.open .sp-section:nth-child(3) { animation-delay: 0.18s; }
+@keyframes spSectionIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ─── Swatch hover bounce ───────────────────────────── */
+.palette-swatch {
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+.palette-swatch:hover {
+  transform: translateY(-3px) scale(1.05);
+}
+.palette-swatch.active {
+  transform: translateY(-2px) scale(1.04);
+}
+
+/* ─── "View All" button arrow bounce ───────────────── */
+.btn-view-more:hover svg,
+.btn-view-more:hover::after {
+  animation: arrowBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes arrowBounce {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(5px); }
+  100% { transform: translateX(0); }
+}
+
+/* ─── Back button hover slide ───────────────────────── */
+.back-btn {
+  position: relative;
+  overflow: hidden;
+}
+.back-btn::before {
+  content: '←';
+  position: absolute;
+  left: -20px;
+  opacity: 0;
+  transition: all 0.2s;
+}
+.back-btn:hover::before {
+  left: 8px;
+  opacity: 0.5;
+}
+
+/* ─── Empty state illustration animate ─────────────── */
+.empty span {
+  display: inline-block;
+  animation: emptyFloat 3s ease-in-out infinite;
+}
+@keyframes emptyFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* ─── Highlight quote block shine ───────────────────── */
+.chi {
+  position: relative;
+  overflow: hidden;
+}
+.chi::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -60%;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(245,158,11,0.08), transparent);
+  animation: quoteShine 4s ease-in-out infinite;
+}
+@keyframes quoteShine {
+  0% { left: -60%; }
+  60%, 100% { left: 130%; }
+}
+
+/* ─── AI Chat input send button glow ────────────────── */
+#aiSendBtn {
+  position: relative;
+  overflow: hidden;
+}
+#aiSendBtn::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  animation: sendShimmer 2s ease-in-out infinite;
+}
+@keyframes sendShimmer {
+  0% { left: -100%; }
+  60%, 100% { left: 200%; }
+}
+
+/* ─── View modal header gradient pulse ──────────────── */
+.view-modal-header {
+  animation: headerGlow 3s ease-in-out infinite;
+}
+@keyframes headerGlow {
+  0%, 100% { background: linear-gradient(135deg, color-mix(in srgb, var(--acc) 6%, transparent), transparent); }
+  50% { background: linear-gradient(135deg, color-mix(in srgb, var(--acc) 10%, transparent), transparent); }
+}
+
+/* ─── Divider gradient animation ────────────────────── */
+.divider {
+  background: linear-gradient(90deg, transparent, var(--bdr), transparent);
+  animation: dividerPulse 5s ease-in-out infinite;
+}
+@keyframes dividerPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* ─── AI modal gradient header pulse ────────────────── */
+.ai-modal-header {
+  animation: aiHeaderGlow 4s ease-in-out infinite;
+}
+@keyframes aiHeaderGlow {
+  0%, 100% { background: linear-gradient(135deg, color-mix(in srgb, var(--acc) 8%, transparent), transparent); }
+  50% { background: linear-gradient(135deg, color-mix(in srgb, var(--acc) 14%, transparent), transparent); }
+}
+
+/* ─── Folder section header gradient line ───────────── */
+.sech::before {
+  animation: accentLineGrow 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes accentLineGrow {
+  from { width: 0; opacity: 0; }
+  to { width: 40px; opacity: 1; }
+}
+
+/* ─── Logo hover scale + glow ───────────────────────── */
+.logo {
+  position: relative;
+}
+.logo::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--logo1), var(--logo2));
+  opacity: 0;
+  filter: blur(8px);
+  z-index: -1;
+  transition: opacity 0.3s;
+}
+.logo:hover::after { opacity: 0.5; }
+
+/* ─── Subtle body background texture ───────────────── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.025;
+  background-image:
+    radial-gradient(circle at 20% 20%, var(--acc) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, var(--logo2, #8b5cf6) 0%, transparent 50%);
+  animation: bgDrift 12s ease-in-out infinite alternate;
+}
+@keyframes bgDrift {
+  from { transform: scale(1) translate(0, 0); }
+  to { transform: scale(1.1) translate(2%, 2%); }
+}
+
+/* ─── Skeleton shimmer upgrade ──────────────────────── */
+.sk {
+  background: linear-gradient(
+    90deg,
+    var(--bdr) 0%,
+    color-mix(in srgb, var(--acc) 8%, var(--bg)) 50%,
+    var(--bdr) 100%
+  );
+  background-size: 300% 100%;
+  animation: shimmerPremium 2s ease-in-out infinite;
+}
+@keyframes shimmerPremium {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}

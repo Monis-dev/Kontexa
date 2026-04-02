@@ -149,8 +149,8 @@ function hasCustomName(url) {
 // ═══════════════════════════════════════════════════════════
 let notes = [];
 let curUser = null;
-let curView = "notes";
-let prevView = "notes";
+let curView = "home";
+let viewStack = ["home"];
 let curProv = "gemini";
 let aiRunning = false;
 let toastT;
@@ -479,10 +479,16 @@ function nCard(n, displayLabel) {
 //  NAVIGATION
 // ═══════════════════════════════════════════════════════════
 function showView(v) {
+  if (curView !== v) {
+    viewStack.push(v);
+  }
+
   ["homeView", "pageView", "noteView", "settingsView"].forEach((id) =>
     $(id)?.classList.toggle("active", id === v + "View"),
   );
+
   curView = v;
+
   $("mainScr").scrollTop = 0;
 }
 
@@ -578,16 +584,24 @@ function openNote(id) {
   showView("note");
 }
 
-$("backBtn").onclick = () =>
-  showView(
-    prevView === "page"
-      ? "page"
-      : prevView === "settings"
-        ? "settings"
-        : "home",
-  );
-$("noteBackBtn").onclick = () =>
-  showView(prevView === "page" ? "page" : "home");
+$("backBtn").onclick = goBack;
+$("noteBackBtn").onclick = goBack;
+
+function goBack() {
+  if (viewStack.length > 1) {
+    viewStack.pop();
+
+    const prev = viewStack[viewStack.length - 1];
+
+    ["homeView", "pageView", "noteView", "settingsView"].forEach((id) =>
+      $(id)?.classList.toggle("active", id === prev + "View"),
+    );
+
+    curView = prev;
+
+    $("mainScr").scrollTop = 0;
+  }
+}
 
 // ═══════════════════════════════════════════════════════════
 //  TAB SWITCH

@@ -167,23 +167,15 @@ E($("aiBtn"), "click", () => {
   modal.classList.add("on");
 });
 
-
 E($("closeAiBtn"), "click", () => {
-
   $("aiModal")?.classList.remove("on");
-
 });
-
 
 // Close when clicking background
 E($("aiModal"), "click", (e) => {
-
   if (e.target.id === "aiModal") {
-
     $("aiModal").classList.remove("on");
-
   }
-
 });
 
 /* ═══════════════════════════════════════
@@ -628,6 +620,17 @@ document.addEventListener("click", (e) => {
   const renameBtn = e.target.closest(".btn-rename");
   const noteCard = e.target.closest("[data-open-note]");
 
+  const saveBtn = e.target.closest(".btn-save-domain");
+  if (saveBtn) {
+    const idx = parseInt(saveBtn.dataset.index, 10);
+    const note = (window.aiGeneratedNotes || [])[idx];
+    if (note) {
+      saveAINote(note);
+      saveBtn.textContent = "Saved ✓";
+      saveBtn.disabled = true;
+    }
+    return;
+  }
   if (noteCard && !editBtn && !delBtn && !pinBtn && !moveBtn) {
     openNoteModal(noteCard.dataset.openNote);
     return;
@@ -763,6 +766,32 @@ document.addEventListener("click", (e) => {
     renameFolder(oldName, newName);
   }
 });
+
+function saveAINote(note) {
+  const newNote = {
+    id: "ai_" + Date.now(),
+    title: note.title,
+    content: note.content,
+    tags: note.tags || [],
+    url: "ai://generated", // safe placeholder — no fake domain
+    domain: "ai-generated",
+    folder: null,
+    pinned: false,
+    timestamp: null,
+    image_data: null,
+    createdAt: new Date().toISOString(),
+    _synced: false,
+  };
+
+  chrome.storage.local.get(["context_notes_data"], (res) => {
+    let notes = res.context_notes_data || [];
+    notes.push(newNote);
+    chrome.storage.local.set({ context_notes_data: notes }, () => {
+      toast("Note saved ✓");
+      loadLocalUI();
+    });
+  });
+}
 
 /* ═══════════════════════════════════════
    MOVE / EDIT
@@ -1040,6 +1069,87 @@ function renderFoldersSidebar() {
         .join("")
     : '<p style="padding:12px;font-size:12px;color:var(--mut)">No folders yet.</p>';
   bindNav();
+}
+
+function renderNoNotesSuggestion(question, notes) {
+  const chatBox = $("aiChatBox");
+
+  if (!notes || !Array.isArray(notes) || notes.length === 0) {
+    chatBox.insertAdjacentHTML(
+      "beforeend",
+      `<div class="chat-msg chat-ai">
+        ⚠️ No notes found and couldn't generate suggestions. Try rephrasing your question.
+      </div>`,
+    );
+    chatBox.scrollTop = chatBox.scrollHeight;
+    return;
+  }
+
+  window.aiGeneratedNotes = notes;
+
+  const cardsHtml = notes
+    .map(
+      (n, i) => `
+    <div style="
+      background: var(--bg, #fff);
+      border: 1px solid var(--bdr, #e2e8f0);
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    ">
+      <div style="font-weight: 600; font-size: 13px; color: var(--ink, #0f172a); line-height: 1.4;">
+        ${esc(n.title)}
+      </div>
+      <div style="font-size: 12px; color: var(--mut, #64748b); line-height: 1.6;">
+        ${esc(n.content)}
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px;">
+        ${(n.tags || [])
+          .map(
+            (t) =>
+              `<span style="font-size: 11px; padding: 2px 8px; background: var(--acc-bg, #eff6ff); color: var(--acc, #3b82f6); border-radius: 20px; border: 1px solid var(--bdr, #e2e8f0);">#${esc(t)}</span>`,
+          )
+          .join("")}
+      </div>
+      <button
+        class="btn-save-domain"
+        data-index="${i}"
+        style="
+          margin-top: 4px;
+          align-self: flex-start;
+          font-size: 12px;
+          font-weight: 500;
+          padding: 6px 14px;
+          border-radius: 8px;
+          border: 1px solid var(--acc, #3b82f6);
+          background: var(--acc, #3b82f6);
+          color: #fff;
+          cursor: pointer;
+          transition: opacity 0.15s;
+        "
+        onmouseover="this.style.opacity='0.85'"
+        onmouseout="this.style.opacity='1'"
+      >+ Save Note</button>
+    </div>
+  `,
+    )
+    .join("");
+
+  chatBox.insertAdjacentHTML(
+    "beforeend",
+    `<div class="chat-msg chat-ai" style="padding: 0; background: none; border: none; box-shadow: none;">
+      <div style="font-size: 12px; color: var(--mut, #64748b); margin-bottom: 10px; padding: 0 2px;">
+        ⚠️ You have no notes on this topic. Here are some suggested notes you can save:
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        ${cardsHtml}
+      </div>
+    </div>`,
+  );
+
+  chatBox.scrollTop = chatBox.scrollHeight;
 }
 
 if (typeof chrome !== "undefined" && chrome.storage) {
@@ -1640,6 +1750,23 @@ async function handleAiSubmit() {
       if (domainFiltered.length > 0) scopedNotes = domainFiltered;
     }
     const filteredNotes = smartFilterNotes(scopedNotes, q);
+    if (!Array.isArray(filteredNotes) || filteredNotes.length === 0) {
+      chatBox.insertAdjacentHTML(
+        "beforeend",
+        `<div class="chat-msg chat-ai">Generating suggestions…</div>`,
+      );
+      chatBox.scrollTop = chatBox.scrollHeight;
+      const suggestions = await AIService.generateNotesFromQuestion(q);
+      chatBox.lastElementChild.remove();
+      renderNoNotesSuggestion(q, suggestions);
+      input.value = "";
+      input.disabled = false;
+      sendBtn.disabled = false;
+      isAiProcessing = false;
+      chatBox.scrollTop = chatBox.scrollHeight;
+      return;
+    }
+
     const result = await AIService.chat(q, filteredNotes);
     const aiAnswer = result?.answer || "⚠️ No answer received.";
     const aiTags = result?.tags || {};
@@ -1771,6 +1898,42 @@ if (typeof chrome !== "undefined" && chrome.storage) {
 } else {
   applyTheme("nova");
 }
+
+window.addEventListener("load", function () {
+  document.addEventListener(
+    "click",
+    function (e) {
+      const backBtn = e.target.closest("#backToDash");
+
+      if (!backBtn) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const singleView = document.getElementById("singlePageView");
+
+      const mainEl = document.getElementById("main");
+
+      if (!singleView || !mainEl) return;
+
+      // Hide detail view
+      singleView.style.display = "none";
+      singleView.innerHTML = "";
+
+      // Show dashboard
+      mainEl.style.display = "block";
+
+      // Reload UI
+      if (typeof loadLocalUI === "function") {
+        loadLocalUI();
+      }
+
+      // Reset scroll
+      mainEl.scrollTop = 0;
+    },
+    true,
+  );
+});
 
 window.addEventListener("focus", () => {
   const now = Date.now();
