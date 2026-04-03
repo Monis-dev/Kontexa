@@ -317,8 +317,8 @@ async function loadPageNotes() {
               </button>
             </div>
           </div>
-          ${n.selection ? `<div class="note-selection">"${esc(n.selection)}"</div>` : ""}
-          ${n.content ? `<div class="note-content">${esc(n.content)}</div>` : ""}
+          ${n.selection ? `<div class="note-selection" style="white-space: pre-wrap; word-break: break-word;">"${esc(n.selection)}"</div>` : ""}
+          ${n.content ? `<div class="note-content" style="white-space: pre-wrap; word-break: break-word;">${esc(n.content)}</div>` : ""}
         </div>
         ${
           hasFooter

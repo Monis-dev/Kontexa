@@ -242,6 +242,7 @@ function openNoteModal(noteId) {
   if (n.selection || n.text_selection) {
     selEl.textContent = `"${n.selection || n.text_selection}"`;
     selEl.style.display = "block";
+    selEl.style.whiteSpace = "pre-wrap"; // <-- Preserves formatting
   } else {
     selEl.style.display = "none";
   }
@@ -250,6 +251,7 @@ function openNoteModal(noteId) {
   if (n.content) {
     contentEl.textContent = n.content;
     contentEl.style.display = "block";
+    contentEl.style.whiteSpace = "pre-wrap"; // <-- Preserves formatting
   } else {
     contentEl.style.display = "none";
   }
@@ -326,12 +328,12 @@ const card = (n, dom, index = 0) => {
 
   // Highlighted quote
   if (sel) {
-    contentPieces += `<div class="chi">"${esc(sel)}"</div>`;
+    contentPieces += `<div class="chi" style="white-space: pre-wrap; word-break: break-word;">"${esc(sel)}"</div>`;
   }
 
   // Note body text
   if (body) {
-    contentPieces += `<div class="cb">${esc(body)}</div>`;
+    contentPieces += `<div class="cb" style="white-space: pre-wrap; word-break: break-word;">${esc(body)}</div>`;
   }
 
   // If nothing at all — show a subtle empty hint so card doesn't look broken

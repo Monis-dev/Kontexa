@@ -314,7 +314,7 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
       `;
 
       const selectionBoxHtml = selectionText
-        ? `<div style="font-size:12px;font-style:italic;color:#92400e;background:#fffbeb;padding:10px;border-left:3px solid #f59e0b;margin-bottom:12px;border-radius:4px;max-height:80px;overflow-y:auto;line-height:1.4;">"${selectionText}"</div>`
+        ? `<div style="font-size:12px;font-style:italic;color:#92400e;background:#fffbeb;padding:10px;border-left:3px solid #f59e0b;margin-bottom:12px;border-radius:4px;max-height:80px;overflow-y:auto;line-height:1.4; white-space: pre-wrap;">"${selectionText}"</div>`
         : "";
 
 
@@ -447,7 +447,7 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
             domain: noteDomain,
             title: title,
             content: desc,
-            selection: selectionText.replace(/\s+/g, " ").trim(),
+            selection: selectionText.trim(),
             timestamp: media.timestamp,
             image_data: currentImage || null,
             pinned: false,
