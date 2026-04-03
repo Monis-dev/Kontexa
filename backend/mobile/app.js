@@ -123,19 +123,12 @@ function getSourceNames() {
   }
 }
 
-/**
- * Returns the display name for a URL:
- *  1. Custom name set via extension (if any)
- *  2. Cleaned domain (strip protocol, www.)
- */
 function getDisplayName(url) {
   if (!url) return "Unknown";
   const names = getSourceNames();
   if (names[url]) return names[url];
-  // Clean domain
-  let name = url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0];
-  if (name.length > 48) name = name.slice(0, 48) + "…";
-  return name;
+  let name = url.replace(/^https?:\/\/(www\.)?/, "");
+  return name.length > 50 ? name.substring(0, 50) + "…" : name;
 }
 
 /** Whether a URL has a custom name set */
@@ -398,7 +391,7 @@ function renderHome(data) {
   all.forEach((g) => {
     const rawName = g.iF
       ? g.name
-      : g.domain || g.url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0];
+      : g.domain || g.url.replace(/^https?:\/\/(www\.)?/, "");
 
     // Use custom name for URL groups
     const displayName = g.iF ? rawName : getDisplayName(g.url);
