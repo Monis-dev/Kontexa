@@ -13,6 +13,7 @@ let notesById = {};
 let notesByUrl = {};
 let sectionCache = [];
 let folderCounts = {};
+let pendingAiSaveIndex = null;
 
 let syncQueue = [];
 let syncTimer = null;
@@ -624,10 +625,26 @@ document.addEventListener("click", (e) => {
   if (saveBtn) {
     const idx = parseInt(saveBtn.dataset.index, 10);
     const note = (window.aiGeneratedNotes || [])[idx];
+
     if (note) {
-      saveAINote(note);
+      const selectEl = document.querySelector(
+        `.ai-folder-select[data-index="${idx}"]`,
+      );
+      let selectedFolder = selectEl ? selectEl.value : null;
+
+      if (selectedFolder === "__CREATE_NEW__") {
+        // Open Modal instead of prompt
+        pendingAiSaveIndex = idx;
+        $("newFolderNameInput").value = "";
+        $("createFolderModal").classList.add("on");
+        setTimeout(() => $("newFolderNameInput").focus(), 50);
+        return;
+      }
+
+      saveAINote(note, selectedFolder || null);
       saveBtn.textContent = "Saved ✓";
       saveBtn.disabled = true;
+      if (selectEl) selectEl.disabled = true;
     }
     return;
   }
@@ -672,21 +689,12 @@ document.addEventListener("click", (e) => {
     $("moveModal").classList.add("on");
   }
 
-  if (e.target.id === "createFolderBtn") {
-    const name = prompt("Enter new folder name:");
-    if (name && name.trim()) {
-      const newName = name.trim();
-      if (!userFolders.includes(newName)) {
-        userFolders.push(newName);
-        chrome.storage.local.set({ [FOLDERS_KEY]: userFolders }, () => {
-          renderFoldersSidebar();
-          loadLocalUI();
-          toast(`Folder "${newName}" created!`);
-        });
-      } else {
-        toast("A folder with that name already exists.");
-      }
-    }
+  if (e.target.closest("#createFolderBtn")) {
+    pendingAiSaveIndex = null; // Ensure AI index is cleared for standard folder creation
+    $("newFolderNameInput").value = "";
+    $("createFolderModal").classList.add("on");
+    setTimeout(() => $("newFolderNameInput").focus(), 50);
+    return;
   }
 
   if (pinBtn) {
@@ -767,15 +775,85 @@ document.addEventListener("click", (e) => {
   }
 });
 
-function saveAINote(note) {
+function closeCreateFolderModal() {
+  $("createFolderModal").classList.remove("on");
+  if (pendingAiSaveIndex !== null) {
+    const selectEl = document.querySelector(
+      `.ai-folder-select[data-index="${pendingAiSaveIndex}"]`,
+    );
+    if (selectEl) selectEl.value = "";
+    pendingAiSaveIndex = null;
+  }
+}
+
+E($("cancelCreateFolder"), "click", closeCreateFolderModal);
+E($("createFolderModal"), "click", (e) => {
+  if (e.target === $("createFolderModal")) closeCreateFolderModal();
+});
+
+E($("newFolderNameInput"), "keydown", (e) => {
+  if (e.key === "Enter") $("confirmCreateFolder").click();
+});
+
+E($("confirmCreateFolder"), "click", () => {
+  const name = $("newFolderNameInput").value.trim();
+  if (!name) return;
+
+  if (!userFolders.includes(name)) {
+    userFolders.push(name);
+    chrome.storage.local.set({ [FOLDERS_KEY]: userFolders }, () => {
+      renderFoldersSidebar();
+      loadLocalUI();
+      toast(`Folder "${name}" created!`);
+    });
+  } else {
+    toast(`Using existing folder: ${name}`);
+  }
+
+  if (pendingAiSaveIndex !== null) {
+    const note = window.aiGeneratedNotes[pendingAiSaveIndex];
+    const selectEl = document.querySelector(
+      `.ai-folder-select[data-index="${pendingAiSaveIndex}"]`,
+    );
+    const saveBtn = document.querySelector(
+      `.btn-save-domain[data-index="${pendingAiSaveIndex}"]`,
+    );
+
+    document.querySelectorAll(".ai-folder-select").forEach((sel) => {
+      if (![...sel.options].some((opt) => opt.value === name)) {
+        const createOpt = sel.querySelector('option[value="__CREATE_NEW__"]');
+        const newOpt = new Option(name, name);
+        if (createOpt) sel.insertBefore(newOpt, createOpt);
+        else sel.add(newOpt);
+      }
+    });
+
+    if (selectEl) selectEl.value = name;
+    if (note) saveAINote(note, name);
+    if (saveBtn) {
+      saveBtn.textContent = "Saved ✓";
+      saveBtn.disabled = true;
+    }
+    if (selectEl) selectEl.disabled = true;
+
+    pendingAiSaveIndex = null;
+  }
+
+  $("createFolderModal").classList.remove("on");
+});
+
+function saveAINote(note, folderName = null) {
   const newNote = {
     id: "ai_" + Date.now(),
     title: note.title,
     content: note.content,
     tags: note.tags || [],
-    url: "ai://generated", // safe placeholder — no fake domain
-    domain: "ai-generated",
-    folder: null,
+
+    // Change these two lines to match your existing folder-only logic
+    url: "general://notes",
+    domain: "general",
+
+    folder: folderName, // Uses selected folder
     pinned: false,
     timestamp: null,
     image_data: null,
@@ -786,12 +864,14 @@ function saveAINote(note) {
   chrome.storage.local.get(["context_notes_data"], (res) => {
     let notes = res.context_notes_data || [];
     notes.push(newNote);
+    allNotesFlat = notes; // Ensure global array updates instantly for Talk mode
     chrome.storage.local.set({ context_notes_data: notes }, () => {
       toast("Note saved ✓");
       loadLocalUI();
     });
   });
 }
+
 
 /* ═══════════════════════════════════════
    MOVE / EDIT
@@ -1088,53 +1168,70 @@ function renderNoNotesSuggestion(question, notes) {
   window.aiGeneratedNotes = notes;
 
   const cardsHtml = notes
-    .map(
-      (n, i) => `
-    <div style="
-      background: var(--bg, #fff);
-      border: 1px solid var(--bdr, #e2e8f0);
-      border-radius: 12px;
-      padding: 14px 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    ">
-      <div style="font-weight: 600; font-size: 13px; color: var(--ink, #0f172a); line-height: 1.4;">
-        ${esc(n.title)}
+    .map((n, i) => {
+      // Build folder options dynamically
+      let folderOptions = `<option value="">[ No Folder ]</option>`;
+      userFolders.forEach((f) => {
+        const isSelected = n.suggested_folder === f ? "selected" : "";
+        folderOptions += `<option value="${esc(f)}" ${isSelected}>${esc(f)}</option>`;
+      });
+      folderOptions += `<option value="__CREATE_NEW__">+ Create New Folder</option>`;
+
+      return `
+      <div style="
+        background: var(--bg, #fff);
+        border: 1px solid var(--bdr, #e2e8f0);
+        border-radius: 12px;
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      ">
+        <div style="font-weight: 600; font-size: 13px; color: var(--ink, #0f172a); line-height: 1.4;">
+          ${esc(n.title)}
+        </div>
+        <div style="font-size: 12px; color: var(--mut, #64748b); line-height: 1.6;">
+          ${esc(n.content)}
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px;">
+          ${(n.tags || [])
+            .map(
+              (t) =>
+                `<span style="font-size: 11px; padding: 2px 8px; background: var(--acc-bg, #eff6ff); color: var(--acc, #3b82f6); border-radius: 20px; border: 1px solid var(--bdr, #e2e8f0);">#${esc(t)}</span>`,
+            )
+            .join("")}
+        </div>
+        
+        <!-- Enhanced Folder Select UI -->
+        <div style="display: flex; gap: 8px; margin-top: 4px; align-items: center;">
+          <div class="ai-folder-select-wrap">
+            <select class="ai-folder-select" data-index="${i}">
+              ${folderOptions}
+            </select>
+            <svg class="ai-folder-select-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </div>
+          <button
+            class="btn-save-domain"
+            data-index="${i}"
+            style="
+              font-size: 12px;
+              font-weight: 500;
+              padding: 7px 14px;
+              border-radius: 8px;
+              border: 1px solid var(--acc, #3b82f6);
+              background: var(--acc, #3b82f6);
+              color: #fff;
+              cursor: pointer;
+              transition: opacity 0.15s;
+              white-space: nowrap;
+            "
+          >+ Save</button>
+        </div>
       </div>
-      <div style="font-size: 12px; color: var(--mut, #64748b); line-height: 1.6;">
-        ${esc(n.content)}
-      </div>
-      <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px;">
-        ${(n.tags || [])
-          .map(
-            (t) =>
-              `<span style="font-size: 11px; padding: 2px 8px; background: var(--acc-bg, #eff6ff); color: var(--acc, #3b82f6); border-radius: 20px; border: 1px solid var(--bdr, #e2e8f0);">#${esc(t)}</span>`,
-          )
-          .join("")}
-      </div>
-      <button
-        class="btn-save-domain"
-        data-index="${i}"
-        style="
-          margin-top: 4px;
-          align-self: flex-start;
-          font-size: 12px;
-          font-weight: 500;
-          padding: 6px 14px;
-          border-radius: 8px;
-          border: 1px solid var(--acc, #3b82f6);
-          background: var(--acc, #3b82f6);
-          color: #fff;
-          cursor: pointer;
-          transition: opacity 0.15s;
-        "
-        onmouseover="this.style.opacity='0.85'"
-        onmouseout="this.style.opacity='1'"
-      >+ Save Note</button>
-    </div>
-  `,
-    )
+      `;
+    })
     .join("");
 
   chatBox.insertAdjacentHTML(
@@ -1684,6 +1781,8 @@ function renderMarkdown(text) {
 /* ═══════════════════════════════════════
    AI CHAT
 ═══════════════════════════════════════ */
+let aiMode = "talk"; // <-- Add this globally right above the DOMContentLoaded block
+
 document.addEventListener("DOMContentLoaded", () => {
   const aiBtn = $("aiBtn");
   const closeAiBtn = $("closeAiBtn");
@@ -1692,9 +1791,7 @@ document.addEventListener("DOMContentLoaded", () => {
     aiBtn.addEventListener("click", () => {
       $("aiChatBox").innerHTML =
         '<div class="chat-msg chat-ai">Ask me anything about your saved notes.</div>';
-
       $("aiModal").dataset.context = JSON.stringify(allNotesFlat || []);
-
       $("aiModal").classList.add("on");
     });
   }
@@ -1702,6 +1799,58 @@ document.addEventListener("DOMContentLoaded", () => {
   if (closeAiBtn) {
     closeAiBtn.addEventListener("click", () => {
       $("aiModal").classList.remove("on");
+    });
+  }
+
+  // --- NEW: Mode Toggle Listeners ---
+  const btnTalk = $("modeTalk");
+  const btnResearch = $("modeResearch");
+
+  if (btnTalk && btnResearch) {
+    btnTalk.addEventListener("click", () => {
+      aiMode = "talk";
+      btnTalk.style.cssText =
+        "flex:1; padding:8px; border-radius:6px; cursor:pointer; font-weight:600; border:1px solid var(--acc); background:var(--acc-bg); color:var(--acc);";
+      btnResearch.style.cssText =
+        "flex:1; padding:8px; border-radius:6px; cursor:pointer; font-weight:500; border:1px solid transparent; background:transparent; color:var(--mut);";
+
+      // Update Chat Text
+      const chatBox = $("aiChatBox");
+      if (chatBox.children.length <= 1) {
+        // If it's a fresh chat, replace the welcome message
+        chatBox.innerHTML =
+          '<div class="chat-msg chat-ai">Ask me anything about your saved notes.</div>';
+      } else {
+        // If mid-conversation, add a subtle status update
+        chatBox.insertAdjacentHTML(
+          "beforeend",
+          `<div class="chat-msg chat-ai" style="font-size:12px; opacity:0.8; padding:8px;"><em>Switched to <strong>🧠 Talk Mode</strong>. Now searching saved notes.</em></div>`,
+        );
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
+    });
+
+    btnResearch.addEventListener("click", () => {
+      aiMode = "research";
+      btnResearch.style.cssText =
+        "flex:1; padding:8px; border-radius:6px; cursor:pointer; font-weight:600; border:1px solid var(--acc); background:var(--acc-bg); color:var(--acc);";
+      btnTalk.style.cssText =
+        "flex:1; padding:8px; border-radius:6px; cursor:pointer; font-weight:500; border:1px solid transparent; background:transparent; color:var(--mut);";
+
+      // Update Chat Text
+      const chatBox = $("aiChatBox");
+      if (chatBox.children.length <= 1) {
+        // If it's a fresh chat, replace the welcome message
+        chatBox.innerHTML =
+          '<div class="chat-msg chat-ai">Enter a topic to generate new research notes.</div>';
+      } else {
+        // If mid-conversation, add a subtle status update
+        chatBox.insertAdjacentHTML(
+          "beforeend",
+          `<div class="chat-msg chat-ai" style="font-size:12px; opacity:0.8; padding:8px;"><em>Switched to <strong>🔬 Research Mode</strong>. Asking the AI directly.</em></div>`,
+        );
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
     });
   }
 });
@@ -1740,7 +1889,33 @@ async function handleAiSubmit() {
   input.value = "Thinking...";
 
   try {
-    const contextNotes = JSON.parse($("aiModal").dataset.context || "[]");
+    // ==========================================
+    // 1. RESEARCH MODE (Always generate notes)
+    // ==========================================
+    if (aiMode === "research") {
+      chatBox.insertAdjacentHTML(
+        "beforeend",
+        `<div class="chat-msg chat-ai">Generating research notes…</div>`,
+      );
+      chatBox.scrollTop = chatBox.scrollHeight;
+
+      const suggestions = await AIService.generateNotesFromQuestion(q);
+      chatBox.lastElementChild.remove();
+      renderNoNotesSuggestion(q, suggestions);
+
+      input.value = "";
+      input.disabled = false;
+      sendBtn.disabled = false;
+      isAiProcessing = false;
+      chatBox.scrollTop = chatBox.scrollHeight;
+      setTimeout(() => input.focus(), 10);
+      return; // Stop here, do not run Talk mode
+    }
+
+    // ==========================================
+    // 2. TALK MODE (Original Filtering Logic)
+    // ==========================================
+    const contextNotes = allNotesFlat || [];
     const domain = detectDomain(q);
     let scopedNotes = contextNotes;
     if (domain) {
@@ -1750,23 +1925,22 @@ async function handleAiSubmit() {
       if (domainFiltered.length > 0) scopedNotes = domainFiltered;
     }
     const filteredNotes = smartFilterNotes(scopedNotes, q);
+
     if (!Array.isArray(filteredNotes) || filteredNotes.length === 0) {
       chatBox.insertAdjacentHTML(
         "beforeend",
-        `<div class="chat-msg chat-ai">Generating suggestions…</div>`,
+        `<div class="chat-msg chat-ai">No saved notes found. Try Research Mode.</div>`,
       );
       chatBox.scrollTop = chatBox.scrollHeight;
-      const suggestions = await AIService.generateNotesFromQuestion(q);
-      chatBox.lastElementChild.remove();
-      renderNoNotesSuggestion(q, suggestions);
       input.value = "";
       input.disabled = false;
       sendBtn.disabled = false;
       isAiProcessing = false;
-      chatBox.scrollTop = chatBox.scrollHeight;
-      return;
+      setTimeout(() => input.focus(), 10);
+      return; // Stop here
     }
 
+    // --- Original Chat execution ---
     const result = await AIService.chat(q, filteredNotes);
     const aiAnswer = result?.answer || "⚠️ No answer received.";
     const aiTags = result?.tags || {};
@@ -1813,6 +1987,7 @@ async function handleAiSubmit() {
       `<div class="chat-msg chat-ai">Error: Could not connect to AI.</div>`,
     );
   }
+
   input.value = "";
   input.disabled = false;
   sendBtn.disabled = false;

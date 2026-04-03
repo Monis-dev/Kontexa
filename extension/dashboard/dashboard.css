@@ -687,6 +687,83 @@ body {
   transition: all 0.15s;
 }
 
+
+/* AI Chat Mode Toggle */
+.ai-mode-toggle {
+  display: flex;
+  background: var(--bg, #ffffff);
+  border-bottom: 1px solid var(--bdr, #e2e8f0);
+  padding: 10px 16px;
+  gap: 10px;
+}
+
+.ai-mode-toggle button {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--mut, #64748b);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ai-mode-toggle button:hover:not(.active) {
+  background: var(--hbg, #f1f5f9);
+  color: var(--ink, #0f172a);
+}
+
+.ai-mode-toggle button.active {
+  background: var(--acc-bg, #eff6ff);
+  color: var(--acc, #3b82f6);
+  border-color: var(--acc, #3b82f6);
+  font-weight: 600;
+}
+
+/* AI Folder Dropdown UI */
+.ai-folder-select-wrap {
+  position: relative;
+  flex: 1;
+}
+
+.ai-folder-select {
+  appearance: none;
+  width: 100%;
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 500;
+  padding: 8px 26px 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--bdr, #e2e8f0);
+  background-color: var(--hbg, #f8fafc);
+  color: var(--ink, #0f172a);
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.ai-folder-select:hover {
+  border-color: var(--mut, #64748b);
+  background-color: var(--bg, #fff);
+}
+
+.ai-folder-select:focus {
+  border-color: var(--acc, #3b82f6);
+  box-shadow: 0 0 0 3px var(--acc-bg, #eff6ff);
+  background-color: var(--bg, #fff);
+}
+
+.ai-folder-select-icon {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--mut, #64748b);
+}
+
 /* ─── MAIN ────────────────────────────────────────────── */
 .main {
   flex: 1;

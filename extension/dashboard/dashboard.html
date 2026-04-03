@@ -402,6 +402,47 @@
             ✕
           </button>
         </div>
+        <div
+          style="
+            display: flex;
+            background: var(--bg);
+            border-bottom: 1px solid var(--bdr);
+            padding: 10px 16px;
+            gap: 10px;
+          "
+        >
+          <button
+            id="modeTalk"
+            class="active"
+            style="
+              flex: 1;
+              padding: 8px;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: 600;
+              border: 1px solid var(--acc);
+              background: var(--acc-bg);
+              color: var(--acc);
+            "
+          >
+            🧠 Talk
+          </button>
+          <button
+            id="modeResearch"
+            style="
+              flex: 1;
+              padding: 8px;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: 500;
+              border: 1px solid transparent;
+              background: transparent;
+              color: var(--mut);
+            "
+          >
+            🔬 Research
+          </button>
+        </div>
         <div id="aiChatBox">
           <div class="chat-msg chat-ai">
             Ask me anything about your notes on this page…
@@ -453,6 +494,39 @@
         <div class="macts">
           <button class="btn" id="cancelMove">Cancel</button>
           <button class="btn pri" id="saveMove">Move Note</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="mbg" id="createFolderModal">
+       <div class="modal" style="max-width: 420px; width: 100%;">
+        <h3>
+          <svg
+            viewBox="0 0 24 24"
+            style="
+              width: 16px;
+              height: 16px;
+              stroke: var(--hbdr);
+              fill: none;
+              stroke-width: 2;
+              stroke-linecap: round;
+              stroke-linejoin: round;
+            "
+          >
+            <path
+              d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+            ></path>
+          </svg>
+          Create New Folder
+        </h3>
+        <input
+          type="text"
+          id="newFolderNameInput"
+          placeholder="Enter folder name..."
+        />
+        <div class="macts">
+          <button class="btn" id="cancelCreateFolder">Cancel</button>
+          <button class="btn pri" id="confirmCreateFolder">Create</button>
         </div>
       </div>
     </div>

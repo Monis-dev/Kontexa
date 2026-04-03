@@ -448,7 +448,7 @@ function smartFilterNotes(notes, query) {
 
       return { note, score };
     })
-    .filter((item) => item.score > 3)
+    .filter((item) => item.score > 0) // Lowered threshold so short AI notes pass
     .sort((a, b) => b.score - a.score)
     .slice(0, 9)
     .map((item) => item.note);
