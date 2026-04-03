@@ -608,6 +608,54 @@ def update_note_tags():
     db.session.commit()
     return jsonify({"message": f"Updated tags for {updated_count} notes"}), 200
 
+@app.route('/api/websites/rename', methods=['PUT'])
+def rename_website():
+    if 'user_id' not in session:
+        return jsonify({"error": "Login required"}), 401
+
+    data = request.json
+    if not data:
+        return jsonify({"error": "Invalid request"}), 400
+
+    url = str(data.get("url", ""))[:500]
+    custom_name = data.get("custom_name")
+
+    if not url:
+        return jsonify({"error": "URL is required"}), 400
+
+    if custom_name is not None:
+        custom_name = str(custom_name).strip()[:255]
+        if not custom_name:
+            custom_name = None
+
+    user_id = session['user_id']
+
+    try:
+        website = Website.query.filter_by(user_id=user_id, url=url).first()
+
+        if website:
+            website.custom_name = custom_name
+            db.session.commit()
+            return jsonify({"message": "Source renamed successfully"}), 200
+        else:
+            from urllib.parse import urlparse
+            domain = urlparse(url).netloc[:200] if "://" in url else url[:200]
+            
+            new_site = Website(
+                url=url, 
+                domain=domain, 
+                custom_name=custom_name, 
+                user_id=user_id
+            )
+            db.session.add(new_site)
+            db.session.commit()
+            return jsonify({"message": "Source tracked and renamed successfully"}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"rename_website error: {e}")
+        return jsonify({"error": "An internal error occurred"}), 500
+
 @app.route('/api/folders/<string:folder_name>', methods=['DELETE'])
 def delete_folder(folder_name):
     if 'user_id' not in session:
