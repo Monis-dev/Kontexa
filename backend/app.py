@@ -142,8 +142,8 @@ google = oauth.register(
     client_kwargs={'scope': 'openid email profile'}
 )
 
-@app.route("/weakUp")
-def weakUp():
+@app.route("/wakeUp")
+def wakeUp():
     return jsonify({"message": "Wake UP!!"}), 200
 
 @app.route("/")
@@ -211,49 +211,10 @@ def authorize():
     session.permanent     = True
 
     origin = session.pop("login_origin", "desktop")
+    email  = user_info['email']  # Jinja2 auto-escapes in templates
 
-    # Escape email before embedding in HTML to prevent XSS
-    safe_email = escape(user_info['email'])
-
-    if origin == "mobile":
-        return f"""<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Signed in — ContextNote</title>
-  <style>
-    *{{box-sizing:border-box;margin:0;padding:0}}
-    body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-         background:#0f0f13;color:#f0eff8;display:flex;align-items:center;
-         justify-content:center;min-height:100vh;text-align:center;padding:24px}}
-    .card{{background:#1a1a24;border:1px solid #2a2a38;border-radius:20px;
-           padding:40px 32px;max-width:340px;width:100%}}
-    .ico{{font-size:52px;margin-bottom:16px}}
-    h2{{font-size:22px;font-weight:700;margin-bottom:10px}}
-    p{{font-size:14px;color:#b8b6d0;line-height:1.6;margin-bottom:24px}}
-    .pill{{display:inline-block;background:#7c6ef2;color:#fff;
-           font-size:13px;font-weight:600;padding:10px 24px;border-radius:30px}}
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="ico">&#x2705;</div>
-    <h2>Signed in!</h2>
-    <p>Signed in as <strong>{safe_email}</strong>.<br>
-       Switch back to the ContextNote app &mdash; your notes will load automatically.</p>
-    <div class="pill">You can close this tab</div>
-  </div>
-  <script>setTimeout(()=>window.close(), 2500);</script>
-</body>
-</html>"""
-
-    return """<html><body>
-      <h2 style="text-align:center;margin-top:50px;font-family:sans-serif;">
-        Logged in! &#x2705;<br>Close this tab.
-      </h2>
-      <script>setTimeout(()=>window.close(),2000);</script>
-    </body></html>"""
+    template = "auth_success_mobile.html" if origin == "mobile" else "auth_success_desktop.html"
+    return render_template(template, email=email)
 
 @app.route('/api/me')
 def get_me():
