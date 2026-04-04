@@ -57,13 +57,19 @@ const mob = () => window.innerWidth <= 768;
 const openS = () => {
   $("side").classList.remove("closed");
   $("hbtn").classList.add("open");
-  if (mob()) $("ovl").classList.add("on");
+  if (mob()) {
+    _ovlUsers.add("sidebar");
+    $("ovl").classList.add("on");
+  }
 };
 const closeS = () => {
   $("side").classList.add("closed");
   $("hbtn").classList.remove("open");
-  $("ovl").classList.remove("on");
+  _ovlUsers.delete("sidebar");
+  if (_ovlUsers.size === 0) $("ovl").classList.remove("on");
 };
+
+
 E($("hbtn"), "click", () =>
   $("side").classList.contains("closed") ? openS() : closeS(),
 );
@@ -79,17 +85,18 @@ E($("ovl"), "click", () => {
 /* ═══════════════════════════════════════
    RIGHT SETTINGS PANEL
 ═══════════════════════════════════════ */
+let _ovlUsers = new Set();
 function openSettingsPanel() {
   $("settingsPanel").classList.add("open");
+  _ovlUsers.add("settings");
   $("ovl").classList.add("on");
 }
 function closeSettingsPanel() {
   $("settingsPanel").classList.remove("open");
-  // Only remove overlay if sidebar is also closed
-  if ($("side").classList.contains("closed")) {
-    $("ovl").classList.remove("on");
-  }
+  _ovlUsers.delete("settings");
+  if (_ovlUsers.size === 0) $("ovl").classList.remove("on");
 }
+
 
 E($("settingsPanelBtn"), "click", (e) => {
   e.stopPropagation();
@@ -788,6 +795,14 @@ function closeCreateFolderModal() {
   }
 }
 
+E($("closeRenewalBtn"), "click", () =>
+  $("renewalModal").classList.remove("on"),
+);
+E($("renewBtn"), "click", () => {
+  window.open(`${API_BASE}/pricing`, "_blank");
+  $("renewalModal").classList.remove("on");
+});
+
 E($("cancelCreateFolder"), "click", closeCreateFolderModal);
 E($("createFolderModal"), "click", (e) => {
   if (e.target === $("createFolderModal")) closeCreateFolderModal();
@@ -1323,6 +1338,7 @@ async function checkAuthAndSync() {
       if (isProUserUI) {
         $("createFolderBtn").style.display = "flex";
         $("proBadge").style.display = "inline";
+        $("feedbackSection").style.display = "block"; // ADD THIS, remove old feedbackBtn line
       }
       const planName = user.is_pro ? "Pro Plan" : "Free Plan";
       const statusColor = user.is_pro ? "#4f46e5" : "#64748b";
@@ -1336,6 +1352,19 @@ async function checkAuthAndSync() {
         if ($("paywallModal")) $("paywallModal").classList.add("on");
         loadLocalUI();
         return;
+      }
+      if (
+        user.is_pro &&
+        user.plan_type === "monthly" &&
+        user.days_left !== null &&
+        user.days_left <= 3
+      ) {
+        // Only show once per session so we don't annoy them on every click
+        if (!sessionStorage.getItem("renewal_warned")) {
+          $("daysLeftText").textContent = user.days_left;
+          $("renewalModal").classList.add("on");
+          sessionStorage.setItem("renewal_warned", "true");
+        }
       }
 
       chrome.storage.local.get(STORAGE_KEY, async (localRes) => {
@@ -1447,13 +1476,20 @@ window.addEventListener("focus", () => {
 });
 
 window.onload = () => {
+  // Sidebar: open by default on desktop, closed on mobile
+  if (!mob()) {
+    openS();
+  }
+
   chrome.storage.local.get(PRO_CACHE_KEY, (res) => {
     isProUserUI = res[PRO_CACHE_KEY] === true;
+    if (isProUserUI) {
+      $("feedbackBtn").style.display = "flex";
+    }
     loadLocalUI();
   });
   checkAuthAndSync();
 };
-
 /* ═══════════════════════════════════════
    ADD NOTE MODAL
 ═══════════════════════════════════════ */
@@ -2118,4 +2154,92 @@ window.addEventListener("focus", () => {
     lastAuthCheck = now;
     checkAuthAndSync();
   }
+});
+
+/* Modal For Server Maintenance */
+(async function checkServerHealth() {
+  try {
+    const res = await fetch(`${API_BASE}/wakeUp`, {
+      method: "GET",
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error("not ok");
+  } catch (e) {
+    // Only show to logged-in pro users — non-pro/local users are unaffected
+    if (!isLoggedIn || !isProUserUI) return;
+    document.getElementById("maintenanceModal").classList.add("on");
+  }
+})();
+
+// OK button — logs user out then reloads so they drop to local mode
+document.getElementById("maintenanceOkBtn").addEventListener("click", async () => {
+  try {
+    await fetch(`${API_BASE}/api/logout`, {
+      method: "POST",
+      credentials: "include",
+    });
+  } catch (e) {}
+  window.location.reload();
+});
+
+
+/* ═══════════════════════════════════════
+   FEEDBACK
+═══════════════════════════════════════ */
+let selectedFeedbackType = "feature";
+
+document.querySelectorAll(".fb-chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    document.querySelectorAll(".fb-chip").forEach(c => c.classList.remove("active"));
+    chip.classList.add("active");
+    selectedFeedbackType = chip.dataset.val;
+  });
+});
+
+E($("feedbackBtn"), "click", () => {
+  $("fbSubject").value = "";
+  $("fbMessage").value = "";
+  selectedFeedbackType = "feature";
+  document.querySelectorAll(".fb-chip").forEach((c, i) => {
+    c.classList.toggle("active", i === 0);
+  });
+  $("feedbackModal").classList.add("on");
+});
+
+E($("cancelFeedback"), "click", () => $("feedbackModal").classList.remove("on"));
+E($("feedbackModal"), "click", (e) => {
+  if (e.target === $("feedbackModal")) $("feedbackModal").classList.remove("on");
+});
+
+E($("submitFeedback"), "click", async () => {
+  const message = $("fbMessage").value.trim();
+  if (!message) {
+    $("fbMessage").style.borderColor = "#ef4444";
+    setTimeout(() => $("fbMessage").style.borderColor = "", 1200);
+    return;
+  }
+
+  const btn = $("submitFeedback");
+  btn.textContent = "Sending…";
+  btn.disabled = true;
+
+  try {
+    await fetch(`${API_BASE}/api/feedback`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: selectedFeedbackType,
+        subject: $("fbSubject").value.trim(),
+        message,
+      }),
+    });
+    $("feedbackModal").classList.remove("on");
+    toast("Feedback sent — thank you! 🙏");
+  } catch (e) {
+    toast("Failed to send. Please try again.");
+  }
+
+  btn.textContent = "Send Feedback";
+  btn.disabled = false;
 });

@@ -158,6 +158,38 @@
           </div>
         </button>
       </div>
+
+      <div class="sp-section" id="feedbackSection" style="display: none">
+        <span class="sp-section-label">Pro</span>
+        <button class="sp-item" id="feedbackBtn">
+          <div
+            class="sp-item-icon"
+            style="background: #eeedfe; border-color: #cecbf6"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="#534AB7"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+              />
+            </svg>
+          </div>
+          <div class="sp-item-text">
+            <span class="sp-item-name">Send Feedback</span>
+            <span class="sp-item-desc">Request features or report bugs</span>
+          </div>
+          <svg class="sp-item-arrow" viewBox="0 0 24 24" width="14" height="14">
+            <path d="m9 18 6-6-6-6" />
+          </svg>
+        </button>
+      </div>
     </aside>
 
     <!-- ═══════════════════════════════════════════
@@ -260,42 +292,259 @@
 
     <!-- Data Guide Modal -->
     <div class="mbg" id="guideModal">
-      <div class="modal">
-        <h3>How ContextNote Stores Your Data</h3>
-        <div class="info-box">
-          <strong><span>🏠</span> Local by Default (Offline)</strong>
-          If you don't log in, your notes live entirely on your computer's hard
-          drive. Fast, private, and available offline.
-        </div>
-        <div
-          class="info-box"
-          style="background: var(--acc-bg); border-color: var(--bdr)"
-        >
-          <strong><span>☁️</span> Cloud Sync (Cross-Device)</strong>
-          Logging in backs up your notes to our cloud servers so you can view
-          them on any device.
-        </div>
-        <div
-          class="info-box"
+      <div class="modal" style="max-width: 420px">
+        <h3 style="margin-bottom: 6px">Sign in to ContextNote</h3>
+        <p
           style="
-            background: var(--hbg);
-            border-color: var(--hbdr);
-            color: #92400e;
+            font-size: 13px;
+            color: var(--mut);
+            margin: 0 0 20px;
+            line-height: 1.5;
           "
         >
-          <strong><span>⚠️</span> Important Warning</strong>
-          ContextNote uses free cloud hosting. In rare cases, cloud backups
-          might be lost. <b>Your local device is your safest primary backup!</b>
+          Your notes are already saved locally. Signing in unlocks sync and Pro
+          features.
+        </p>
+
+        <!-- Row: Free account -->
+        <div
+          style="
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 13px 0;
+            border-bottom: 1px solid var(--bdr);
+          "
+        >
+          <div
+            style="
+              width: 32px;
+              height: 32px;
+              border-radius: 8px;
+              background: #eaf3de;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              flex-shrink: 0;
+            "
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#3B6D11"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </div>
+          <div>
+            <p
+              style="
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--ink);
+                margin: 0 0 3px;
+              "
+            >
+              Free account
+            </p>
+            <p
+              style="
+                font-size: 12px;
+                color: var(--mut);
+                margin: 0;
+                line-height: 1.5;
+              "
+            >
+              Sign in with Google to confirm your identity and keep notes safe
+              across reinstalls.
+            </p>
+          </div>
         </div>
-        <div class="macts" id="guideActs">
-          <button class="btn" id="closeGuideBtn">Got it</button>
-          <button class="btn pri" id="proceedLoginBtn" style="display: none">
-            I understand, Login
+
+        <!-- Row: Pro -->
+        <div
+          style="
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 13px 0;
+            border-bottom: 1px solid var(--bdr);
+          "
+        >
+          <div
+            style="
+              width: 32px;
+              height: 32px;
+              border-radius: 8px;
+              background: #eeedfe;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              flex-shrink: 0;
+            "
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#534AB7"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <rect x="2" y="3" width="20" height="14" rx="2" />
+              <line x1="8" y1="21" x2="16" y2="21" />
+              <line x1="12" y1="17" x2="12" y2="21" />
+            </svg>
+          </div>
+          <div>
+            <p
+              style="
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--ink);
+                margin: 0 0 3px;
+              "
+            >
+              Pro — sync &amp; cross-device access
+            </p>
+            <p
+              style="
+                font-size: 12px;
+                color: var(--mut);
+                margin: 0;
+                line-height: 1.5;
+              "
+            >
+              Upgrade after signing in to unlock cloud sync, mobile app, AI
+              notes, and more.
+            </p>
+          </div>
+        </div>
+
+        <!-- Row: No Pro -->
+        <div
+          style="
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 13px 0;
+          "
+        >
+          <div
+            style="
+              width: 32px;
+              height: 32px;
+              border-radius: 8px;
+              background: #e6f1fb;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              flex-shrink: 0;
+            "
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#185FA5"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <rect x="3" y="11" width="18" height="11" rx="2" />
+              <path d="M7 11V7a5 5 0 0110 0v4" />
+            </svg>
+          </div>
+          <div>
+            <p
+              style="
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--ink);
+                margin: 0 0 3px;
+              "
+            >
+              No Pro? No problem
+            </p>
+            <p
+              style="
+                font-size: 12px;
+                color: var(--mut);
+                margin: 0;
+                line-height: 1.5;
+              "
+            >
+              If you sign in without upgrading, you'll be asked to upgrade or
+              log out — your local notes stay untouched either way.
+            </p>
+          </div>
+        </div>
+
+        <!-- Warning notice -->
+        <div
+          style="
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            background: var(--hbg);
+            border: 1px solid var(--hbdr);
+            border-radius: 8px;
+            padding: 12px 14px;
+            margin: 16px 0 20px;
+          "
+        >
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#b45309"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            style="flex-shrink: 0; margin-top: 1px"
+          >
+            <path
+              d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+            />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+          <p
+            style="font-size: 12px; color: #92400e; margin: 0; line-height: 1.5"
+          >
+            Signing in alone does not sync your notes — cloud sync requires a
+            Pro subscription.
+          </p>
+        </div>
+
+        <div
+          class="macts"
+          id="guideActs"
+          style="flex-direction: column; gap: 8px"
+        >
+          <button
+            class="btn pri"
+            id="proceedLoginBtn"
+            style="width: 100%; display: none"
+          >
+            Continue with Google
+          </button>
+          <button class="btn" id="closeGuideBtn" style="width: 100%">
+            Maybe later
           </button>
         </div>
       </div>
     </div>
-
     <!-- Logout Modal -->
     <div class="mbg" id="logoutModal">
       <div class="modal">
@@ -328,55 +577,392 @@
     </div>
 
     <!-- Paywall Modal -->
-    <div
-      class="mbg"
-      id="paywallModal"
-      style="backdrop-filter: blur(8px); background: rgba(255, 255, 255, 0.8)"
-    >
+    <div class="mbg" id="paywallModal">
       <div
         class="modal"
-        style="
-          text-align: center;
-          padding: 40px 30px;
-          box-shadow: 0 25px 80px rgba(0, 0, 0, 0.2);
-        "
+        style="padding: 0; max-width: 440px; overflow: hidden; text-align: left"
       >
-        <div style="font-size: 40px; margin-bottom: 10px">💎</div>
-        <h3 style="font-size: 20px; margin-bottom: 10px">
-          Upgrade to ContextNote Pro
-        </h3>
-        <p style="color: var(--mut); margin-bottom: 24px; line-height: 1.6">
-          Your account is on the <b>Free Tier</b>.<br /><br />
-          To enable <b>Cloud Sync, Screenshots, and Multi-Device Support</b>,
-          upgrade now.
-        </p>
+        <!-- Purple header -->
         <div
           style="
-            background: #f8fafc;
-            padding: 15px;
-            border-radius: 8px;
-            text-align: left;
-            margin-bottom: 24px;
-            font-size: 13px;
-            color: var(--ink2);
+            background: #eeedfe;
+            padding: 28px 28px 22px;
+            text-align: center;
+            border-bottom: 1px solid #cecbf6;
           "
         >
-          ✅ Unlimited Cloud Storage<br />
-          ✅ Sync across Laptop &amp; Desktop<br />
-          ✅ Save Screenshots &amp; YouTube Timestamps<br />
-          ✅ AI Summarization (Coming Soon)
-        </div>
-        <div class="macts" style="flex-direction: column; gap: 10px">
-          <button
-            class="btn pri"
-            id="upgradeBtn"
-            style="width: 100%; padding: 12px"
+          <div
+            style="
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
+              background: #cecbf6;
+              color: #3c3489;
+              font-size: 11px;
+              font-weight: 600;
+              padding: 4px 12px;
+              border-radius: 20px;
+              margin-bottom: 14px;
+            "
           >
-            Upgrade Now ($5/mo)
-          </button>
-          <button class="btn danger" id="paywallLogoutBtn" style="width: 100%">
-            No thanks, Log me out
-          </button>
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#3C3489"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polygon
+                points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+              />
+            </svg>
+            Pro plan
+          </div>
+          <h3
+            style="
+              font-size: 20px;
+              font-weight: 700;
+              color: #26215c;
+              margin: 0 0 6px;
+            "
+          >
+            Upgrade to ContextNote Pro
+          </h3>
+          <p style="font-size: 13px; color: #534ab7; margin: 0">
+            Everything in Free, plus the good stuff
+          </p>
+        </div>
+
+        <!-- Body -->
+        <div style="padding: 22px 24px">
+          <!-- Price -->
+          <div
+            style="
+              display: flex;
+              align-items: baseline;
+              gap: 4px;
+              margin-bottom: 18px;
+            "
+          >
+            <span style="font-size: 32px; font-weight: 700; color: var(--ink)"
+              >$5</span
+            >
+            <span style="font-size: 14px; color: var(--mut)">/ month</span>
+          </div>
+
+          <!-- Feature list -->
+          <div
+            style="
+              border: 1px solid var(--bdr);
+              border-radius: 12px;
+              overflow: hidden;
+              margin-bottom: 20px;
+            "
+          >
+            <div
+              style="
+                display: flex;
+                align-items: flex-start;
+                gap: 12px;
+                padding: 11px 14px;
+                border-bottom: 1px solid var(--bdr);
+              "
+            >
+              <div
+                style="
+                  width: 28px;
+                  height: 28px;
+                  border-radius: 8px;
+                  background: #e1f5ee;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  flex-shrink: 0;
+                "
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#0F6E56"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M18 20V10M12 20V4M6 20v-6" />
+                </svg>
+              </div>
+              <div>
+                <p
+                  style="
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: var(--ink);
+                    margin: 0 0 2px;
+                  "
+                >
+                  Unlimited cloud sync
+                </p>
+                <p style="font-size: 12px; color: var(--mut); margin: 0">
+                  Access your notes on any device, anytime
+                </p>
+              </div>
+            </div>
+
+            <div
+              style="
+                display: flex;
+                align-items: flex-start;
+                gap: 12px;
+                padding: 11px 14px;
+                border-bottom: 1px solid var(--bdr);
+              "
+            >
+              <div
+                style="
+                  width: 28px;
+                  height: 28px;
+                  border-radius: 8px;
+                  background: #eeedfe;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  flex-shrink: 0;
+                "
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#534AB7"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="5" y="2" width="14" height="20" rx="2" />
+                  <line x1="12" y1="18" x2="12.01" y2="18" />
+                </svg>
+              </div>
+              <div>
+                <p
+                  style="
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: var(--ink);
+                    margin: 0 0 2px;
+                  "
+                >
+                  Mobile PWA app
+                  <span
+                    style="
+                      font-size: 10px;
+                      font-weight: 600;
+                      background: #eeedfe;
+                      color: #534ab7;
+                      padding: 2px 7px;
+                      border-radius: 10px;
+                    "
+                    >New</span
+                  >
+                </p>
+                <p style="font-size: 12px; color: var(--mut); margin: 0">
+                  Install on iOS &amp; Android, works offline
+                </p>
+              </div>
+            </div>
+
+            <div
+              style="
+                display: flex;
+                align-items: flex-start;
+                gap: 12px;
+                padding: 11px 14px;
+                border-bottom: 1px solid var(--bdr);
+              "
+            >
+              <div
+                style="
+                  width: 28px;
+                  height: 28px;
+                  border-radius: 8px;
+                  background: #faeeda;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  flex-shrink: 0;
+                "
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#854F0B"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polygon points="23 7 16 12 23 17 23 7" />
+                  <rect x="1" y="5" width="15" height="14" rx="2" />
+                </svg>
+              </div>
+              <div>
+                <p
+                  style="
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: var(--ink);
+                    margin: 0 0 2px;
+                  "
+                >
+                  Video transcript notes
+                  <span
+                    style="
+                      font-size: 10px;
+                      font-weight: 600;
+                      background: #faeeda;
+                      color: #854f0b;
+                      padding: 2px 7px;
+                      border-radius: 10px;
+                    "
+                    >New</span
+                  >
+                </p>
+                <p style="font-size: 12px; color: var(--mut); margin: 0">
+                  AI extracts key ideas from YouTube videos
+                </p>
+              </div>
+            </div>
+
+            <div
+              style="
+                display: flex;
+                align-items: flex-start;
+                gap: 12px;
+                padding: 11px 14px;
+                border-bottom: 1px solid var(--bdr);
+              "
+            >
+              <div
+                style="
+                  width: 28px;
+                  height: 28px;
+                  border-radius: 8px;
+                  background: #e1f5ee;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  flex-shrink: 0;
+                "
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#0F6E56"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 8v4M12 16h.01" />
+                </svg>
+              </div>
+              <div>
+                <p
+                  style="
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: var(--ink);
+                    margin: 0 0 2px;
+                  "
+                >
+                  AI summarization
+                </p>
+                <p style="font-size: 12px; color: var(--mut); margin: 0">
+                  Chat with all your notes at once
+                </p>
+              </div>
+            </div>
+
+            <div
+              style="
+                display: flex;
+                align-items: flex-start;
+                gap: 12px;
+                padding: 11px 14px;
+              "
+            >
+              <div
+                style="
+                  width: 28px;
+                  height: 28px;
+                  border-radius: 8px;
+                  background: #e6f1fb;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  flex-shrink: 0;
+                "
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#185FA5"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"
+                  />
+                  <polyline points="22,6 12,13 2,6" />
+                </svg>
+              </div>
+              <div>
+                <p
+                  style="
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: var(--ink);
+                    margin: 0 0 2px;
+                  "
+                >
+                  YouTube timestamps
+                </p>
+                <p style="font-size: 12px; color: var(--mut); margin: 0">
+                  Save exact moments from any video
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div style="display: flex; flex-direction: column; gap: 10px">
+            <button
+              class="btn pri"
+              id="upgradeBtn"
+              style="
+                width: 100%;
+                padding: 12px;
+                background: #534ab7;
+                border-color: #534ab7;
+              "
+            >
+              Upgrade now — $5 / month
+            </button>
+            <button class="btn" id="paywallLogoutBtn" style="width: 100%">
+              No thanks, log me out
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -499,7 +1085,7 @@
     </div>
 
     <div class="mbg" id="createFolderModal">
-       <div class="modal" style="max-width: 420px; width: 100%;">
+      <div class="modal" style="max-width: 420px; width: 100%">
         <h3>
           <svg
             viewBox="0 0 24 24"
@@ -604,6 +1190,159 @@
         <div class="macts">
           <button class="btn" id="cancelAddNote">Cancel</button>
           <button class="btn pri" id="saveAddNote">Save Note</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Server Maintenance modal-->
+    <div class="mbg" id="maintenanceModal">
+      <div class="modal" style="text-align: center; max-width: 420px">
+        <div
+          style="
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            background: #fef3c7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 18px;
+          "
+        >
+          <svg
+            viewBox="0 0 24 24"
+            style="
+              width: 24px;
+              height: 24px;
+              stroke: #b45309;
+              fill: none;
+              stroke-width: 2;
+              stroke-linecap: round;
+              stroke-linejoin: round;
+            "
+          >
+            <path
+              d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+            />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+        </div>
+        <h3 style="margin-bottom: 10px">Server under maintenance</h3>
+        <p
+          style="
+            font-size: 13.5px;
+            color: var(--mut);
+            line-height: 1.65;
+            margin-bottom: 18px;
+          "
+        >
+          We'll be back shortly. Since sync is unavailable right now, you'll be
+          signed out — your local notes are safe and untouched.
+        </p>
+        <div
+          style="
+            background: var(--bg);
+            border: 1px solid var(--bdr);
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 22px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-align: left;
+          "
+        >
+          <svg
+            viewBox="0 0 24 24"
+            style="
+              width: 16px;
+              height: 16px;
+              flex-shrink: 0;
+              stroke: #10b981;
+              fill: none;
+              stroke-width: 2;
+              stroke-linecap: round;
+              stroke-linejoin: round;
+            "
+          >
+            <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+            <polyline points="22 4 12 14.01 9 11.01" />
+          </svg>
+          <span style="font-size: 12.5px; color: var(--mut)"
+            >Your notes are safe locally — nothing will be lost</span
+          >
+        </div>
+        <button class="btn pri" id="maintenanceOkBtn" style="width: 100%">
+          OK, sign me out
+        </button>
+      </div>
+    </div>
+
+    <!-- Renewal Warning Modal -->
+    <div class="mbg" id="renewalModal">
+      <div class="modal" style="text-align: center">
+        <h3 style="color: #ea580c">⚠️ Subscription Expiring Soon</h3>
+        <p style="font-size: 14px; color: var(--mut); margin-bottom: 20px">
+          Your Monthly Pro Plan expires in
+          <strong id="daysLeftText"></strong> days.<br /><br />
+          To avoid losing sync features, please renew your plan.
+        </p>
+        <div class="macts" style="flex-direction: column; gap: 10px">
+          <button class="btn pri" id="renewBtn" style="width: 100%">
+            Renew Now ($5/mo)
+          </button>
+          <button class="btn" id="closeRenewalBtn" style="width: 100%">
+            Remind me later
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feedback Modal -->
+    <div class="mbg" id="feedbackModal">
+      <div class="modal" style="max-width: 460px">
+        <h3>Share your feedback</h3>
+        <p
+          style="
+            font-size: 13px;
+            color: var(--mut);
+            margin-bottom: 18px;
+            line-height: 1.5;
+          "
+        >
+          Tell us what you'd like to see, what's broken, or what's working
+          great. Pro users get priority response.
+        </p>
+
+        <!-- Category chips -->
+        <div
+          style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px"
+          id="feedbackChips"
+        >
+          <button class="fb-chip active" data-val="feature">
+            ✨ Feature request
+          </button>
+          <button class="fb-chip" data-val="bug">🐛 Bug report</button>
+          <button class="fb-chip" data-val="ux">🎨 UI / UX</button>
+          <button class="fb-chip" data-val="other">💬 Other</button>
+        </div>
+
+        <input
+          type="text"
+          id="fbSubject"
+          placeholder="Subject (optional)"
+          style="margin-bottom: 10px; font-weight: 500"
+        />
+        <textarea
+          id="fbMessage"
+          rows="5"
+          placeholder="Describe what you'd like or what went wrong…"
+        ></textarea>
+
+        <div class="macts">
+          <button class="btn" id="cancelFeedback">Cancel</button>
+          <button class="btn pri" id="submitFeedback">Send Feedback</button>
         </div>
       </div>
     </div>

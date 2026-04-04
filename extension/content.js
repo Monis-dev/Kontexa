@@ -274,115 +274,118 @@ if (!window.__cnInjected) {
 
   async function extractYouTubeTranscript() {
     try {
-      // 1. Find the "More actions" button — try multiple selectors
-      // YouTube changes this periodically so we cast a wide net
-      const moreBtn =
-        document.querySelector('button[aria-label="More actions"]') ||
-        document.querySelector('button[aria-label="More Actions"]') ||
-        document.querySelector("#button-shape button") ||
-        [...document.querySelectorAll("button")].find(
-          (b) =>
-            b.getAttribute("aria-label")?.toLowerCase().includes("more") &&
-            b.closest("ytd-menu-renderer"),
-        );
+      // 1. Expand the video description (the transcript button is often hidden inside)
+      const expandBtn =
+        document.querySelector("ytd-text-inline-expander #expand") ||
+        document.querySelector("#description-inline-expander #expand") ||
+        document.querySelector("#bottom-row #expand");
 
-      if (!moreBtn) return { error: "NO_MORE_BTN" };
-
-      moreBtn.click();
-      await new Promise((r) => setTimeout(r, 1000));
-
-      // 2. Find "Show transcript" — try text match AND partial match
-      const allFormattedStrings = [
-        ...document.querySelectorAll("yt-formatted-string"),
-      ];
-
-      // Also check tp-yt-paper-item and plain text inside menu items
-      const allMenuTexts = [
-        ...document.querySelectorAll(
-          "tp-yt-paper-item, ytd-menu-service-item-renderer",
-        ),
-      ];
-
-      const transcriptBtn =
-        allFormattedStrings.find(
-          (el) => el.textContent.trim() === "Show transcript",
-        ) ||
-        allFormattedStrings.find((el) =>
-          el.textContent.trim().toLowerCase().includes("transcript"),
-        ) ||
-        allMenuTexts.find((el) =>
-          el.textContent.trim().toLowerCase().includes("transcript"),
-        );
-
-      if (!transcriptBtn) {
-        // Close the menu before returning
-        document.body.click();
-        await new Promise((r) => setTimeout(r, 300));
-        return { error: "NO_TRANSCRIPT" };
+      if (expandBtn) {
+        expandBtn.click();
+        await new Promise((r) => setTimeout(r, 500)); // Wait for expansion animation
       }
 
-      transcriptBtn.click();
-      let segments = [];
-      const MAX_WAIT = 5000;
-      const POLL_INTERVAL = 300;
-      let waited = 0;
+      // 2. Look for the "Show transcript" button directly on the page
+      const allElements = [
+        ...document.querySelectorAll(
+          "button, yt-formatted-string, tp-yt-paper-item",
+        ),
+      ];
+      let transcriptBtn = allElements.find(
+        (el) =>
+          el.textContent &&
+          el.textContent.trim().toLowerCase() === "show transcript",
+      );
 
-      while (waited < MAX_WAIT) {
-        await new Promise((r) => setTimeout(r, POLL_INTERVAL));
-        waited += POLL_INTERVAL;
+      // 3. Fallback: If not found directly, try opening the old "More actions" menu
+      if (!transcriptBtn) {
+        const moreBtn =
+          document.querySelector('button[aria-label="More actions"]') ||
+          document.querySelector('button[aria-label="More Actions"]') ||
+          [...document.querySelectorAll("button")].find(
+            (b) =>
+              b.getAttribute("aria-label")?.toLowerCase().includes("more") &&
+              b.closest("ytd-menu-renderer"),
+          );
 
-        const found = document.querySelectorAll(
-          "ytd-transcript-segment-renderer",
-        );
-        if (found.length > 0) {
-          segments = [...found];
-          break;
+        if (moreBtn) {
+          moreBtn.click();
+          await new Promise((r) => setTimeout(r, 800)); // Wait for menu to open
+
+          // Search inside the newly opened menu
+          const menuItems = [
+            ...document.querySelectorAll(
+              "tp-yt-paper-item, yt-formatted-string",
+            ),
+          ];
+          transcriptBtn = menuItems.find(
+            (el) =>
+              el.textContent &&
+              el.textContent.trim().toLowerCase().includes("transcript"),
+          );
         }
       }
 
-      if (!segments.length) return { error: "NO_SEGMENTS" };
+      // If we still can't find it, the video actually has no transcript available
+      if (!transcriptBtn) {
+        document.body.click(); // Close any stray menus
+        return { error: "NO_TRANSCRIPT" };
+      }
 
-      // Newer YouTube layout fallback
-      if (!segments.length) {
+      // 4. Click it to open the side panel
+      transcriptBtn.click();
+
+      // 5. Wait for the transcript segments to render (poll for up to 5 seconds)
+      let segments = [];
+      const MAX_WAIT = 5000;
+      let waited = 0;
+
+      while (waited < MAX_WAIT) {
+        await new Promise((r) => setTimeout(r, 300));
+        waited += 300;
+
+        // Try standard layout
+        segments = document.querySelectorAll("ytd-transcript-segment-renderer");
+        if (segments.length > 0) break;
+
+        // Try alternative newer layout
         segments = document.querySelectorAll(
           "ytd-transcript-segment-list-renderer ytd-transcript-segment-renderer",
         );
+        if (segments.length > 0) break;
       }
 
       if (!segments.length) return { error: "NO_SEGMENTS" };
 
+      // 6. Extract the text from the segments
       const lines = [...segments]
         .map((seg) => {
-          // Try multiple possible text container selectors
-          const text =
+          return (
             seg.querySelector(".segment-text")?.textContent?.trim() ||
             seg.querySelector("yt-formatted-string")?.textContent?.trim() ||
             seg.textContent?.trim() ||
-            "";
-          return text;
+            ""
+          );
         })
         .filter(Boolean);
 
       if (!lines.length) return { error: "NO_SEGMENTS" };
 
-      // 4. Close transcript panel
+      // 7. Clean up the UI by closing the transcript panel
       const closeBtn =
         document.querySelector('button[aria-label="Close transcript"]') ||
-        document.querySelector('button[aria-label="close"]');
-      closeBtn?.click();
+        document.querySelector('button[aria-label="close"]') ||
+        document.querySelector(
+          'ytd-engagement-panel-title-header-renderer button[aria-label="Close"]',
+        );
 
-      // 5. Get video title — try multiple selectors
-      const title =
-        document
-          .querySelector("h1.ytd-video-primary-info-renderer")
-          ?.textContent?.trim() ||
-        document
-          .querySelector("ytd-video-primary-info-renderer h1")
-          ?.textContent?.trim() ||
-        document
-          .querySelector("h1.style-scope.ytd-watch-metadata")
-          ?.textContent?.trim() ||
-        document.title;
+      if (closeBtn) closeBtn.click();
+
+      // 8. Get reliable video title (fallback to document.title)
+      const title = document.title
+        .replace(/^\(\d+\)\s*/, "")
+        .replace(" - YouTube", "")
+        .trim();
 
       return { transcript: lines.join(" "), title };
     } catch (e) {

@@ -764,6 +764,22 @@ body {
   color: var(--mut, #64748b);
 }
 
+
+.fb-chip {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1.5px solid var(--bdr);
+  background: var(--bg);
+  color: var(--mut);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.fb-chip:hover { border-color: var(--acc); color: var(--acc); }
+.fb-chip.active { background: var(--acc-bg); border-color: var(--acc); color: var(--acc); }
+
 /* ─── MAIN ────────────────────────────────────────────── */
 .main {
   flex: 1;

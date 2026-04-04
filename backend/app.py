@@ -397,6 +397,31 @@ def time_travel(days_left):
     
     return f"Time travel successful! Your account now expires in {days_left} days."
 
+
+# ─── FeedBack ────────────────────────────────────────────────────────────────
+
+# @app.route('/api/feedback', methods=['POST'])
+# def submit_feedback():
+#     data       = request.get_json(silent=True) or {}
+#     fb_type    = escape(data.get('type',    'other'))
+#     subject    = escape(data.get('subject', ''))
+#     message    = escape(data.get('message', ''))
+
+#     if not message:
+#         return jsonify({'error': 'Message required'}), 400
+
+#     feedback = Feedback(
+#         user_id = session['user_id'],
+#         type    = fb_type,
+#         subject = subject,
+#         message = message,
+#     )
+#     db.session.add(feedback)
+#     db.session.commit()
+
+#     return jsonify({'ok': True}), 201
+
+
 # ─── Notes API ────────────────────────────────────────────────────────────────
 
 @app.route('/api/sync', methods=['POST'])
