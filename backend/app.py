@@ -103,10 +103,12 @@ _FOLDER_NAME_MAX      = 100
 # ─── Models ───────────────────────────────────────────────────────────────────
 
 class User(db.Model):
-    id       = db.Column(db.Integer, primary_key=True)
-    email    = db.Column(db.String(120), unique=True, nullable=False)
-    is_pro   = db.Column(db.Boolean, default=False)
-    websites = db.relationship('Website', backref='user', lazy=True)
+    id             = db.Column(db.Integer, primary_key=True)
+    email          = db.Column(db.String(120), unique=True, nullable=False)
+    is_pro         = db.Column(db.Boolean, default=False)
+    plan_type      = db.Column(db.String(20), default='free') # 'free', 'monthly', 'lifetime'
+    pro_expires_at = db.Column(db.DateTime, nullable=True)
+    websites       = db.relationship('Website', backref='user', lazy=True)
 
 class Website(db.Model):
     id          = db.Column(db.Integer, primary_key=True)
@@ -220,8 +222,24 @@ def authorize():
 def get_me():
     if 'user_id' not in session:
         return jsonify({"error": "Not logged in"}), 401
+        
     user = db.session.get(User, session['user_id'])
-    return jsonify({'email': session['user_email'], 'is_pro': user.is_pro})
+    days_left = None
+    if user.is_pro and user.plan_type == 'monthly' and user.pro_expires_at:
+        if datetime.utcnow() > user.pro_expires_at:
+            user.is_pro = False
+            user.plan_type = 'free'
+            db.session.commit()
+        else:
+            delta = user.pro_expires_at - datetime.utcnow()
+            days_left = delta.days
+
+    return jsonify({
+        'email': session['user_email'], 
+        'is_pro': user.is_pro,
+        'plan_type': user.plan_type,
+        'days_left': days_left
+    })
 
 @app.route('/api/logout', methods=['POST'])
 def logout():
@@ -301,6 +319,7 @@ def verify_payment():
     data = request.json
     if not data:
         return jsonify({"status": "failed", "error": "Invalid request"}), 400
+    
 
     razorpay_order_id   = data.get('razorpay_order_id')
     razorpay_payment_id = data.get('razorpay_payment_id')
@@ -321,6 +340,7 @@ def verify_payment():
         order           = client.order.fetch(razorpay_order_id)
         order_user_id   = int(order["notes"]["user_id"])
         session_user_id = session['user_id']
+        
 
         # 3. Ensure the logged-in user matches the order owner (TOCTOU guard)
         if order_user_id != session_user_id:
@@ -333,7 +353,17 @@ def verify_payment():
         # 4. Grant Pro access
         user = db.session.get(User, session_user_id)
         if user:
+            plan_type = order["notes"].get("plan_type", "lifetime")
             user.is_pro = True
+            user.plan_type = plan_type
+            
+            if plan_type == "monthly":
+                # Expires in 30 days
+                user.pro_expires_at = datetime.utcnow() + timedelta(days=30)
+            else:
+                # Lifetime has no expiration
+                user.pro_expires_at = None
+                
             db.session.commit()
 
         return jsonify({"status": "success"})
@@ -351,6 +381,21 @@ def success():
         <p><b>Close this tab and click 'Account &rarr; Sync' in your extension to activate.</b></p>
     </div>"""
 
+
+@app.route('/test/time-travel/<int:days_left>')
+def time_travel(days_left):
+    if 'user_id' not in session:
+        return "Please log in first."
+    
+    user = db.session.get(User, session['user_id'])
+    if not user:
+        return "User not found."
+    
+    # Fast-forward time so the subscription expires in 'X' days
+    user.pro_expires_at = datetime.utcnow() + timedelta(days=days_left)
+    db.session.commit()
+    
+    return f"Time travel successful! Your account now expires in {days_left} days."
 
 # ─── Notes API ────────────────────────────────────────────────────────────────
 
