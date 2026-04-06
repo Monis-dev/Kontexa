@@ -201,10 +201,24 @@ def login():
 def authorize():
     token     = google.authorize_access_token()
     user_info = token.get('userinfo')
-    user      = User.query.filter_by(email=user_info['email']).first()
+    user = User.query.filter_by(email=user_info['email']).first()
 
     if not user:
-        user = User(email=user_info['email'], is_pro=False)
+        total_users = User.query.count()
+        if total_users < 100:
+            user = User(
+                email=user_info['email'], 
+                is_pro=True, 
+                plan_type='lifetime'
+            )
+            app.logger.info(f"Early Bird User Created! ({total_users + 1}/100): {user_info['email']}")
+        else:
+            user = User(
+                email=user_info['email'], 
+                is_pro=False, 
+                plan_type='free'
+            )
+            
         db.session.add(user)
         db.session.commit()
 
@@ -278,8 +292,7 @@ def pricing():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     user = db.session.get(User, session['user_id'])
-    if user.is_pro:
-        return "<h2>You are already a Pro user! Close this tab and enjoy the extension.</h2>"
+    
     return render_template('pricing.html', email=user.email, razorpay_key_id=RAZORPAY_KEY_ID)
 
 @app.route('/create-order', methods=['POST'])
@@ -292,10 +305,10 @@ def create_order():
         return jsonify({"error": "Invalid request"}), 400
     plan_type = data.get("plan_type")
     if plan_type == "lifetime":
-        amount   = 200000
+        amount   = 350000
         currency = "INR"
     elif plan_type == "monthly":
-        amount   = 20000
+        amount   = 18000
         currency = "INR"
     else:
         return jsonify({"error": "Invalid plan"}), 400
@@ -350,20 +363,20 @@ def verify_payment():
             )
             return jsonify({"status": "failed", "error": "User mismatch"}), 403
 
-        # 4. Grant Pro access
         user = db.session.get(User, session_user_id)
         if user:
             plan_type = order["notes"].get("plan_type", "lifetime")
             user.is_pro = True
-            user.plan_type = plan_type
             
             if plan_type == "monthly":
-                # Expires in 30 days
-                user.pro_expires_at = datetime.utcnow() + timedelta(days=30)
+                if user.plan_type == 'monthly' and user.pro_expires_at and user.pro_expires_at > datetime.utcnow():
+                    user.pro_expires_at = user.pro_expires_at + timedelta(days=30)
+                else:
+                    user.pro_expires_at = datetime.utcnow() + timedelta(days=30)
             else:
-                # Lifetime has no expiration
                 user.pro_expires_at = None
                 
+            user.plan_type = plan_type
             db.session.commit()
 
         return jsonify({"status": "success"})
