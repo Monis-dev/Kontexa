@@ -390,7 +390,7 @@ def success():
     return """
     <div style="text-align:center;font-family:sans-serif;margin-top:50px;">
         <h1 style="color:#4f46e5;">Payment Successful! &#127881;</h1>
-        <p>Your account has been upgraded to ContextNote Pro.</p>
+        <p>Your account has been upgraded to Kontexa Pro.</p>
         <p><b>Close this tab and click 'Account &rarr; Sync' in your extension to activate.</b></p>
     </div>"""
 

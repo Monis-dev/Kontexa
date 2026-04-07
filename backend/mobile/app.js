@@ -316,7 +316,7 @@ function renderLoggedOut() {
           <path d="M9 12h6M9 16h6M7 8h10M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"/>
         </svg>
       </div>
-      <div class="auth-ttl">Welcome to ContextNote</div>
+      <div class="auth-ttl">Welcome to Kontexa</div>
       <div class="auth-sub">Sign in with Google to access your synced notes from any device.</div>
       <a class="auth-btn" href="${API}/login?mobile=1" target="_blank" rel="noopener" onclick="startAuthPoll()">
         <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round">
@@ -333,7 +333,7 @@ function renderFreeUser() {
     <div class="auth">
       <div class="auth-logo" style="font-size:28px;background:linear-gradient(135deg,#f59e0b,#d97706)">💎</div>
       <div class="auth-ttl">Pro Plan Required</div>
-      <div class="auth-sub">Accessing notes on mobile requires <strong>ContextNote Pro</strong>. Upgrade once and sync everywhere.</div>
+      <div class="auth-sub">Accessing notes on mobile requires <strong>Kontexa Pro</strong>. Upgrade once and sync everywhere.</div>
       <a class="auth-btn" href="${API}/pricing" target="_blank" rel="noopener">Upgrade to Pro →</a>
       <button class="auth-btn sec" onclick="checkAuth()">↻ I've already upgraded</button>
       <div class="auth-note">After upgrading, tap the button above to reload.</div>
@@ -372,7 +372,7 @@ function renderHome(data) {
     $("homeCnt").innerHTML = `<div class="empty">
       <div class="empty-ico">📝</div>
       <div class="empty-ttl">No notes yet</div>
-      <div class="empty-sub">Use the ContextNote browser extension to highlight text on any website, then sync to see them here.</div>
+      <div class="empty-sub">Use the Kontexa browser extension to highlight text on any website, then sync to see them here.</div>
     </div>`;
     return;
   }
@@ -979,7 +979,7 @@ function renderSettings() {
         <span class="schev">›</span>
       </div>
     </div>
-    <div style="text-align:center;padding:20px 0 4px;font-size:11px;color:var(--mut2)">ContextNote Mobile v1.5 PWA</div>`;
+    <div style="text-align:center;padding:20px 0 4px;font-size:11px;color:var(--mut2)">Kontexa Mobile v1.5 PWA</div>`;
 }
 
 async function syncNow() {

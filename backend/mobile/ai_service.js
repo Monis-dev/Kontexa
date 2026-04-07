@@ -72,7 +72,7 @@ const AIAgent = {
     const relevant = this.filterNotes(allNotes, question);
     const context = this.buildContext(relevant);
 
-    const systemPrompt = `You are an expert research assistant for ContextNote.
+    const systemPrompt = `You are an expert research assistant for Kontexa.
 
 Answer the user's question using ONLY the notes provided below.
 Be concise. Use markdown: **bold**, bullet points, short paragraphs.
