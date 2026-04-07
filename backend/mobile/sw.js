@@ -1,10 +1,16 @@
 // ContextNote PWA — Service Worker v1.4
 const CACHE = 'cn-pwa-v1.4';
-const STATIC = ['./index.html',
-  './app.css',
-  './app.js',
-  './ai_agent.js',
-  './manifest.json'];
+const STATIC = [
+  "./",
+  "./index.html",
+  "./app.css",
+  "./app.js",
+  "./ai_agent.js",
+  "./manifest.json",
+
+  "./icons/icon-192.png",
+  "./icons/icon-512.png",
+];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)));
@@ -20,33 +26,48 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
-self.addEventListener('fetch', e => {
-  const url = new URL(e.request.url);
+self.addEventListener("fetch", (e) => {
+  const req = e.request;
+  const url = new URL(req.url);
 
-  // Network-first: API, AI providers, Google OAuth
+  // APIs → network first, fallback to cache
   if (
-    url.hostname.includes('context-notes.onrender.com') ||
-    url.hostname.includes('generativelanguage.googleapis.com') ||
-    url.hostname.includes('api.openai.com') ||
-    url.hostname.includes('accounts.google.com')
+    url.hostname.includes("context-notes.onrender.com") ||
+    url.hostname.includes("generativelanguage.googleapis.com") ||
+    url.hostname.includes("api.openai.com") ||
+    url.hostname.includes("accounts.google.com")
   ) {
-    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
-    return;
-  }
-
-  // Google Fonts — cache after first fetch
-  if (url.hostname.includes('fonts.googleapis.com') || url.hostname.includes('fonts.gstatic.com')) {
     e.respondWith(
-      caches.open(CACHE).then(cache =>
-        cache.match(e.request).then(cached => {
-          if (cached) return cached;
-          return fetch(e.request).then(res => { cache.put(e.request, res.clone()); return res; });
+      fetch(req)
+        .then((res) => {
+          return res;
         })
-      )
+        .catch(() => caches.match(req)),
     );
     return;
   }
 
-  // App shell — cache first
-  e.respondWith(caches.match(e.request).then(cached => cached || fetch(e.request)));
+  // Everything else → cache first
+  e.respondWith(
+    caches.match(req).then((cached) => {
+      if (cached) return cached;
+
+      return fetch(req)
+        .then((res) => {
+          return caches.open(CACHE).then((cache) => {
+            cache.put(req, res.clone());
+            return res;
+          });
+        })
+        .catch(() => {
+          return caches.match("./index.html");
+        });
+    }),
+  );
+});
+
+self.addEventListener("sync", (event) => {
+  if (event.tag === "sync-notes") {
+    event.waitUntil(syncNotesToServer());
+  }
 });

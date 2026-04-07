@@ -213,7 +213,11 @@ async function checkAuth() {
       notes = [];
     }
   } catch (e) {
-    /* offline — keep cached state */
+    console.log("Offline mode");
+
+    if (notes.length) {
+      toast("📡 Offline — showing cached notes");
+    }
   }
 
   loadNotes();
