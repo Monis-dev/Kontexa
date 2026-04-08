@@ -63,7 +63,7 @@ EXTENSION_ID     = os.getenv("EXTENSION_ID", "")
 EXTENSION_ID_DEV = os.getenv("EXTENSION_ID_DEV", "")
 
 _allowed_origins = [
-    "https://context-notes.onrender.com",
+    "https://kontexa.online",
     "http://127.0.0.1:5000",
     "http://localhost:5000",
 ]
@@ -165,7 +165,7 @@ _stop_ping = threading.Event()
 def self_ping():
     while not _stop_ping.wait(600):   # 10 minutes; stops cleanly on shutdown
         try:
-            requests.get("https://context-notes.onrender.com/weakUp", timeout=10)
+            requests.get("https://kontexa.online/weakUp", timeout=10)
             app.logger.info("Self-ping OK")
         except Exception as e:
             app.logger.warning(f"Self-ping failed: {e}")
