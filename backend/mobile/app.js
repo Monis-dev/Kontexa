@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════
 //  CONFIG
 // ═══════════════════════════════════════════════════════════
-const API = "https://context-notes.onrender.com";
+const API = "https://kontexa.online";
 const NKEY = "cn_notes_v3";
 const KKEY = "cn_keys";
 const TKEY = "cn_theme";

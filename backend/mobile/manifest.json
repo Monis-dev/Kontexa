@@ -1,6 +1,6 @@
 {
-  "name": "ContextNote",
-  "short_name": "ContextNote",
+  "name": "Kontexa",
+  "short_name": "Kontexa",
   "description": "Your saved notes, everywhere.",
   "start_url": "/mobile/",
   "scope": "/mobile/",
