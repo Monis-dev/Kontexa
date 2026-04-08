@@ -184,239 +184,239 @@ def home():
 
 # ─── Mobile PWA ───────────────────────────────────────────────────────────────
 
-@app.route("/mobile")
-def mobile_redirect():
-    return redirect("/mobile/", code=301)
+# @app.route("/mobile")
+# def mobile_redirect():
+#     return redirect("/mobile/", code=301)
 
-@app.route("/mobile/")
-def mobile_app():
-    return send_from_directory(MOBILE_DIR, 'index.html')
+# @app.route("/mobile/")
+# def mobile_app():
+#     return send_from_directory(MOBILE_DIR, 'index.html')
 
-@app.route("/mobile/<path:filename>")
-def mobile_static(filename):
-    return send_from_directory(MOBILE_DIR, filename)
+# @app.route("/mobile/<path:filename>")
+# def mobile_static(filename):
+#     return send_from_directory(MOBILE_DIR, filename)
 
 
 # ─── Login / OAuth ────────────────────────────────────────────────────────────
 
-@app.route("/login")
-def login():
-    mobile = request.args.get("mobile", "0")
-    session["login_origin"] = "mobile" if mobile == "1" else "desktop"
-    return google.authorize_redirect(url_for('authorize', _external=True))
+# @app.route("/login")
+# def login():
+#     mobile = request.args.get("mobile", "0")
+#     session["login_origin"] = "mobile" if mobile == "1" else "desktop"
+#     return google.authorize_redirect(url_for('authorize', _external=True))
 
-@app.route('/authorize')
-def authorize():
-    token     = google.authorize_access_token()
-    user_info = token.get('userinfo')
-    user = User.query.filter_by(email=user_info['email']).first()
+# @app.route('/authorize')
+# def authorize():
+#     token     = google.authorize_access_token()
+#     user_info = token.get('userinfo')
+#     user = User.query.filter_by(email=user_info['email']).first()
 
-    if not user:
-        total_users = User.query.count()
-        if total_users < 100:
-            user = User(
-                email=user_info['email'], 
-                is_pro=True, 
-                plan_type='lifetime'
-            )
-            app.logger.info(f"Early Bird User Created! ({total_users + 1}/100): {user_info['email']}")
-        else:
-            user = User(
-                email=user_info['email'], 
-                is_pro=False, 
-                plan_type='free'
-            )
+#     if not user:
+#         total_users = User.query.count()
+#         if total_users < 100:
+#             user = User(
+#                 email=user_info['email'], 
+#                 is_pro=True, 
+#                 plan_type='lifetime'
+#             )
+#             app.logger.info(f"Early Bird User Created! ({total_users + 1}/100): {user_info['email']}")
+#         else:
+#             user = User(
+#                 email=user_info['email'], 
+#                 is_pro=False, 
+#                 plan_type='free'
+#             )
             
-        db.session.add(user)
-        db.session.commit()
+#         db.session.add(user)
+#         db.session.commit()
 
-    session['user_id']    = user.id
-    session['user_email'] = user.email
-    session.permanent     = True
+#     session['user_id']    = user.id
+#     session['user_email'] = user.email
+#     session.permanent     = True
 
-    origin = session.pop("login_origin", "desktop")
-    email  = user_info['email']  # Jinja2 auto-escapes in templates
+#     origin = session.pop("login_origin", "desktop")
+#     email  = user_info['email']  # Jinja2 auto-escapes in templates
 
-    template = "auth_success_mobile.html" if origin == "mobile" else "auth_success_desktop.html"
-    return render_template(template, email=email)
+#     template = "auth_success_mobile.html" if origin == "mobile" else "auth_success_desktop.html"
+#     return render_template(template, email=email)
 
-@app.route('/api/me')
-def get_me():
-    if 'user_id' not in session:
-        return jsonify({"error": "Not logged in"}), 401
+# @app.route('/api/me')
+# def get_me():
+#     if 'user_id' not in session:
+#         return jsonify({"error": "Not logged in"}), 401
         
-    user = db.session.get(User, session['user_id'])
-    days_left = None
-    if user.is_pro and user.plan_type == 'monthly' and user.pro_expires_at:
-        if datetime.utcnow() > user.pro_expires_at:
-            user.is_pro = False
-            user.plan_type = 'free'
-            db.session.commit()
-        else:
-            delta = user.pro_expires_at - datetime.utcnow()
-            days_left = delta.days
+#     user = db.session.get(User, session['user_id'])
+#     days_left = None
+#     if user.is_pro and user.plan_type == 'monthly' and user.pro_expires_at:
+#         if datetime.utcnow() > user.pro_expires_at:
+#             user.is_pro = False
+#             user.plan_type = 'free'
+#             db.session.commit()
+#         else:
+#             delta = user.pro_expires_at - datetime.utcnow()
+#             days_left = delta.days
 
-    return jsonify({
-        'email': session['user_email'], 
-        'is_pro': user.is_pro,
-        'plan_type': user.plan_type,
-        'days_left': days_left
-    })
+#     return jsonify({
+#         'email': session['user_email'], 
+#         'is_pro': user.is_pro,
+#         'plan_type': user.plan_type,
+#         'days_left': days_left
+#     })
 
-@app.route('/api/logout', methods=['POST'])
-def logout():
-    session.clear()
-    return jsonify({"message": "Logged out"}), 200
-
-
-# ─── Database initialisation (admin-only) ─────────────────────────────────────
-# Protected by X-Admin-Token header. Run once after first deployment,
-# then prefer Flask-Migrate for subsequent schema changes.
-
-@app.route("/init-db")
-def init_db():
-    if not _admin_token_required():
-        return jsonify({"error": "Forbidden"}), 403
-    try:
-        db.create_all()
-        with db.engine.connect() as con:
-            try:
-                con.execute(db.text("ALTER TABLE note ADD COLUMN deleted BOOLEAN DEFAULT FALSE"))
-                con.execute(db.text("ALTER TABLE note ADD COLUMN deleted_at TIMESTAMP"))
-                con.commit()
-                app.logger.info("DB columns added.")
-            except Exception as col_err:
-                app.logger.info(f"Columns may already exist: {col_err}")
-        return "Database initialized!", 200
-    except Exception as e:
-        app.logger.error(f"init-db error: {e}")
-        return "Internal error during DB init.", 500
+# @app.route('/api/logout', methods=['POST'])
+# def logout():
+#     session.clear()
+#     return jsonify({"message": "Logged out"}), 200
 
 
-# ─── Pricing & Razorpay ───────────────────────────────────────────────────────
+# # ─── Database initialisation (admin-only) ─────────────────────────────────────
+# # Protected by X-Admin-Token header. Run once after first deployment,
+# # then prefer Flask-Migrate for subsequent schema changes.
 
-@app.route('/pricing')
-def pricing():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    user = db.session.get(User, session['user_id'])
+# @app.route("/init-db")
+# def init_db():
+#     if not _admin_token_required():
+#         return jsonify({"error": "Forbidden"}), 403
+#     try:
+#         db.create_all()
+#         with db.engine.connect() as con:
+#             try:
+#                 con.execute(db.text("ALTER TABLE note ADD COLUMN deleted BOOLEAN DEFAULT FALSE"))
+#                 con.execute(db.text("ALTER TABLE note ADD COLUMN deleted_at TIMESTAMP"))
+#                 con.commit()
+#                 app.logger.info("DB columns added.")
+#             except Exception as col_err:
+#                 app.logger.info(f"Columns may already exist: {col_err}")
+#         return "Database initialized!", 200
+#     except Exception as e:
+#         app.logger.error(f"init-db error: {e}")
+#         return "Internal error during DB init.", 500
+
+
+# # ─── Pricing & Razorpay ───────────────────────────────────────────────────────
+
+# @app.route('/pricing')
+# def pricing():
+#     if 'user_id' not in session:
+#         return redirect(url_for('login'))
+#     user = db.session.get(User, session['user_id'])
     
-    return render_template('pricing.html', email=user.email, razorpay_key_id=RAZORPAY_KEY_ID)
+#     return render_template('pricing.html', email=user.email, razorpay_key_id=RAZORPAY_KEY_ID)
 
-@app.route('/create-order', methods=['POST'])
-def create_order():
-    if 'user_id' not in session:
-        return jsonify({"error": "Login required"}), 401
-    user_id = session['user_id']
-    data = request.json
-    if not data:
-        return jsonify({"error": "Invalid request"}), 400
-    plan_type = data.get("plan_type")
-    if plan_type == "lifetime":
-        amount   = 350000
-        currency = "INR"
-    elif plan_type == "monthly":
-        amount   = 18000
-        currency = "INR"
-    else:
-        return jsonify({"error": "Invalid plan"}), 400
-    order = client.order.create({
-        "amount": amount,
-        "currency": currency,
-        "payment_capture": 1,
-        "notes": {
-            "user_id": str(user_id),
-            "plan_type": plan_type
-        }
-    })
-    return jsonify(order)
+# @app.route('/create-order', methods=['POST'])
+# def create_order():
+#     if 'user_id' not in session:
+#         return jsonify({"error": "Login required"}), 401
+#     user_id = session['user_id']
+#     data = request.json
+#     if not data:
+#         return jsonify({"error": "Invalid request"}), 400
+#     plan_type = data.get("plan_type")
+#     if plan_type == "lifetime":
+#         amount   = 350000
+#         currency = "INR"
+#     elif plan_type == "monthly":
+#         amount   = 18000
+#         currency = "INR"
+#     else:
+#         return jsonify({"error": "Invalid plan"}), 400
+#     order = client.order.create({
+#         "amount": amount,
+#         "currency": currency,
+#         "payment_capture": 1,
+#         "notes": {
+#             "user_id": str(user_id),
+#             "plan_type": plan_type
+#         }
+#     })
+#     return jsonify(order)
 
-@app.route('/verify-payment', methods=['POST'])
-def verify_payment():
-    # Must be logged in
-    if 'user_id' not in session:
-        return jsonify({"error": "Login required"}), 401
+# @app.route('/verify-payment', methods=['POST'])
+# def verify_payment():
+#     # Must be logged in
+#     if 'user_id' not in session:
+#         return jsonify({"error": "Login required"}), 401
 
-    data = request.json
-    if not data:
-        return jsonify({"status": "failed", "error": "Invalid request"}), 400
+#     data = request.json
+#     if not data:
+#         return jsonify({"status": "failed", "error": "Invalid request"}), 400
     
 
-    razorpay_order_id   = data.get('razorpay_order_id')
-    razorpay_payment_id = data.get('razorpay_payment_id')
-    razorpay_signature  = data.get('razorpay_signature')
+#     razorpay_order_id   = data.get('razorpay_order_id')
+#     razorpay_payment_id = data.get('razorpay_payment_id')
+#     razorpay_signature  = data.get('razorpay_signature')
 
-    if not all([razorpay_order_id, razorpay_payment_id, razorpay_signature]):
-        return jsonify({"status": "failed", "error": "Missing payment fields"}), 400
+#     if not all([razorpay_order_id, razorpay_payment_id, razorpay_signature]):
+#         return jsonify({"status": "failed", "error": "Missing payment fields"}), 400
 
-    try:
-        # 1. Verify the cryptographic signature first
-        client.utility.verify_payment_signature({
-            'razorpay_order_id':   razorpay_order_id,
-            'razorpay_payment_id': razorpay_payment_id,
-            'razorpay_signature':  razorpay_signature
-        })
+#     try:
+#         # 1. Verify the cryptographic signature first
+#         client.utility.verify_payment_signature({
+#             'razorpay_order_id':   razorpay_order_id,
+#             'razorpay_payment_id': razorpay_payment_id,
+#             'razorpay_signature':  razorpay_signature
+#         })
 
-        # 2. Fetch the order and extract the user_id stored in notes
-        order           = client.order.fetch(razorpay_order_id)
-        order_user_id   = int(order["notes"]["user_id"])
-        session_user_id = session['user_id']
+#         # 2. Fetch the order and extract the user_id stored in notes
+#         order           = client.order.fetch(razorpay_order_id)
+#         order_user_id   = int(order["notes"]["user_id"])
+#         session_user_id = session['user_id']
         
 
-        # 3. Ensure the logged-in user matches the order owner (TOCTOU guard)
-        if order_user_id != session_user_id:
-            app.logger.warning(
-                f"Payment user mismatch: order owner {order_user_id} "
-                f"vs session user {session_user_id}"
-            )
-            return jsonify({"status": "failed", "error": "User mismatch"}), 403
+#         # 3. Ensure the logged-in user matches the order owner (TOCTOU guard)
+#         if order_user_id != session_user_id:
+#             app.logger.warning(
+#                 f"Payment user mismatch: order owner {order_user_id} "
+#                 f"vs session user {session_user_id}"
+#             )
+#             return jsonify({"status": "failed", "error": "User mismatch"}), 403
 
-        user = db.session.get(User, session_user_id)
-        if user:
-            plan_type = order["notes"].get("plan_type", "lifetime")
-            user.is_pro = True
+#         user = db.session.get(User, session_user_id)
+#         if user:
+#             plan_type = order["notes"].get("plan_type", "lifetime")
+#             user.is_pro = True
             
-            if plan_type == "monthly":
-                if user.plan_type == 'monthly' and user.pro_expires_at and user.pro_expires_at > datetime.utcnow():
-                    user.pro_expires_at = user.pro_expires_at + timedelta(days=30)
-                else:
-                    user.pro_expires_at = datetime.utcnow() + timedelta(days=30)
-            else:
-                user.pro_expires_at = None
+#             if plan_type == "monthly":
+#                 if user.plan_type == 'monthly' and user.pro_expires_at and user.pro_expires_at > datetime.utcnow():
+#                     user.pro_expires_at = user.pro_expires_at + timedelta(days=30)
+#                 else:
+#                     user.pro_expires_at = datetime.utcnow() + timedelta(days=30)
+#             else:
+#                 user.pro_expires_at = None
                 
-            user.plan_type = plan_type
-            db.session.commit()
+#             user.plan_type = plan_type
+#             db.session.commit()
 
-        return jsonify({"status": "success"})
+#         return jsonify({"status": "success"})
 
-    except Exception as e:
-        app.logger.error(f"verify-payment error: {e}")
-        return jsonify({"status": "failed"}), 400
+#     except Exception as e:
+#         app.logger.error(f"verify-payment error: {e}")
+#         return jsonify({"status": "failed"}), 400
 
-@app.route('/success')
-def success():
-    return """
-    <div style="text-align:center;font-family:sans-serif;margin-top:50px;">
-        <h1 style="color:#4f46e5;">Payment Successful! &#127881;</h1>
-        <p>Your account has been upgraded to Kontexa Pro.</p>
-        <p><b>Close this tab and click 'Account &rarr; Sync' in your extension to activate.</b></p>
-    </div>"""
+# @app.route('/success')
+# def success():
+#     return """
+#     <div style="text-align:center;font-family:sans-serif;margin-top:50px;">
+#         <h1 style="color:#4f46e5;">Payment Successful! &#127881;</h1>
+#         <p>Your account has been upgraded to Kontexa Pro.</p>
+#         <p><b>Close this tab and click 'Account &rarr; Sync' in your extension to activate.</b></p>
+#     </div>"""
 
 
-@app.route('/test/time-travel/<int:days_left>')
-def time_travel(days_left):
-    if 'user_id' not in session:
-        return "Please log in first."
+# @app.route('/test/time-travel/<int:days_left>')
+# def time_travel(days_left):
+#     if 'user_id' not in session:
+#         return "Please log in first."
     
-    user = db.session.get(User, session['user_id'])
-    if not user:
-        return "User not found."
+#     user = db.session.get(User, session['user_id'])
+#     if not user:
+#         return "User not found."
     
-    # Fast-forward time so the subscription expires in 'X' days
-    user.pro_expires_at = datetime.utcnow() + timedelta(days=days_left)
-    db.session.commit()
+#     # Fast-forward time so the subscription expires in 'X' days
+#     user.pro_expires_at = datetime.utcnow() + timedelta(days=days_left)
+#     db.session.commit()
     
-    return f"Time travel successful! Your account now expires in {days_left} days."
+#     return f"Time travel successful! Your account now expires in {days_left} days."
 
 
 # ─── FeedBack ────────────────────────────────────────────────────────────────
@@ -445,325 +445,325 @@ def time_travel(days_left):
 
 # ─── Notes API ────────────────────────────────────────────────────────────────
 
-@app.route('/api/sync', methods=['POST'])
-def sync_notes():
-    if 'user_id' not in session:
-        return jsonify({"error": "Login required"}), 401
-    user = db.session.get(User, session['user_id'])
-    if not user.is_pro:
-        return jsonify({"error": "Pro upgrade required"}), 403
+# @app.route('/api/sync', methods=['POST'])
+# def sync_notes():
+#     if 'user_id' not in session:
+#         return jsonify({"error": "Login required"}), 401
+#     user = db.session.get(User, session['user_id'])
+#     if not user.is_pro:
+#         return jsonify({"error": "Pro upgrade required"}), 403
 
-    notes = request.json
-    if not isinstance(notes, list):
-        return jsonify({"error": "Invalid payload"}), 400
+#     notes = request.json
+#     if not isinstance(notes, list):
+#         return jsonify({"error": "Invalid payload"}), 400
 
-    # Guard: cap total notes per sync to prevent abuse
-    if len(notes) > _NOTE_MAX_COUNT:
-        return jsonify({"error": f"Sync limit is {_NOTE_MAX_COUNT} notes per request"}), 400
+#     # Guard: cap total notes per sync to prevent abuse
+#     if len(notes) > _NOTE_MAX_COUNT:
+#         return jsonify({"error": f"Sync limit is {_NOTE_MAX_COUNT} notes per request"}), 400
 
-    existing_ids = {n.local_id for n in Note.query.join(Website).filter(Website.user_id == user.id).all()}
-    sites_cache  = {s.url: s for s in Website.query.filter_by(user_id=user.id).all()}
-    new_notes    = []
+#     existing_ids = {n.local_id for n in Note.query.join(Website).filter(Website.user_id == user.id).all()}
+#     sites_cache  = {s.url: s for s in Website.query.filter_by(user_id=user.id).all()}
+#     new_notes    = []
 
-    for note in notes:
-        local_id = str(note.get("id", ""))[:50]  # cap local_id length
+#     for note in notes:
+#         local_id = str(note.get("id", ""))[:50]  # cap local_id length
 
-        if note.get("deleted"):
-            existing_note = (
-                Note.query
-                .join(Website)
-                .filter(Website.user_id == user.id, Note.local_id == local_id)
-                .first()
-            )
-            if existing_note:
-                db.session.delete(existing_note)
-            continue
+#         if note.get("deleted"):
+#             existing_note = (
+#                 Note.query
+#                 .join(Website)
+#                 .filter(Website.user_id == user.id, Note.local_id == local_id)
+#                 .first()
+#             )
+#             if existing_note:
+#                 db.session.delete(existing_note)
+#             continue
 
-        if local_id in existing_ids:
-            continue
+#         if local_id in existing_ids:
+#             continue
 
-        # Validate and truncate fields
-        title      = str(note.get("title", "Untitled"))[:_NOTE_TITLE_MAX]
-        content    = str(note.get("content", ""))[:_NOTE_CONTENT_MAX]
-        image_data = str(note.get("image_data", ""))
-        if len(image_data) > _NOTE_IMAGE_MAX:
-            image_data = ""   # drop oversized images silently; log if needed
+#         # Validate and truncate fields
+#         title      = str(note.get("title", "Untitled"))[:_NOTE_TITLE_MAX]
+#         content    = str(note.get("content", ""))[:_NOTE_CONTENT_MAX]
+#         image_data = str(note.get("image_data", ""))
+#         if len(image_data) > _NOTE_IMAGE_MAX:
+#             image_data = ""   # drop oversized images silently; log if needed
 
-        site = sites_cache.get(note.get("url", ""))
-        if not site:
-            raw_url = str(note.get("url", ""))[:500]
-            site = Website(
-                url=raw_url,
-                domain=note.get("domain", urlparse(raw_url).netloc)[:200],
-                user_id=user.id
-            )
-            db.session.add(site)
-            db.session.flush()
-            sites_cache[raw_url] = site
+#         site = sites_cache.get(note.get("url", ""))
+#         if not site:
+#             raw_url = str(note.get("url", ""))[:500]
+#             site = Website(
+#                 url=raw_url,
+#                 domain=note.get("domain", urlparse(raw_url).netloc)[:200],
+#                 user_id=user.id
+#             )
+#             db.session.add(site)
+#             db.session.flush()
+#             sites_cache[raw_url] = site
 
-        incoming_tags = note.get("tags")
-        if isinstance(incoming_tags, list):
-            parsed_tags = ",".join(str(t)[:50] for t in incoming_tags[:50])
-        elif incoming_tags:
-            parsed_tags = str(incoming_tags)[:500]
-        else:
-            parsed_tags = ""
+#         incoming_tags = note.get("tags")
+#         if isinstance(incoming_tags, list):
+#             parsed_tags = ",".join(str(t)[:50] for t in incoming_tags[:50])
+#         elif incoming_tags:
+#             parsed_tags = str(incoming_tags)[:500]
+#         else:
+#             parsed_tags = ""
 
-        new_notes.append(Note(
-            local_id=local_id,
-            title=title,
-            content=content,
-            selection=str(note.get("selection", ""))[:5000],
-            pinned=bool(note.get("pinned", False)),
-            timestamp=str(note.get("timestamp", ""))[:20],
-            image_data=image_data,
-            folder=str(note.get("folder", ""))[:_FOLDER_NAME_MAX],
-            tags=parsed_tags,
-            website_id=site.id
-        ))
+#         new_notes.append(Note(
+#             local_id=local_id,
+#             title=title,
+#             content=content,
+#             selection=str(note.get("selection", ""))[:5000],
+#             pinned=bool(note.get("pinned", False)),
+#             timestamp=str(note.get("timestamp", ""))[:20],
+#             image_data=image_data,
+#             folder=str(note.get("folder", ""))[:_FOLDER_NAME_MAX],
+#             tags=parsed_tags,
+#             website_id=site.id
+#         ))
 
-    db.session.add_all(new_notes)
-    db.session.commit()
-    return jsonify({"message": "Sync complete"}), 200
+#     db.session.add_all(new_notes)
+#     db.session.commit()
+#     return jsonify({"message": "Sync complete"}), 200
 
-@app.route('/api/notes', methods=['GET'])
-def get_notes():
-    if 'user_id' not in session:
-        return jsonify([]), 401
-    user = db.session.get(User, session['user_id'])
-    if not user.is_pro:
-        return jsonify([]), 403
+# @app.route('/api/notes', methods=['GET'])
+# def get_notes():
+#     if 'user_id' not in session:
+#         return jsonify([]), 401
+#     user = db.session.get(User, session['user_id'])
+#     if not user.is_pro:
+#         return jsonify([]), 403
 
-    websites = Website.query.options(joinedload(Website.notes)).filter_by(user_id=user.id).all()
-    result = []
-    for s in websites:
-        if s.url == "general://notes":
-            continue
-        filtered_notes = [{
-            "id":        n.local_id,
-            "title":     n.title,
-            "content":   n.content,
-            "selection": n.selection,
-            "pinned":    n.pinned,
-            "timestamp": n.timestamp,
-            "folder":    n.folder,
-            "image_data": n.image_data,
-            "tags":      n.tags.split(",") if n.tags else [],
-            "deleted":   n.deleted
-        } for n in s.notes]
-        if not filtered_notes:
-            continue
-        result.append({
-            "domain":      s.domain,
-            "url":         s.url,
-            "custom_name": s.custom_name,
-            "notes":       filtered_notes
-        })
-    return jsonify(result)
+#     websites = Website.query.options(joinedload(Website.notes)).filter_by(user_id=user.id).all()
+#     result = []
+#     for s in websites:
+#         if s.url == "general://notes":
+#             continue
+#         filtered_notes = [{
+#             "id":        n.local_id,
+#             "title":     n.title,
+#             "content":   n.content,
+#             "selection": n.selection,
+#             "pinned":    n.pinned,
+#             "timestamp": n.timestamp,
+#             "folder":    n.folder,
+#             "image_data": n.image_data,
+#             "tags":      n.tags.split(",") if n.tags else [],
+#             "deleted":   n.deleted
+#         } for n in s.notes]
+#         if not filtered_notes:
+#             continue
+#         result.append({
+#             "domain":      s.domain,
+#             "url":         s.url,
+#             "custom_name": s.custom_name,
+#             "notes":       filtered_notes
+#         })
+#     return jsonify(result)
 
-@app.route('/api/general-notes', methods=['GET'])
-def get_general_notes():
-    if 'user_id' not in session:
-        return jsonify([]), 401
-    user = db.session.get(User, session['user_id'])
-    if not user.is_pro:
-        return jsonify([]), 403
+# @app.route('/api/general-notes', methods=['GET'])
+# def get_general_notes():
+#     if 'user_id' not in session:
+#         return jsonify([]), 401
+#     user = db.session.get(User, session['user_id'])
+#     if not user.is_pro:
+#         return jsonify([]), 403
 
-    site = Website.query.filter_by(url="general://notes", user_id=user.id).first()
-    if not site:
-        return jsonify([])
+#     site = Website.query.filter_by(url="general://notes", user_id=user.id).first()
+#     if not site:
+#         return jsonify([])
 
-    notes = [{
-        "id":        n.local_id,
-        "title":     n.title,
-        "content":   n.content,
-        "selection": n.selection,
-        "pinned":    n.pinned,
-        "timestamp": n.timestamp,
-        "folder":    n.folder,
-        "image_data": n.image_data,
-        "tags":      n.tags.split(",") if n.tags else [],
-        "deleted":   n.deleted,
-        "url":       "general://notes",
-        "domain":    "general",
-        "_synced":   True
-    } for n in site.notes if not n.deleted]
+#     notes = [{
+#         "id":        n.local_id,
+#         "title":     n.title,
+#         "content":   n.content,
+#         "selection": n.selection,
+#         "pinned":    n.pinned,
+#         "timestamp": n.timestamp,
+#         "folder":    n.folder,
+#         "image_data": n.image_data,
+#         "tags":      n.tags.split(",") if n.tags else [],
+#         "deleted":   n.deleted,
+#         "url":       "general://notes",
+#         "domain":    "general",
+#         "_synced":   True
+#     } for n in site.notes if not n.deleted]
 
-    return jsonify(notes)
+#     return jsonify(notes)
 
-@app.route('/api/notes/<string:local_id>', methods=['PUT'])
-def update_note(local_id):
-    if 'user_id' not in session:
-        return jsonify({"error": "Login required"}), 401
-    note = Note.query.join(Website).filter(
-        Website.user_id == session['user_id'],
-        Note.local_id == local_id
-    ).first()
-    if not note:
-        return jsonify({"error": "Note not found"}), 404
-    data = request.json
-    if not data:
-        return jsonify({"error": "Invalid request"}), 400
-    if 'title'   in data: note.title   = str(data['title'])[:_NOTE_TITLE_MAX]
-    if 'content' in data: note.content = str(data['content'])[:_NOTE_CONTENT_MAX]
-    if 'pinned'  in data: note.pinned  = bool(data['pinned'])
-    if 'folder'  in data: note.folder  = str(data['folder'])[:_FOLDER_NAME_MAX]
-    if 'tags'    in data: note.tags    = data['tags']
-    if 'deleted' in data: note.deleted = bool(data['deleted'])
-    db.session.commit()
-    return jsonify({"message": "Updated successfully"})
+# @app.route('/api/notes/<string:local_id>', methods=['PUT'])
+# def update_note(local_id):
+#     if 'user_id' not in session:
+#         return jsonify({"error": "Login required"}), 401
+#     note = Note.query.join(Website).filter(
+#         Website.user_id == session['user_id'],
+#         Note.local_id == local_id
+#     ).first()
+#     if not note:
+#         return jsonify({"error": "Note not found"}), 404
+#     data = request.json
+#     if not data:
+#         return jsonify({"error": "Invalid request"}), 400
+#     if 'title'   in data: note.title   = str(data['title'])[:_NOTE_TITLE_MAX]
+#     if 'content' in data: note.content = str(data['content'])[:_NOTE_CONTENT_MAX]
+#     if 'pinned'  in data: note.pinned  = bool(data['pinned'])
+#     if 'folder'  in data: note.folder  = str(data['folder'])[:_FOLDER_NAME_MAX]
+#     if 'tags'    in data: note.tags    = data['tags']
+#     if 'deleted' in data: note.deleted = bool(data['deleted'])
+#     db.session.commit()
+#     return jsonify({"message": "Updated successfully"})
 
-@app.route('/api/notes/<string:local_id>', methods=['DELETE'])
-def delete_note(local_id):
-    if 'user_id' not in session:
-        return jsonify({"error": "Login required"}), 401
-    try:
-        note = Note.query.join(Website).filter(
-            Website.user_id == session['user_id'],
-            Note.local_id == local_id
-        ).first()
-        if not note:
-            return '', 204
-        db.session.delete(note)
-        db.session.commit()
-        return '', 204
-    except Exception as e:
-        db.session.rollback()
-        app.logger.error(f"delete_note error: {e}")
-        return jsonify({"error": "An internal error occurred"}), 500
+# @app.route('/api/notes/<string:local_id>', methods=['DELETE'])
+# def delete_note(local_id):
+#     if 'user_id' not in session:
+#         return jsonify({"error": "Login required"}), 401
+#     try:
+#         note = Note.query.join(Website).filter(
+#             Website.user_id == session['user_id'],
+#             Note.local_id == local_id
+#         ).first()
+#         if not note:
+#             return '', 204
+#         db.session.delete(note)
+#         db.session.commit()
+#         return '', 204
+#     except Exception as e:
+#         db.session.rollback()
+#         app.logger.error(f"delete_note error: {e}")
+#         return jsonify({"error": "An internal error occurred"}), 500
 
-@app.route('/api/notes/tags', methods=['PUT'])
-def update_note_tags():
-    if 'user_id' not in session:
-        return jsonify({"error": "Login required"}), 401
-    user = db.session.get(User, session['user_id'])
-    if not user.is_pro:
-        return jsonify({"error": "Pro required"}), 403
-    data = request.json
-    if not data:
-        return jsonify({"error": "No data"}), 400
+# @app.route('/api/notes/tags', methods=['PUT'])
+# def update_note_tags():
+#     if 'user_id' not in session:
+#         return jsonify({"error": "Login required"}), 401
+#     user = db.session.get(User, session['user_id'])
+#     if not user.is_pro:
+#         return jsonify({"error": "Pro required"}), 403
+#     data = request.json
+#     if not data:
+#         return jsonify({"error": "No data"}), 400
 
-    updated_count = 0
-    for item in data:
-        local_id = str(item.get("id", ""))[:50]
-        new_tags = item.get("tags", [])
-        note = Note.query.join(Website).filter(
-            Website.user_id == user.id,
-            Note.local_id == local_id
-        ).first()
-        if note:
-            existing = set(note.tags.split(",")) if note.tags else set()
-            merged   = existing | set(str(t)[:50] for t in new_tags)
-            note.tags = ",".join(t for t in merged if t)
-            updated_count += 1
+#     updated_count = 0
+#     for item in data:
+#         local_id = str(item.get("id", ""))[:50]
+#         new_tags = item.get("tags", [])
+#         note = Note.query.join(Website).filter(
+#             Website.user_id == user.id,
+#             Note.local_id == local_id
+#         ).first()
+#         if note:
+#             existing = set(note.tags.split(",")) if note.tags else set()
+#             merged   = existing | set(str(t)[:50] for t in new_tags)
+#             note.tags = ",".join(t for t in merged if t)
+#             updated_count += 1
 
-    db.session.commit()
-    return jsonify({"message": f"Updated tags for {updated_count} notes"}), 200
+#     db.session.commit()
+#     return jsonify({"message": f"Updated tags for {updated_count} notes"}), 200
 
-@app.route('/api/websites/rename', methods=['PUT'])
-def rename_website():
-    if 'user_id' not in session:
-        return jsonify({"error": "Login required"}), 401
+# @app.route('/api/websites/rename', methods=['PUT'])
+# def rename_website():
+#     if 'user_id' not in session:
+#         return jsonify({"error": "Login required"}), 401
 
-    data = request.json
-    if not data:
-        return jsonify({"error": "Invalid request"}), 400
+#     data = request.json
+#     if not data:
+#         return jsonify({"error": "Invalid request"}), 400
 
-    url = str(data.get("url", ""))[:500]
-    custom_name = data.get("custom_name")
+#     url = str(data.get("url", ""))[:500]
+#     custom_name = data.get("custom_name")
 
-    if not url:
-        return jsonify({"error": "URL is required"}), 400
+#     if not url:
+#         return jsonify({"error": "URL is required"}), 400
 
-    if custom_name is not None:
-        custom_name = str(custom_name).strip()[:255]
-        if not custom_name:
-            custom_name = None
+#     if custom_name is not None:
+#         custom_name = str(custom_name).strip()[:255]
+#         if not custom_name:
+#             custom_name = None
 
-    user_id = session['user_id']
+#     user_id = session['user_id']
 
-    try:
-        website = Website.query.filter_by(user_id=user_id, url=url).first()
+#     try:
+#         website = Website.query.filter_by(user_id=user_id, url=url).first()
 
-        if website:
-            website.custom_name = custom_name
-            db.session.commit()
-            return jsonify({"message": "Source renamed successfully"}), 200
-        else:
-            from urllib.parse import urlparse
-            domain = urlparse(url).netloc[:200] if "://" in url else url[:200]
+#         if website:
+#             website.custom_name = custom_name
+#             db.session.commit()
+#             return jsonify({"message": "Source renamed successfully"}), 200
+#         else:
+#             from urllib.parse import urlparse
+#             domain = urlparse(url).netloc[:200] if "://" in url else url[:200]
             
-            new_site = Website(
-                url=url, 
-                domain=domain, 
-                custom_name=custom_name, 
-                user_id=user_id
-            )
-            db.session.add(new_site)
-            db.session.commit()
-            return jsonify({"message": "Source tracked and renamed successfully"}), 200
+#             new_site = Website(
+#                 url=url, 
+#                 domain=domain, 
+#                 custom_name=custom_name, 
+#                 user_id=user_id
+#             )
+#             db.session.add(new_site)
+#             db.session.commit()
+#             return jsonify({"message": "Source tracked and renamed successfully"}), 200
 
-    except Exception as e:
-        db.session.rollback()
-        app.logger.error(f"rename_website error: {e}")
-        return jsonify({"error": "An internal error occurred"}), 500
+#     except Exception as e:
+#         db.session.rollback()
+#         app.logger.error(f"rename_website error: {e}")
+#         return jsonify({"error": "An internal error occurred"}), 500
 
-@app.route('/api/folders/<string:folder_name>', methods=['DELETE'])
-def delete_folder(folder_name):
-    if 'user_id' not in session:
-        return jsonify({"error": "Login required"}), 401
+# @app.route('/api/folders/<string:folder_name>', methods=['DELETE'])
+# def delete_folder(folder_name):
+#     if 'user_id' not in session:
+#         return jsonify({"error": "Login required"}), 401
 
-    folder_name = unquote(folder_name)[:_FOLDER_NAME_MAX]
-    if not folder_name:
-        return jsonify({"error": "Invalid folder name"}), 400
+#     folder_name = unquote(folder_name)[:_FOLDER_NAME_MAX]
+#     if not folder_name:
+#         return jsonify({"error": "Invalid folder name"}), 400
 
-    try:
-        notes = (
-            Note.query.join(Website)
-            .filter(Website.user_id == session['user_id'], Note.folder == folder_name)
-            .all()
-        )
-        for note in notes:
-            db.session.delete(note)
-        db.session.commit()
-        return jsonify({"message": f"Folder and {len(notes)} notes deleted"}), 200
-    except Exception as e:
-        db.session.rollback()
-        app.logger.error(f"delete_folder error: {e}")
-        return jsonify({"error": "An internal error occurred"}), 500
+#     try:
+#         notes = (
+#             Note.query.join(Website)
+#             .filter(Website.user_id == session['user_id'], Note.folder == folder_name)
+#             .all()
+#         )
+#         for note in notes:
+#             db.session.delete(note)
+#         db.session.commit()
+#         return jsonify({"message": f"Folder and {len(notes)} notes deleted"}), 200
+#     except Exception as e:
+#         db.session.rollback()
+#         app.logger.error(f"delete_folder error: {e}")
+#         return jsonify({"error": "An internal error occurred"}), 500
 
-@app.route('/api/folders/rename', methods=['PUT'])
-def rename_folder():
-    if 'user_id' not in session:
-        return jsonify({"error": "Login required"}), 401
+# @app.route('/api/folders/rename', methods=['PUT'])
+# def rename_folder():
+#     if 'user_id' not in session:
+#         return jsonify({"error": "Login required"}), 401
 
-    data = request.json
-    if not data:
-        return jsonify({"error": "Invalid request"}), 400
+#     data = request.json
+#     if not data:
+#         return jsonify({"error": "Invalid request"}), 400
 
-    old_name = str(data.get("old_name", ""))[:_FOLDER_NAME_MAX]
-    new_name = str(data.get("new_name", ""))[:_FOLDER_NAME_MAX]
+#     old_name = str(data.get("old_name", ""))[:_FOLDER_NAME_MAX]
+#     new_name = str(data.get("new_name", ""))[:_FOLDER_NAME_MAX]
 
-    if not old_name or not new_name:
-        return jsonify({"error": "Invalid folder names"}), 400
+#     if not old_name or not new_name:
+#         return jsonify({"error": "Invalid folder names"}), 400
 
-    try:
-        notes = (
-            Note.query.join(Website)
-            .filter(Website.user_id == session['user_id'], Note.folder == old_name)
-            .all()
-        )
-        for note in notes:
-            note.folder = new_name
-        db.session.commit()
-        return jsonify({"message": "Folder renamed"}), 200
-    except Exception as e:
-        db.session.rollback()
-        app.logger.error(f"rename_folder error: {e}")
-        return jsonify({"error": "An internal error occurred"}), 500
+#     try:
+#         notes = (
+#             Note.query.join(Website)
+#             .filter(Website.user_id == session['user_id'], Note.folder == old_name)
+#             .all()
+#         )
+#         for note in notes:
+#             note.folder = new_name
+#         db.session.commit()
+#         return jsonify({"message": "Folder renamed"}), 200
+#     except Exception as e:
+#         db.session.rollback()
+#         app.logger.error(f"rename_folder error: {e}")
+#         return jsonify({"error": "An internal error occurred"}), 500
     
-if __name__ == "__main__":
-    # Render provides the PORT env var; we must use it
-    port = int(os.environ.get("PORT", 5000))
-    # '0.0.0.0' is required for Render to see the app
-    app.run(host='0.0.0.0', port=port)
+# if __name__ == "__main__":
+#     # Render provides the PORT env var; we must use it
+#     port = int(os.environ.get("PORT", 5000))
+#     # '0.0.0.0' is required for Render to see the app
+#     app.run(host='0.0.0.0', port=port)
