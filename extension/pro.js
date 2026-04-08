@@ -1,4 +1,4 @@
-const API_URL = "https://context-notes.onrender.com"; // Change to your Render URL
+const API_URL = "https://www.kontexa.online"; // Change to your Render URL
 
 const ProMode = {
 

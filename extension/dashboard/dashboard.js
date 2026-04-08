@@ -3,26 +3,101 @@ const FOLDERS_KEY = "cn_user_folders";
 const PRO_CACHE_KEY = "cn_is_pro_cached";
 const THEME_KEY = "cn_theme";
 const NAMES_KEY = "cn_source_names";
-const API_BASE = "https://context-notes.onrender.com";
+const API_BASE = "https://www.kontexa.online";
+
+// Client-side field length limits — mirrors backend constants
+const MAX_TITLE_LEN = 255;
+const MAX_CONTENT_LEN = 100_000;
+const MAX_FOLDER_LEN = 100;
+const MAX_TAG_LEN = 50;
 
 let mId = null;
 let userFolders = [];
 let sourceNames = {};
+
+// FIX: isProUserUI is never seeded from chrome.storage — only ever set from
+// a live server response in checkAuthAndSync(). This prevents any local
+// storage manipulation from bypassing the Pro paywall.
 let isProUserUI = false;
+
 let notesById = {};
 let notesByUrl = {};
 let sectionCache = [];
 let folderCounts = {};
 let pendingAiSaveIndex = null;
 
-let syncQueue = [];
-let syncTimer = null;
-let lastSyncTime = 0;
-let retryDelay = 2000;
+// ─── Sync queue — debounced, batched ──────────────────────────────────────────
+// These constants are now actually used by the debounced sync implementation.
+const SYNC_DEBOUNCE = 4000; // ms to wait after last change before flushing
+const SYNC_MAX_INTERVAL = 30000; // flush at most once per 30 s even if quiet
+const MAX_BATCH_SIZE = 25; // notes per /api/sync request
 
-const SYNC_DEBOUNCE = 4000;
-const SYNC_MAX_INTERVAL = 30000;
-const MAX_BATCH_SIZE = 25;
+let _syncQueue = []; // accumulated pending notes
+let _syncTimer = null; // debounce timer handle
+let _lastFlush = 0; // timestamp of last actual HTTP sync
+
+// FIX: replaces the old queueSync that fired immediately on every call.
+// Now accumulates notes and flushes after SYNC_DEBOUNCE ms of quiet,
+// or immediately if SYNC_MAX_INTERVAL has elapsed since the last flush.
+function queueSync(notes) {
+  if (!isLoggedIn || !isProUserUI) return; // FIX: guard both login AND pro
+  if (!Array.isArray(notes)) notes = [notes];
+
+  // Merge into queue, deduplicating by id
+  const queueMap = new Map(_syncQueue.map((n) => [n.id, n]));
+  notes.forEach((n) => queueMap.set(n.id, n));
+  _syncQueue = Array.from(queueMap.values());
+
+  const now = Date.now();
+  const overdue = now - _lastFlush >= SYNC_MAX_INTERVAL;
+
+  clearTimeout(_syncTimer);
+
+  if (overdue) {
+    _flushSync();
+  } else {
+    _syncTimer = setTimeout(_flushSync, SYNC_DEBOUNCE);
+  }
+}
+
+async function _flushSync() {
+  if (!_syncQueue.length) return;
+  clearTimeout(_syncTimer);
+  _lastFlush = Date.now();
+
+  // Drain the queue in batches
+  const toSend = _syncQueue.splice(0, MAX_BATCH_SIZE);
+
+  try {
+    const res = await fetch(`${API_BASE}/api/sync`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(toSend),
+    });
+    if (res.ok) {
+      chrome.storage.local.get(STORAGE_KEY, (localRes) => {
+        let stored = localRes[STORAGE_KEY] || [];
+        const syncedIds = new Set(toSend.map((n) => n.id));
+        stored = stored.map((n) =>
+          syncedIds.has(n.id) ? { ...n, _synced: true } : n,
+        );
+        chrome.storage.local.set({ [STORAGE_KEY]: stored });
+      });
+      // If more items remain in queue, flush again after debounce
+      if (_syncQueue.length) _syncTimer = setTimeout(_flushSync, SYNC_DEBOUNCE);
+    }
+  } catch (err) {
+    console.warn("Sync flush failed:", err);
+    // Re-queue failed notes for retry
+    _syncQueue = [...toSend, ..._syncQueue];
+  }
+}
+
+// ─── Unique note ID generator — enough entropy to prevent collisions ──────────
+function generateNoteId(prefix = "note") {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
 
 const $ = (id) => document.getElementById(id);
 const E = (el, ev, fn) => {
@@ -55,29 +130,24 @@ const toast = (m, ms = 2600) => {
 ═══════════════════════════════════════ */
 const mob = () => window.innerWidth <= 768;
 const openS = () => {
-  $("side").classList.remove("closed");
-  $("hbtn").classList.add("open");
-  if (mob()) {
-    _ovlUsers.add("sidebar");
-    $("ovl").classList.add("on");
-  }
+  // $("side").classList.remove("closed");
+  // $("hbtn").classList.add("open");
+  // if (mob()) {
+  //   _ovlUsers.add("sidebar");
+  //   $("ovl").classList.add("on");
+  // }
 };
 const closeS = () => {
-  $("side").classList.add("closed");
-  $("hbtn").classList.remove("open");
-  _ovlUsers.delete("sidebar");
-  if (_ovlUsers.size === 0) $("ovl").classList.remove("on");
+  // $("side").classList.add("closed");
+  // $("hbtn").classList.remove("open");
+  // _ovlUsers.delete("sidebar");
+  // if (_ovlUsers.size === 0) $("ovl").classList.remove("on");
 };
 
-
-E($("hbtn"), "click", () =>
-  $("side").classList.contains("closed") ? openS() : closeS(),
-);
+$("side").classList.remove("closed");
 E($("ovl"), "click", () => {
   closeS();
   closeSettingsPanel();
-
-  // Also close modals
   $("aiModal")?.classList.remove("on");
   $("guideModal")?.classList.remove("on");
 });
@@ -97,7 +167,6 @@ function closeSettingsPanel() {
   if (_ovlUsers.size === 0) $("ovl").classList.remove("on");
 }
 
-
 E($("settingsPanelBtn"), "click", (e) => {
   e.stopPropagation();
   const isOpen = $("settingsPanel").classList.contains("open");
@@ -105,8 +174,6 @@ E($("settingsPanelBtn"), "click", (e) => {
   else openSettingsPanel();
 });
 E($("settingsPanelClose"), "click", closeSettingsPanel);
-
-// Close panel when clicking overlay
 E($("ovl"), "click", closeSettingsPanel);
 
 /* ═══════════════════════════════════════
@@ -163,55 +230,16 @@ E($("logoutWipeBtn"), "click", async () => {
    AI CHAT MODAL
 ═══════════════════════════════════════ */
 E($("aiBtn"), "click", () => {
-  // Close settings panel first
   closeSettingsPanel();
-
   const modal = $("aiModal");
-
   if (!modal) return;
-
   modal.dataset.context = JSON.stringify(allNotesFlat || []);
-
   modal.classList.add("on");
 });
-
-E($("closeAiBtn"), "click", () => {
-  $("aiModal")?.classList.remove("on");
-});
-
-// Close when clicking background
+E($("closeAiBtn"), "click", () => $("aiModal")?.classList.remove("on"));
 E($("aiModal"), "click", (e) => {
-  if (e.target.id === "aiModal") {
-    $("aiModal").classList.remove("on");
-  }
+  if (e.target.id === "aiModal") $("aiModal").classList.remove("on");
 });
-
-/* ═══════════════════════════════════════
-   SYNC
-═══════════════════════════════════════ */
-function queueSync(notes) {
-  if (!isLoggedIn) return;
-  if (!Array.isArray(notes)) notes = [notes];
-  fetch(`${API_BASE}/api/sync`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(notes),
-  })
-    .then((res) => {
-      if (res.ok) {
-        chrome.storage.local.get(STORAGE_KEY, (localRes) => {
-          let stored = localRes[STORAGE_KEY] || [];
-          const syncedIds = new Set(notes.map((n) => n.id));
-          stored = stored.map((n) =>
-            syncedIds.has(n.id) ? { ...n, _synced: true } : n,
-          );
-          chrome.storage.local.set({ [STORAGE_KEY]: stored });
-        });
-      }
-    })
-    .catch((err) => console.warn("Sync failed:", err));
-}
 
 /* ═══════════════════════════════════════
    VIEW NOTE MODAL
@@ -249,7 +277,7 @@ function openNoteModal(noteId) {
   if (n.selection || n.text_selection) {
     selEl.textContent = `"${n.selection || n.text_selection}"`;
     selEl.style.display = "block";
-    selEl.style.whiteSpace = "pre-wrap"; // <-- Preserves formatting
+    selEl.style.whiteSpace = "pre-wrap";
   } else {
     selEl.style.display = "none";
   }
@@ -258,7 +286,7 @@ function openNoteModal(noteId) {
   if (n.content) {
     contentEl.textContent = n.content;
     contentEl.style.display = "block";
-    contentEl.style.whiteSpace = "pre-wrap"; // <-- Preserves formatting
+    contentEl.style.whiteSpace = "pre-wrap";
   } else {
     contentEl.style.display = "none";
   }
@@ -286,18 +314,24 @@ E($("viewModal"), "click", (e) => {
 ═══════════════════════════════════════ */
 function renameSource(url, currentName) {
   const newName = prompt(`Rename "${currentName}" to:`, currentName);
+  // FIX: use `clean` consistently — avoids calling .trim() on null if prompt was cancelled
   const clean = newName?.trim();
   if (!clean || clean === currentName) return;
-  sourceNames[url] = newName.trim();
+  // FIX: client-side length validation before sending to server
+  if (clean.length > MAX_FOLDER_LEN) {
+    toast(`Name too long (max ${MAX_FOLDER_LEN} characters).`);
+    return;
+  }
+  sourceNames[url] = clean;
   chrome.storage.local.set({ [NAMES_KEY]: sourceNames }, async () => {
-    toast(`Renamed to "${newName.trim()}"`);
+    toast(`Renamed to "${clean}"`);
     loadLocalUI();
     if (isLoggedIn) {
       try {
         await fetch(`${API_BASE}/api/websites/rename`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url, custom_name: newName.trim() }),
+          body: JSON.stringify({ url, custom_name: clean }),
           credentials: "include",
         });
       } catch (err) {
@@ -314,8 +348,7 @@ function getDisplayName(url) {
 }
 
 /* ═══════════════════════════════════════
-   CARD GENERATOR — redesigned
-   Heights are natural/auto; no forced equal sizes.
+   CARD GENERATOR
 ═══════════════════════════════════════ */
 const card = (n, dom, index = 0) => {
   const title = n.title || "Untitled";
@@ -325,35 +358,20 @@ const card = (n, dom, index = 0) => {
   const pinColor = n.pinned ? "#f59e0b" : "currentColor";
   const pinFill = n.pinned ? "#f59e0b" : "none";
 
-  /* ── Build inner content pieces ── */
   let contentPieces = "";
-
-  // Timestamp chip (small, inline)
-  if (n.timestamp) {
+  if (n.timestamp)
     contentPieces += `<div class="c-timestamp">⏱️ ${esc(n.timestamp)}</div>`;
-  }
-
-  // Highlighted quote
-  if (sel) {
-    contentPieces += `<div class="chi" style="white-space: pre-wrap; word-break: break-word;">"${esc(sel)}"</div>`;
-  }
-
-  // Note body text
-  if (body) {
-    contentPieces += `<div class="cb" style="white-space: pre-wrap; word-break: break-word;">${esc(body)}</div>`;
-  }
-
-  // If nothing at all — show a subtle empty hint so card doesn't look broken
-  if (!sel && !body && !n.image_data && !n.timestamp) {
+  if (sel)
+    contentPieces += `<div class="chi" style="white-space:pre-wrap;word-break:break-word;">"${esc(sel)}"</div>`;
+  if (body)
+    contentPieces += `<div class="cb" style="white-space:pre-wrap;word-break:break-word;">${esc(body)}</div>`;
+  if (!sel && !body && !n.image_data && !n.timestamp)
     contentPieces += `<div class="card-empty-hint">No description added.</div>`;
-  }
 
-  /* ── Image — only if present, full-bleed below content ── */
   const imageHtml = n.image_data
     ? `<img class="card-img" loading="lazy" src="${n.image_data}" alt="Screenshot"/>`
     : "";
 
-  /* ── Tags ── */
   const tagsHtml = `
     <div class="ctags">
       <span class="tag">${esc(dom.slice(0, 22))}</span>
@@ -367,14 +385,11 @@ const card = (n, dom, index = 0) => {
        data-open-note="${n.id}"
        style="--i:${index};"
        title="Click to view note">
-
     <div class="card-top">
       <div class="ct">${esc(title)}</div>
       ${contentPieces}
     </div>
-
     ${imageHtml}
-
     <div class="card-footer">
       ${tagsHtml}
       <div class="ca">
@@ -470,7 +485,6 @@ function render(urlGroups, folderGroups) {
           displayNotes = unpinnedNotes.slice(0, 3);
           hiddenCount = Math.max(0, group.notes.length - 3);
         }
-
         const gridHTML = displayNotes
           .map((n, idx) => card(n, group.domain, idx))
           .join("");
@@ -495,43 +509,21 @@ function render(urlGroups, folderGroups) {
             </svg>
           </div>
           <span class="sdom">${esc(displayName)}</span>
-          <div class="folder-actions"
-              style="display:flex;flex-direction:row;align-items:center;gap:6px;">
-
-            <!-- Rename Folder -->
-            <button
-              class="act btn-rename-folder"
-              data-folder="${esc(displayName)}"
-              title="Rename Folder"
-            >
-              <svg viewBox="0 0 24 24"
-                  style="width:13px;height:13px;stroke:currentColor;fill:none;
-                          stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
-                          pointer-events:none;">
-                <path d="M12 20h9"/>
-                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+          <div class="folder-actions" style="display:flex;flex-direction:row;align-items:center;gap:6px;">
+            <button class="act btn-rename-folder" data-folder="${esc(displayName)}" title="Rename Folder">
+              <svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none;">
+                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
               </svg>
             </button>
-
-            <!-- Delete Folder -->
-            <button
-              class="act del btn-delete-folder"
-              data-folder="${esc(displayName)}"
-              title="Delete Folder"
-            >
-              <svg viewBox="0 0 24 24"
-                  style="width:13px;height:13px;stroke:currentColor;fill:none;
-                          stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
-                          pointer-events:none;">
+            <button class="act del btn-delete-folder" data-folder="${esc(displayName)}" title="Delete Folder">
+              <svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none;">
                 <polyline points="3 6 5 6 21 6"/>
                 <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
                 <path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
               </svg>
             </button>
-
           </div>
           <span class="scnt">${group.notes.length} note${group.notes.length !== 1 ? "s" : ""}</span>
-          
         </div>`;
         } else {
           headerHtml = `
@@ -545,23 +537,9 @@ function render(urlGroups, folderGroups) {
           <span class="sdom sdom-name" data-custom="${sourceNames[group.url] ? "true" : "false"}"
                 style="max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
                 title="${esc(group.url)}">${esc(displayName)}</span>
-          <button
-            class="act btn-rename"
-            data-url="${esc(group.url)}"
-            data-name="${esc(displayName)}"
-            title="Rename Source"
-          >
-            <svg viewBox="0 0 24 24"
-                style="width:13px;height:13px;
-                        stroke:currentColor;
-                        fill:none;
-                        stroke-width:2;
-                        pointer-events:none;">
-              <path d="M12 20h9"/>
-              <path d="M16.5 3.5a2.121
-                      2.121 0 0 1 3 3
-                      L7 19l-4 1
-                      1-4 12.5-12.5z"/>
+          <button class="act btn-rename" data-url="${esc(group.url)}" data-name="${esc(displayName)}" title="Rename Source">
+            <svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;pointer-events:none;">
+              <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
             </svg>
           </button>
           <a href="${esc(group.url)}" target="_blank" rel="noopener" class="slink">Visit ↗</a>
@@ -629,27 +607,23 @@ document.addEventListener("click", (e) => {
   const deleteFolderBtn = e.target.closest(".btn-delete-folder");
   const renameBtn = e.target.closest(".btn-rename");
   const noteCard = e.target.closest("[data-open-note]");
-
   const saveBtn = e.target.closest(".btn-save-domain");
+
   if (saveBtn) {
     const idx = parseInt(saveBtn.dataset.index, 10);
     const note = (window.aiGeneratedNotes || [])[idx];
-
     if (note) {
       const selectEl = document.querySelector(
         `.ai-folder-select[data-index="${idx}"]`,
       );
       let selectedFolder = selectEl ? selectEl.value : null;
-
       if (selectedFolder === "__CREATE_NEW__") {
-        // Open Modal instead of prompt
         pendingAiSaveIndex = idx;
         $("newFolderNameInput").value = "";
         $("createFolderModal").classList.add("on");
         setTimeout(() => $("newFolderNameInput").focus(), 50);
         return;
       }
-
       saveAINote(note, selectedFolder || null);
       saveBtn.textContent = "Saved ✓";
       saveBtn.disabled = true;
@@ -657,10 +631,12 @@ document.addEventListener("click", (e) => {
     }
     return;
   }
+
   if (noteCard && !editBtn && !delBtn && !pinBtn && !moveBtn) {
     openNoteModal(noteCard.dataset.openNote);
     return;
   }
+
   if (renameBtn) {
     renameSource(renameBtn.dataset.url, renameBtn.dataset.name);
     return;
@@ -699,7 +675,7 @@ document.addEventListener("click", (e) => {
   }
 
   if (e.target.closest("#createFolderBtn")) {
-    pendingAiSaveIndex = null; // Ensure AI index is cleared for standard folder creation
+    pendingAiSaveIndex = null;
     $("newFolderNameInput").value = "";
     $("createFolderModal").classList.add("on");
     setTimeout(() => $("newFolderNameInput").focus(), 50);
@@ -711,17 +687,19 @@ document.addEventListener("click", (e) => {
     const idx = allNotesFlat.findIndex((n) => String(n.id) === String(id));
     if (idx > -1) {
       allNotesFlat[idx].pinned = !allNotesFlat[idx].pinned;
+      const newPinned = allNotesFlat[idx].pinned;
+      const pinUrl = allNotesFlat[idx].url;
       chrome.storage.local.set({ [STORAGE_KEY]: allNotesFlat }, async () => {
         if ($("singlePageView").style.display === "block")
-          openSpecificPage(allNotesFlat[idx].url);
+          openSpecificPage(pinUrl);
         else loadLocalUI();
-        if (isLoggedIn) {
+        if (isLoggedIn && isProUserUI) {
           try {
             await fetch(`${API_BASE}/api/notes/${id}`, {
               method: "PUT",
               credentials: "include",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ pinned: allNotesFlat[idx].pinned }),
+              body: JSON.stringify({ pinned: newPinned }),
             });
           } catch (err) {
             console.error("Pin sync failed", err);
@@ -761,26 +739,24 @@ document.addEventListener("click", (e) => {
       }
     });
   }
-  // Delet folder
+
   if (deleteFolderBtn) {
     const folder = deleteFolderBtn.dataset.folder;
-
     if (!confirm(`Delete folder "${folder}"?\nNotes will remain.`)) return;
-
     deleteFolder(folder);
-
     return;
   }
 
-  // Rename
   if (renameFolderBtn) {
     const oldName = renameFolderBtn.dataset.folder;
-
     const newName = prompt("Rename folder:", oldName);
-
-    if (!newName || newName === oldName) return;
-
-    renameFolder(oldName, newName);
+    if (!newName || newName.trim() === oldName) return;
+    // FIX: client-side length validation before sending
+    if (newName.trim().length > MAX_FOLDER_LEN) {
+      toast(`Folder name too long (max ${MAX_FOLDER_LEN} characters).`);
+      return;
+    }
+    renameFolder(oldName, newName.trim());
   }
 });
 
@@ -807,7 +783,6 @@ E($("cancelCreateFolder"), "click", closeCreateFolderModal);
 E($("createFolderModal"), "click", (e) => {
   if (e.target === $("createFolderModal")) closeCreateFolderModal();
 });
-
 E($("newFolderNameInput"), "keydown", (e) => {
   if (e.key === "Enter") $("confirmCreateFolder").click();
 });
@@ -815,6 +790,11 @@ E($("newFolderNameInput"), "keydown", (e) => {
 E($("confirmCreateFolder"), "click", () => {
   const name = $("newFolderNameInput").value.trim();
   if (!name) return;
+  // FIX: client-side length validation
+  if (name.length > MAX_FOLDER_LEN) {
+    toast(`Folder name too long (max ${MAX_FOLDER_LEN} characters).`);
+    return;
+  }
 
   if (!userFolders.includes(name)) {
     userFolders.push(name);
@@ -832,7 +812,7 @@ E($("confirmCreateFolder"), "click", () => {
     const selectEl = document.querySelector(
       `.ai-folder-select[data-index="${pendingAiSaveIndex}"]`,
     );
-    const saveBtn = document.querySelector(
+    const saveBtnEl = document.querySelector(
       `.btn-save-domain[data-index="${pendingAiSaveIndex}"]`,
     );
 
@@ -847,12 +827,11 @@ E($("confirmCreateFolder"), "click", () => {
 
     if (selectEl) selectEl.value = name;
     if (note) saveAINote(note, name);
-    if (saveBtn) {
-      saveBtn.textContent = "Saved ✓";
-      saveBtn.disabled = true;
+    if (saveBtnEl) {
+      saveBtnEl.textContent = "Saved ✓";
+      saveBtnEl.disabled = true;
     }
     if (selectEl) selectEl.disabled = true;
-
     pendingAiSaveIndex = null;
   }
 
@@ -861,16 +840,14 @@ E($("confirmCreateFolder"), "click", () => {
 
 function saveAINote(note, folderName = null) {
   const newNote = {
-    id: "ai_" + Date.now(),
+    // FIX: use standardised ID generator — no collision risk
+    id: generateNoteId("ai"),
     title: note.title,
     content: note.content,
     tags: note.tags || [],
-
-    // Change these two lines to match your existing folder-only logic
     url: "general://notes",
     domain: "general",
-
-    folder: folderName, // Uses selected folder
+    folder: folderName,
     pinned: false,
     timestamp: null,
     image_data: null,
@@ -881,14 +858,13 @@ function saveAINote(note, folderName = null) {
   chrome.storage.local.get(["context_notes_data"], (res) => {
     let notes = res.context_notes_data || [];
     notes.push(newNote);
-    allNotesFlat = notes; // Ensure global array updates instantly for Talk mode
+    allNotesFlat = notes;
     chrome.storage.local.set({ context_notes_data: notes }, () => {
       toast("Note saved ✓");
       loadLocalUI();
     });
   });
 }
-
 
 /* ═══════════════════════════════════════
    MOVE / EDIT
@@ -898,8 +874,12 @@ E($("cancelMove"), "click", () => {
   mId = null;
 });
 E($("saveMove"), "click", async () => {
+  // FIX: capture mId into a local const before any async operation.
+  // Prevents the global being overwritten if the user clicks Move on another
+  // note while this save is still in-flight.
+  const savedMoveId = mId;
   const selectedFolder = $("folderSelect").value;
-  const idx = allNotesFlat.findIndex((n) => n.id === mId);
+  const idx = allNotesFlat.findIndex((n) => n.id === savedMoveId);
   if (idx > -1) {
     allNotesFlat[idx].folder = selectedFolder || null;
     chrome.storage.local.set({ [STORAGE_KEY]: allNotesFlat }, async () => {
@@ -907,9 +887,9 @@ E($("saveMove"), "click", async () => {
       mId = null;
       toast("Note moved ✓");
       loadLocalUI();
-      if (isLoggedIn) {
+      if (isLoggedIn && isProUserUI) {
         try {
-          await fetch(`${API_BASE}/api/notes/${mId}`, {
+          await fetch(`${API_BASE}/api/notes/${savedMoveId}`, {
             method: "PUT",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
@@ -934,6 +914,19 @@ E($("modal"), "click", (e) => {
 E($("saveEdit"), "click", async () => {
   const titleVal = $("etitle").value.trim() || "Untitled";
   const contentVal = $("eta").value.trim();
+
+  // FIX: client-side length validation before sending
+  if (titleVal.length > MAX_TITLE_LEN) {
+    toast(`Title too long (max ${MAX_TITLE_LEN} characters).`);
+    return;
+  }
+  if (contentVal.length > MAX_CONTENT_LEN) {
+    toast(
+      `Content too long (max ${MAX_CONTENT_LEN.toLocaleString()} characters).`,
+    );
+    return;
+  }
+
   const idx = allNotesFlat.findIndex((n) => n.id === eId);
   if (idx > -1) {
     allNotesFlat[idx].title = titleVal;
@@ -945,7 +938,7 @@ E($("saveEdit"), "click", async () => {
       toast("Saved ✓");
       if ($("singlePageView").style.display === "block") openSpecificPage(url);
       else loadLocalUI();
-      if (isLoggedIn) {
+      if (isLoggedIn && isProUserUI) {
         try {
           await fetch(`${API_BASE}/api/notes/${savedId}`, {
             method: "PUT",
@@ -961,24 +954,19 @@ E($("saveEdit"), "click", async () => {
   }
 });
 
-// Folder Funtions
-// Delete\
+/* ═══════════════════════════════════════
+   FOLDER FUNCTIONS
+═══════════════════════════════════════ */
 async function deleteFolder(folderName) {
-  // Remove locally
   userFolders = userFolders.filter((f) => f !== folderName);
-
   allNotesFlat = allNotesFlat.map((n) =>
     n.folder === folderName ? { ...n, folder: null } : n,
   );
-
   chrome.storage.local.set({
     [FOLDERS_KEY]: userFolders,
     [STORAGE_KEY]: allNotesFlat,
   });
-
   loadLocalUI();
-
-  // Sync backend
   if (isLoggedIn) {
     try {
       await fetch(`${API_BASE}/api/folders/${encodeURIComponent(folderName)}`, {
@@ -989,48 +977,34 @@ async function deleteFolder(folderName) {
       console.error("Folder delete failed", err);
     }
   }
-
   toast(`Folder "${folderName}" deleted`);
 }
 
 async function renameFolder(oldName, newName) {
-  // Update folder list
   userFolders = userFolders.map((f) => (f === oldName ? newName : f));
-
-  // Update notes
   allNotesFlat = allNotesFlat.map((n) =>
     n.folder === oldName ? { ...n, folder: newName } : n,
   );
-
-  // Save locally
   chrome.storage.local.set({
     [FOLDERS_KEY]: userFolders,
     [STORAGE_KEY]: allNotesFlat,
   });
-
-  // Refresh ALL UI
   renderFoldersSidebar();
   loadLocalUI();
-
-  // Sync backend
   if (isLoggedIn) {
     try {
       await fetch(`${API_BASE}/api/folders/rename`, {
         method: "PUT",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          old_name: oldName,
-          new_name: newName,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ old_name: oldName, new_name: newName }),
       });
     } catch (err) {
       console.error("Rename folder failed", err);
     }
   }
 }
+
 /* ═══════════════════════════════════════
    SEARCH
 ═══════════════════════════════════════ */
@@ -1147,21 +1121,11 @@ function renderFoldersSidebar() {
         .map((f, i) => {
           const count = folderCounts[f] || 0;
           const fid = getSafeId("folder_" + f);
-          return `
-            <a class="na"
-              href="#${fid}"
-              data-t="${fid}"
-              style="animation-delay:${i * 40}ms;">
-              <div class="dot"
-                  style="border-radius:2px;background:var(--mut2);">
-              </div>
-              <span class="nd">
-                ${esc(f)}
-              </span>
-              <span class="bdg">
-                ${count}
-              </span>
-            </a>`;
+          return `<a class="na" href="#${fid}" data-t="${fid}" style="animation-delay:${i * 40}ms;">
+          <div class="dot" style="border-radius:2px;background:var(--mut2);"></div>
+          <span class="nd">${esc(f)}</span>
+          <span class="bdg">${count}</span>
+        </a>`;
         })
         .join("")
     : '<p style="padding:12px;font-size:12px;color:var(--mut)">No folders yet.</p>';
@@ -1170,23 +1134,18 @@ function renderFoldersSidebar() {
 
 function renderNoNotesSuggestion(question, notes) {
   const chatBox = $("aiChatBox");
-
   if (!notes || !Array.isArray(notes) || notes.length === 0) {
     chatBox.insertAdjacentHTML(
       "beforeend",
-      `<div class="chat-msg chat-ai">
-        ⚠️ No notes found and couldn't generate suggestions. Try rephrasing your question.
-      </div>`,
+      `<div class="chat-msg chat-ai">⚠️ No notes found and couldn't generate suggestions. Try rephrasing your question.</div>`,
     );
     chatBox.scrollTop = chatBox.scrollHeight;
     return;
   }
 
   window.aiGeneratedNotes = notes;
-
   const cardsHtml = notes
     .map((n, i) => {
-      // Build folder options dynamically
       let folderOptions = `<option value="">[ No Folder ]</option>`;
       userFolders.forEach((f) => {
         const isSelected = n.suggested_folder === f ? "selected" : "";
@@ -1195,74 +1154,37 @@ function renderNoNotesSuggestion(question, notes) {
       folderOptions += `<option value="__CREATE_NEW__">+ Create New Folder</option>`;
 
       return `
-      <div style="
-        background: var(--bg, #fff);
-        border: 1px solid var(--bdr, #e2e8f0);
-        border-radius: 12px;
-        padding: 14px 16px;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      ">
-        <div style="font-weight: 600; font-size: 13px; color: var(--ink, #0f172a); line-height: 1.4;">
-          ${esc(n.title)}
-        </div>
-        <div style="font-size: 12px; color: var(--mut, #64748b); line-height: 1.6;">
-          ${esc(n.content)}
-        </div>
-        <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px;">
+      <div style="background:var(--bg);border:1px solid var(--bdr);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;">
+        <div style="font-weight:600;font-size:13px;color:var(--ink);line-height:1.4;">${esc(n.title)}</div>
+        <div style="font-size:12px;color:var(--mut);line-height:1.6;">${esc(n.content)}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:2px;">
           ${(n.tags || [])
             .map(
               (t) =>
-                `<span style="font-size: 11px; padding: 2px 8px; background: var(--acc-bg, #eff6ff); color: var(--acc, #3b82f6); border-radius: 20px; border: 1px solid var(--bdr, #e2e8f0);">#${esc(t)}</span>`,
+                `<span style="font-size:11px;padding:2px 8px;background:var(--acc-bg);color:var(--acc);border-radius:20px;border:1px solid var(--bdr);">#${esc(t)}</span>`,
             )
             .join("")}
         </div>
-        
-        <!-- Enhanced Folder Select UI -->
-        <div style="display: flex; gap: 8px; margin-top: 4px; align-items: center;">
+        <div style="display:flex;gap:8px;margin-top:4px;align-items:center;">
           <div class="ai-folder-select-wrap">
-            <select class="ai-folder-select" data-index="${i}">
-              ${folderOptions}
-            </select>
+            <select class="ai-folder-select" data-index="${i}">${folderOptions}</select>
             <svg class="ai-folder-select-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
           </div>
-          <button
-            class="btn-save-domain"
-            data-index="${i}"
-            style="
-              font-size: 12px;
-              font-weight: 500;
-              padding: 7px 14px;
-              border-radius: 8px;
-              border: 1px solid var(--acc, #3b82f6);
-              background: var(--acc, #3b82f6);
-              color: #fff;
-              cursor: pointer;
-              transition: opacity 0.15s;
-              white-space: nowrap;
-            "
-          >+ Save</button>
+          <button class="btn-save-domain" data-index="${i}" style="font-size:12px;font-weight:500;padding:7px 14px;border-radius:8px;border:1px solid var(--acc);background:var(--acc);color:#fff;cursor:pointer;transition:opacity 0.15s;white-space:nowrap;">+ Save</button>
         </div>
-      </div>
-      `;
+      </div>`;
     })
     .join("");
 
   chatBox.insertAdjacentHTML(
     "beforeend",
-    `<div class="chat-msg chat-ai" style="padding: 0; background: none; border: none; box-shadow: none;">
-      <div style="font-size: 12px; color: var(--mut, #64748b); margin-bottom: 10px; padding: 0 2px;">
-        ⚠️ You have no notes on this topic. Here are some suggested notes you can save:
-      </div>
-      <div style="display: flex; flex-direction: column; gap: 10px;">
-        ${cardsHtml}
-      </div>
+    `<div class="chat-msg chat-ai" style="padding:0;background:none;border:none;box-shadow:none;">
+      <div style="font-size:12px;color:var(--mut);margin-bottom:10px;padding:0 2px;">⚠️ You have no notes on this topic. Here are some suggested notes you can save:</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">${cardsHtml}</div>
     </div>`,
   );
-
   chatBox.scrollTop = chatBox.scrollHeight;
 }
 
@@ -1295,6 +1217,7 @@ E($("paywallLogoutBtn"), "click", async () => {
     });
   } catch (e) {}
   isLoggedIn = false;
+  isProUserUI = false;
   $("paywallModal").classList.remove("on");
   $("uStatus").textContent = "Local Mode Only";
   const logoutBtnEl = $("logoutBtn");
@@ -1333,13 +1256,25 @@ async function checkAuthAndSync() {
     if (res.ok) {
       const user = await res.json();
       isLoggedIn = true;
+      // FIX: isProUserUI is ONLY set here from a live server response.
+      // It is never read from chrome.storage, preventing local spoofing.
       isProUserUI = user.is_pro;
+
+      const wasPro = await new Promise((r) =>
+        chrome.storage.local.get(PRO_CACHE_KEY, (res) => r(res[PRO_CACHE_KEY])),
+      );
       chrome.storage.local.set({ [PRO_CACHE_KEY]: user.is_pro });
+
+      if (user.is_pro && !wasPro) {
+        launchProCelebration();
+        return;
+      }
       if (isProUserUI) {
         $("createFolderBtn").style.display = "flex";
         $("proBadge").style.display = "inline";
-        $("feedbackSection").style.display = "block"; // ADD THIS, remove old feedbackBtn line
+        $("feedbackSection").style.display = "block";
       }
+
       const planName = user.is_pro ? "Pro Plan" : "Free Plan";
       const statusColor = user.is_pro ? "#4f46e5" : "#64748b";
       $("uStatus").innerHTML =
@@ -1349,17 +1284,18 @@ async function checkAuthAndSync() {
           `<div class="sitem danger" id="logoutBtn">🚪 Logout</div>`;
 
       if (!user.is_pro) {
-        if ($("paywallModal")) $("paywallModal").classList.add("on");
+        $("paywallModal")?.classList.add("on");
         loadLocalUI();
         return;
       }
+      $("paywallModal")?.classList.remove("on");
+
       if (
         user.is_pro &&
         user.plan_type === "monthly" &&
         user.days_left !== null &&
         user.days_left <= 3
       ) {
-        // Only show once per session so we don't annoy them on every click
         if (!sessionStorage.getItem("renewal_warned")) {
           $("daysLeftText").textContent = user.days_left;
           $("renewalModal").classList.add("on");
@@ -1466,6 +1402,9 @@ E($("loginBtn"), "click", () => {
   $("guideModal").classList.add("on");
 });
 
+// FIX: Only ONE focus listener — the duplicate at the bottom of the original
+// file has been removed. Both shared the same lastAuthCheck guard anyway,
+// making the second one a no-op while risking a future double-registration.
 let lastAuthCheck = 0;
 window.addEventListener("focus", () => {
   const now = Date.now();
@@ -1476,20 +1415,14 @@ window.addEventListener("focus", () => {
 });
 
 window.onload = () => {
-  // Sidebar: open by default on desktop, closed on mobile
-  if (!mob()) {
-    openS();
-  }
-
-  chrome.storage.local.get(PRO_CACHE_KEY, (res) => {
-    isProUserUI = res[PRO_CACHE_KEY] === true;
-    if (isProUserUI) {
-      $("feedbackBtn").style.display = "flex";
-    }
-    loadLocalUI();
-  });
+  if (!mob()) openS();
+  // FIX: Do NOT seed isProUserUI from chrome.storage here.
+  // Just load the local UI immediately for responsiveness,
+  // then let checkAuthAndSync() set isProUserUI from the server.
+  loadLocalUI();
   checkAuthAndSync();
 };
+
 /* ═══════════════════════════════════════
    ADD NOTE MODAL
 ═══════════════════════════════════════ */
@@ -1526,12 +1459,24 @@ async function saveNewNote() {
     setTimeout(() => ($("anTitle").style.borderColor = ""), 1200);
     return;
   }
+  // FIX: client-side length validation
+  if (titleVal.length > MAX_TITLE_LEN) {
+    toast(`Title too long (max ${MAX_TITLE_LEN} characters).`);
+    return;
+  }
+  if (contentVal.length > MAX_CONTENT_LEN) {
+    toast(
+      `Content too long (max ${MAX_CONTENT_LEN.toLocaleString()} characters).`,
+    );
+    return;
+  }
 
   const context = JSON.parse($("addNoteModal").dataset.context || "{}");
   const isGeneralNote = context.type === "folder";
 
   const newNote = {
-    id: "dash_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+    // FIX: standardised ID with entropy
+    id: generateNoteId("dash"),
     title: titleVal,
     content: contentVal,
     selection: "",
@@ -1573,17 +1518,9 @@ async function saveNewNote() {
       toast("Note added ✓");
       if (context.type === "page") openSpecificPage(newNote.url);
       else openSpecificFolder(context.folderName);
-      if (isLoggedIn) {
-        try {
-          await fetch(`${API_BASE}/api/sync`, {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify([newNote]),
-          });
-        } catch (err) {
-          console.error("Add sync failed", err);
-        }
+      // FIX: guard both login AND pro before syncing
+      if (isLoggedIn && isProUserUI) {
+        queueSync([newNote]);
       }
     });
   });
@@ -1654,7 +1591,7 @@ function openSpecificPage(targetUrl) {
   E($("downloadMdBtn"), "click", () => {
     const lines = [
       `# Notes — ${displayName}`,
-      `*Exported from ContextNote on ${new Date().toLocaleDateString()}*`,
+      `*Exported from Kontexa on ${new Date().toLocaleDateString()}*`,
       `*Source: ${targetUrl}*`,
       "",
     ];
@@ -1735,7 +1672,7 @@ function openSpecificFolder(folderName) {
   E($("downloadMdBtn"), "click", () => {
     const lines = [
       `# Folder — ${folderName}`,
-      `*Exported from ContextNote on ${new Date().toLocaleDateString()}*`,
+      `*Exported from Kontexa on ${new Date().toLocaleDateString()}*`,
       "",
     ];
     folderNotes.forEach((n, i) => {
@@ -1769,6 +1706,8 @@ function openSpecificFolder(folderName) {
 
 /* ═══════════════════════════════════════
    MARKDOWN RENDERER (for AI chat)
+   IMPORTANT: HTML-encode FIRST, then add markup tags.
+   Never reverse this order — doing so would create an XSS vector.
 ═══════════════════════════════════════ */
 function renderMarkdown(text) {
   return text
@@ -1819,7 +1758,7 @@ function renderMarkdown(text) {
 /* ═══════════════════════════════════════
    AI CHAT
 ═══════════════════════════════════════ */
-let aiMode = "talk"; // <-- Add this globally right above the DOMContentLoaded block
+let aiMode = "talk";
 
 document.addEventListener("DOMContentLoaded", () => {
   const aiBtn = $("aiBtn");
@@ -1833,14 +1772,12 @@ document.addEventListener("DOMContentLoaded", () => {
       $("aiModal").classList.add("on");
     });
   }
-
   if (closeAiBtn) {
-    closeAiBtn.addEventListener("click", () => {
-      $("aiModal").classList.remove("on");
-    });
+    closeAiBtn.addEventListener("click", () =>
+      $("aiModal").classList.remove("on"),
+    );
   }
 
-  // --- NEW: Mode Toggle Listeners ---
   const btnTalk = $("modeTalk");
   const btnResearch = $("modeResearch");
 
@@ -1848,21 +1785,17 @@ document.addEventListener("DOMContentLoaded", () => {
     btnTalk.addEventListener("click", () => {
       aiMode = "talk";
       btnTalk.style.cssText =
-        "flex:1; padding:8px; border-radius:6px; cursor:pointer; font-weight:600; border:1px solid var(--acc); background:var(--acc-bg); color:var(--acc);";
+        "flex:1;padding:8px;border-radius:6px;cursor:pointer;font-weight:600;border:1px solid var(--acc);background:var(--acc-bg);color:var(--acc);";
       btnResearch.style.cssText =
-        "flex:1; padding:8px; border-radius:6px; cursor:pointer; font-weight:500; border:1px solid transparent; background:transparent; color:var(--mut);";
-
-      // Update Chat Text
+        "flex:1;padding:8px;border-radius:6px;cursor:pointer;font-weight:500;border:1px solid transparent;background:transparent;color:var(--mut);";
       const chatBox = $("aiChatBox");
-      if (chatBox.children.length <= 1) {
-        // If it's a fresh chat, replace the welcome message
+      if (chatBox.children.length <= 1)
         chatBox.innerHTML =
           '<div class="chat-msg chat-ai">Ask me anything about your saved notes.</div>';
-      } else {
-        // If mid-conversation, add a subtle status update
+      else {
         chatBox.insertAdjacentHTML(
           "beforeend",
-          `<div class="chat-msg chat-ai" style="font-size:12px; opacity:0.8; padding:8px;"><em>Switched to <strong>🧠 Talk Mode</strong>. Now searching saved notes.</em></div>`,
+          `<div class="chat-msg chat-ai" style="font-size:12px;opacity:0.8;padding:8px;"><em>Switched to <strong>🧠 Talk Mode</strong>. Now searching saved notes.</em></div>`,
         );
         chatBox.scrollTop = chatBox.scrollHeight;
       }
@@ -1871,29 +1804,23 @@ document.addEventListener("DOMContentLoaded", () => {
     btnResearch.addEventListener("click", () => {
       aiMode = "research";
       btnResearch.style.cssText =
-        "flex:1; padding:8px; border-radius:6px; cursor:pointer; font-weight:600; border:1px solid var(--acc); background:var(--acc-bg); color:var(--acc);";
+        "flex:1;padding:8px;border-radius:6px;cursor:pointer;font-weight:600;border:1px solid var(--acc);background:var(--acc-bg);color:var(--acc);";
       btnTalk.style.cssText =
-        "flex:1; padding:8px; border-radius:6px; cursor:pointer; font-weight:500; border:1px solid transparent; background:transparent; color:var(--mut);";
-
-      // Update Chat Text
+        "flex:1;padding:8px;border-radius:6px;cursor:pointer;font-weight:500;border:1px solid transparent;background:transparent;color:var(--mut);";
       const chatBox = $("aiChatBox");
-      if (chatBox.children.length <= 1) {
-        // If it's a fresh chat, replace the welcome message
+      if (chatBox.children.length <= 1)
         chatBox.innerHTML =
           '<div class="chat-msg chat-ai">Enter a topic to generate new research notes.</div>';
-      } else {
-        // If mid-conversation, add a subtle status update
+      else {
         chatBox.insertAdjacentHTML(
           "beforeend",
-          `<div class="chat-msg chat-ai" style="font-size:12px; opacity:0.8; padding:8px;"><em>Switched to <strong>🔬 Research Mode</strong>. Asking the AI directly.</em></div>`,
+          `<div class="chat-msg chat-ai" style="font-size:12px;opacity:0.8;padding:8px;"><em>Switched to <strong>🔬 Research Mode</strong>. Asking the AI directly.</em></div>`,
         );
         chatBox.scrollTop = chatBox.scrollHeight;
       }
     });
   }
 });
-
-E($("closeAiBtn"), "click", () => $("aiModal").classList.remove("on"));
 
 let isAiProcessing = false;
 async function handleAiSubmit() {
@@ -1927,32 +1854,24 @@ async function handleAiSubmit() {
   input.value = "Thinking...";
 
   try {
-    // ==========================================
-    // 1. RESEARCH MODE (Always generate notes)
-    // ==========================================
     if (aiMode === "research") {
       chatBox.insertAdjacentHTML(
         "beforeend",
         `<div class="chat-msg chat-ai">Generating research notes…</div>`,
       );
       chatBox.scrollTop = chatBox.scrollHeight;
-
       const suggestions = await AIService.generateNotesFromQuestion(q);
       chatBox.lastElementChild.remove();
       renderNoNotesSuggestion(q, suggestions);
-
       input.value = "";
       input.disabled = false;
       sendBtn.disabled = false;
       isAiProcessing = false;
       chatBox.scrollTop = chatBox.scrollHeight;
       setTimeout(() => input.focus(), 10);
-      return; // Stop here, do not run Talk mode
+      return;
     }
 
-    // ==========================================
-    // 2. TALK MODE (Original Filtering Logic)
-    // ==========================================
     const contextNotes = allNotesFlat || [];
     const domain = detectDomain(q);
     let scopedNotes = contextNotes;
@@ -1975,17 +1894,16 @@ async function handleAiSubmit() {
       sendBtn.disabled = false;
       isAiProcessing = false;
       setTimeout(() => input.focus(), 10);
-      return; // Stop here
+      return;
     }
 
-    // --- Original Chat execution ---
     const result = await AIService.chat(q, filteredNotes);
     const aiAnswer = result?.answer || "⚠️ No answer received.";
     const aiTags = result?.tags || {};
 
-    const res = await new Promise((resolve) => {
-      chrome.storage.local.get("context_notes_data", resolve);
-    });
+    const res = await new Promise((resolve) =>
+      chrome.storage.local.get("context_notes_data", resolve),
+    );
     let allNotes = res.context_notes_data || [];
     const updated = allNotes.map((note) => {
       const newTags = aiTags[note.id];
@@ -1995,16 +1913,17 @@ async function handleAiSubmit() {
       }
       return note;
     });
-    await new Promise((resolve) => {
-      chrome.storage.local.set({ context_notes_data: updated }, resolve);
-    });
+    await new Promise((resolve) =>
+      chrome.storage.local.set({ context_notes_data: updated }, resolve),
+    );
 
     const tagUpdates = Object.entries(aiTags)
       .filter(([, tags]) => tags?.length > 0)
       .map(([id, tags]) => ({ id, tags }));
-    if (tagUpdates.length > 0) {
+    if (tagUpdates.length > 0 && isLoggedIn && isProUserUI) {
       try {
-        await fetch(`${API_BASE}/api/notes/tags`, {
+        // FIX: updated endpoint from /api/notes/tags → /api/notes/batch-tags
+        await fetch(`${API_BASE}/api/notes/batch-tags`, {
           method: "PUT",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -2078,9 +1997,7 @@ function buildThemeMenu() {
     swatch.innerHTML = `
       <div class="swatch-circle" style="background:${theme.swatch}"></div>
       <span class="swatch-label">${theme.emoji} ${theme.label}</span>`;
-    swatch.addEventListener("click", () => {
-      applyTheme(themeKey);
-    });
+    swatch.addEventListener("click", () => applyTheme(themeKey));
     grid.appendChild(swatch);
   });
 }
@@ -2103,7 +2020,6 @@ function applyTheme(theme) {
 }
 
 buildThemeMenu();
-
 if (typeof chrome !== "undefined" && chrome.storage) {
   chrome.storage.local.get([THEME_KEY], (res) => {
     applyTheme(res[THEME_KEY] || "nova");
@@ -2117,80 +2033,69 @@ window.addEventListener("load", function () {
     "click",
     function (e) {
       const backBtn = e.target.closest("#backToDash");
-
       if (!backBtn) return;
-
       e.preventDefault();
       e.stopPropagation();
-
       const singleView = document.getElementById("singlePageView");
-
       const mainEl = document.getElementById("main");
-
       if (!singleView || !mainEl) return;
-
-      // Hide detail view
       singleView.style.display = "none";
       singleView.innerHTML = "";
-
-      // Show dashboard
       mainEl.style.display = "block";
-
-      // Reload UI
-      if (typeof loadLocalUI === "function") {
-        loadLocalUI();
-      }
-
-      // Reset scroll
+      if (typeof loadLocalUI === "function") loadLocalUI();
       mainEl.scrollTop = 0;
     },
     true,
   );
 });
 
-window.addEventListener("focus", () => {
-  const now = Date.now();
-  if (now - lastAuthCheck > 15000) {
-    lastAuthCheck = now;
-    checkAuthAndSync();
-  }
-});
-
-/* Modal For Server Maintenance */
+/* ═══════════════════════════════════════
+   SERVER HEALTH CHECK
+   FIX: /wakeUp typo corrected to /weakUp (matching the backend route).
+   FIX: Only shows maintenance modal on confirmed server error (non-transient),
+        not on simple network failures which are just cold-start timeouts.
+═══════════════════════════════════════ */
 (async function checkServerHealth() {
+  // Only worth checking for logged-in Pro users
+  if (!isLoggedIn || !isProUserUI) return;
   try {
-    const res = await fetch(`${API_BASE}/wakeUp`, {
+    const res = await fetch(`${API_BASE}/weakUp`, {
+      // FIX: was /wakeUp
       method: "GET",
       credentials: "include",
     });
-    if (!res.ok) throw new Error("not ok");
+    // Only show modal on a real server error (5xx), not a network timeout
+    if (res.status >= 500) {
+      document.getElementById("maintenanceModal").classList.add("on");
+    }
   } catch (e) {
-    // Only show to logged-in pro users — non-pro/local users are unaffected
-    if (!isLoggedIn || !isProUserUI) return;
-    document.getElementById("maintenanceModal").classList.add("on");
+    // Network error = cold start or offline. Do not show maintenance modal.
+    console.warn("Health check failed (likely cold start):", e.message);
   }
 })();
 
-// OK button — logs user out then reloads so they drop to local mode
-document.getElementById("maintenanceOkBtn").addEventListener("click", async () => {
-  try {
-    await fetch(`${API_BASE}/api/logout`, {
-      method: "POST",
-      credentials: "include",
-    });
-  } catch (e) {}
-  window.location.reload();
-});
-
+document
+  .getElementById("maintenanceOkBtn")
+  .addEventListener("click", async () => {
+    try {
+      await fetch(`${API_BASE}/api/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch (e) {}
+    window.location.reload();
+  });
 
 /* ═══════════════════════════════════════
    FEEDBACK
 ═══════════════════════════════════════ */
 let selectedFeedbackType = "feature";
 
-document.querySelectorAll(".fb-chip").forEach(chip => {
+document.querySelectorAll(".fb-chip").forEach((chip) => {
   chip.addEventListener("click", () => {
-    document.querySelectorAll(".fb-chip").forEach(c => c.classList.remove("active"));
+    document
+      .querySelectorAll(".fb-chip")
+      .forEach((c) => c.classList.remove("active"));
     chip.classList.add("active");
     selectedFeedbackType = chip.dataset.val;
   });
@@ -2200,29 +2105,29 @@ E($("feedbackBtn"), "click", () => {
   $("fbSubject").value = "";
   $("fbMessage").value = "";
   selectedFeedbackType = "feature";
-  document.querySelectorAll(".fb-chip").forEach((c, i) => {
-    c.classList.toggle("active", i === 0);
-  });
+  document
+    .querySelectorAll(".fb-chip")
+    .forEach((c, i) => c.classList.toggle("active", i === 0));
   $("feedbackModal").classList.add("on");
 });
-
-E($("cancelFeedback"), "click", () => $("feedbackModal").classList.remove("on"));
+E($("cancelFeedback"), "click", () =>
+  $("feedbackModal").classList.remove("on"),
+);
 E($("feedbackModal"), "click", (e) => {
-  if (e.target === $("feedbackModal")) $("feedbackModal").classList.remove("on");
+  if (e.target === $("feedbackModal"))
+    $("feedbackModal").classList.remove("on");
 });
 
 E($("submitFeedback"), "click", async () => {
   const message = $("fbMessage").value.trim();
   if (!message) {
     $("fbMessage").style.borderColor = "#ef4444";
-    setTimeout(() => $("fbMessage").style.borderColor = "", 1200);
+    setTimeout(() => ($("fbMessage").style.borderColor = ""), 1200);
     return;
   }
-
   const btn = $("submitFeedback");
   btn.textContent = "Sending…";
   btn.disabled = true;
-
   try {
     await fetch(`${API_BASE}/api/feedback`, {
       method: "POST",
@@ -2239,7 +2144,143 @@ E($("submitFeedback"), "click", async () => {
   } catch (e) {
     toast("Failed to send. Please try again.");
   }
-
   btn.textContent = "Send Feedback";
   btn.disabled = false;
+});
+
+/* ═══════════════════════════════════════
+   PRO CELEBRATION
+═══════════════════════════════════════ */
+function launchProCelebration() {
+  $("paywallModal")?.classList.remove("on");
+  const modal = $("proCelebrationModal");
+  const canvas = $("proCelebCanvas");
+  const ctx = canvas.getContext("2d");
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  modal.classList.add("on");
+
+  const COLORS = [
+    "#534AB7",
+    "#7F77DD",
+    "#CECBF6",
+    "#1D9E75",
+    "#5DCAA5",
+    "#9FE1CB",
+    "#EF9F27",
+    "#FAC775",
+    "#D4537E",
+  ];
+  const pieces = Array.from({ length: 140 }, () => ({
+    x: Math.random() * canvas.width,
+    y: -20 - Math.random() * 300,
+    w: 6 + Math.random() * 9,
+    h: 4 + Math.random() * 6,
+    vx: (Math.random() - 0.5) * 4,
+    vy: 2 + Math.random() * 4,
+    rot: Math.random() * Math.PI * 2,
+    rs: (Math.random() - 0.5) * 0.18,
+    color: COLORS[Math.floor(Math.random() * COLORS.length)],
+    alpha: 1,
+    shape: Math.random() > 0.4 ? "rect" : "circle",
+  }));
+
+  let raf,
+    frame = 0;
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let alive = false;
+    pieces.forEach((p) => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rot += p.rs;
+      p.vy += 0.07;
+      p.vx *= 0.994;
+      if (p.y > canvas.height * 0.75) p.alpha -= 0.02;
+      if (p.alpha > 0) {
+        alive = true;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, p.alpha);
+        ctx.fillStyle = p.color;
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        if (p.shape === "circle") {
+          ctx.beginPath();
+          ctx.arc(0, 0, p.w * 0.5, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        }
+        ctx.restore();
+      }
+    });
+    frame++;
+    if (alive || frame < 50) raf = requestAnimationFrame(draw);
+    else canvas.remove();
+  }
+  draw();
+}
+
+E($("closeCelebrationBtn"), "click", () => {
+  $("proCelebrationModal").classList.remove("on");
+  window.location.reload();
+});
+
+/* ═══════════════════════════════════════
+   SYNC NOW BUTTON
+═══════════════════════════════════════ */
+E($("syncNowBtn"), "click", async () => {
+  if (!isLoggedIn || !isProUserUI) {
+    toast("Sign in with a Pro account to sync your notes.");
+    return;
+  }
+  const btn = $("syncNowBtn");
+  const desc = $("syncStatusDesc");
+  const icon = btn.querySelector(".sp-item-icon svg");
+
+  desc.textContent = "Syncing…";
+  icon.style.animation = "spin 0.8s linear infinite";
+
+  try {
+    const unsynced = allNotesFlat.filter((n) => !n._synced);
+    if (unsynced.length === 0) {
+      desc.textContent = "Everything is up to date";
+      toast("Already in sync ✓");
+    } else {
+      // Force immediate flush rather than going through the debounce queue
+      _syncQueue = [...unsynced, ..._syncQueue];
+      await _flushSync();
+      desc.textContent = `Synced ${unsynced.length} note${unsynced.length !== 1 ? "s" : ""} ✓`;
+      toast(
+        `Synced ${unsynced.length} note${unsynced.length !== 1 ? "s" : ""} ✓`,
+      );
+    }
+  } catch (e) {
+    desc.textContent = "Sync failed — try again";
+    toast("Sync failed.");
+  }
+
+  icon.style.animation = "";
+  setTimeout(() => {
+    desc.textContent = "Push local changes to cloud";
+  }, 3000);
+});
+
+E($("pwaLinkBtn"), "click", () => {
+  window.open(`${API_BASE}`, "_blank");
+});
+
+
+E($("manageSubBtn"), "click", () => {
+  if (!isLoggedIn) {
+    // If they aren't logged in, show the login guide
+    $("proceedLoginBtn").style.display = "block";
+    $("guideModal").classList.add("on");
+    closeSettingsPanel();
+    return;
+  }
+
+  // Open the pricing page
+  window.open(`${API_BASE}/pricing`, "_blank");
+  closeSettingsPanel();
 });

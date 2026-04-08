@@ -6,7 +6,7 @@ const FOLDERS_KEY = "cn_user_folders";
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: "save-highlight",
-    title: "Save Highlight to ContextNote",
+    title: "Save Highlight to Kontexa",
     contexts: ["selection", "page", "video"],
   });
 });
@@ -301,7 +301,7 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
         if (isProUser && media.timestamp) {
           metaHtml = `<span style="background:#eef2ff;color:#4f46e5;padding:4px 8px;border-radius:4px;font-size:12px;font-weight:bold;display:inline-flex;align-items:center;gap:4px;border:1px solid #c7d2fe;">⏱️ ${media.timestamp}</span>`;
         } else {
-          metaHtml = `<span onclick="alert('👑 Unlock YouTube Timestamps with ContextNote Pro!')" style="background:#fff1f2;color:#e11d48;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:bold;display:inline-flex;align-items:center;border:1px solid #fecdd3;cursor:pointer;">👑 Pro Timestamp</span>`;
+          metaHtml = `<span onclick="alert('👑 Unlock YouTube Timestamps with Kontexa Pro!')" style="background:#fff1f2;color:#e11d48;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:bold;display:inline-flex;align-items:center;border:1px solid #fecdd3;cursor:pointer;">👑 Pro Timestamp</span>`;
         }
       }
 

@@ -10,6 +10,7 @@
       /* ══════════════════════════════════════════
          THEME VARIABLES (synced with dashboard)
       ══════════════════════════════════════════ */
+      @import url("https://fonts.cdnfonts.com/css/neoneon");
       :root,
       [data-theme="indigo"] {
         --bg: #f6f7f9;
@@ -193,7 +194,52 @@
         height: 13px;
         fill: #fff;
       }
+      /* Ensure your Neoneon font is loaded here */
+      .brand-logo {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        background-color: #5459e8;
+        /* UPDATED: Matches the 40% fold size exactly */
+        /* (100% - 40% = 60%) -> 60% 0, 100% 40% */
+        clip-path: polygon(0 0, 60% 0, 100% 40%, 100% 100%, 0 100%);
+        border-radius: 6px; /* Reduced slightly, 10px is too much for a 32px box */
+        overflow: hidden;
+      }
 
+      /* The Folded Flap */
+      .brand-logo::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 35%;
+        height: 35%;
+        background-color: rgba(
+          0,
+          0,
+          0,
+          0.25
+        ); /* Slightly darker for better contrast */
+        border-bottom-left-radius: 3px;
+        z-index: 2;
+      }
+
+      .brand-text {
+        font-family: "Neoneon", sans-serif;
+        color: #fff;
+        font-size: 22px; /* 25px is often too big for 32px container with padding */
+        line-height: 1;
+        position: relative;
+        z-index: 1;
+        /* Nudge the K away from the fold */
+        margin-top: 4px;
+        margin-left: -2px;
+        text-shadow: 0 0 2px rgba(255, 255, 255, 0.5);
+      }
       .brand-name {
         font-size: 15px;
         font-weight: 700;
@@ -864,13 +910,9 @@
     <div class="header">
       <div class="brand">
         <div class="brand-logo">
-          <svg viewBox="0 0 24 24">
-            <path
-              d="M9 12h6M9 16h6M7 8h10M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"
-            />
-          </svg>
+          <span class="brand-text">K</span>
         </div>
-        <span class="brand-name">Context<span>Note</span></span>
+        <span class="brand-name">Kontexa</span>
       </div>
 
       <div class="header-right">

@@ -1,6 +1,7 @@
 /* ══════════════════════════════════════════════════════════
    CSS VARIABLES — ALL THEMES
 ══════════════════════════════════════════════════════════ */
+@import url("https://fonts.cdnfonts.com/css/neoneon");
 :root {
   --bg: #f6f7f9;
   --sur: #ffffff;

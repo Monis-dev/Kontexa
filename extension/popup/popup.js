@@ -2,7 +2,11 @@ const STORAGE_KEY = "context_notes_data";
 const FOLDERS_KEY = "cn_user_folders";
 const SETTINGS_KEY = "cn_show_highlights";
 const THEME_KEY = "cn_theme";
-const API_BASE = "https://context-notes.onrender.com";
+const API_BASE = "https://www.kontexa.online";
+
+// Client-side field limits — mirrors backend constants
+const MAX_TITLE_LEN = 255;
+const MAX_CONTENT_LEN = 100_000;
 
 let cachedNotes = null;
 let notesByUrlCache = null;
@@ -30,6 +34,15 @@ chrome.storage.onChanged.addListener((changes) => {
   if (changes[THEME_KEY]) applyThemeToPopup(changes[THEME_KEY].newValue);
   if (changes[FOLDERS_KEY]) loadFolderDropdown();
 });
+
+/* ═══════════════════════════════════════
+   UNIQUE NOTE ID — standardised, collision-safe
+   FIX: was just Date.now().toString() with no random suffix,
+   meaning two saves in the same millisecond get the same id.
+═══════════════════════════════════════ */
+function generateNoteId(prefix = "note") {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
 
 /* ═══════════════════════════════════════
    FOLDER DROPDOWN
@@ -85,9 +98,7 @@ function setupGeneralNoteToggle() {
   const folderSelect = document.getElementById("folderSelect");
   if (!row) return;
 
-  // Show the row
   row.style.display = "flex";
-  // Start with folder row hidden
   if (folderRow) folderRow.style.display = "none";
 
   let isGeneral = false;
@@ -96,16 +107,11 @@ function setupGeneralNoteToggle() {
     isGeneral = !isGeneral;
     switchEl.style.background = isGeneral ? "var(--acc)" : "var(--bdr)";
     thumbEl.style.left = isGeneral ? "15px" : "2px";
-
-    if (folderRow) {
-      folderRow.style.display = isGeneral ? "flex" : "none";
-    }
-
+    if (folderRow) folderRow.style.display = isGeneral ? "flex" : "none";
     if (isGeneral && folderSelect) {
       const first = [...folderSelect.options].find((o) => o.value !== "");
       if (first) folderSelect.value = first.value;
     }
-
     row.dataset.isGeneral = isGeneral;
   });
 }
@@ -138,7 +144,7 @@ function setupHighlightToggle() {
 }
 
 /* ═══════════════════════════════════════
-   DASHBOARD LINK (no pop-out)
+   DASHBOARD LINK
 ═══════════════════════════════════════ */
 function setupDashboardLink() {
   const dashBtn = document.getElementById("openDashboard");
@@ -176,6 +182,20 @@ function setupSaveButton() {
       return;
     }
 
+    // FIX: client-side length validation before writing to storage / syncing
+    if (title.length > MAX_TITLE_LEN) {
+      alert(`Title too long (max ${MAX_TITLE_LEN} characters).`);
+      saveBtn.disabled = false;
+      return;
+    }
+    if (content.length > MAX_CONTENT_LEN) {
+      alert(
+        `Content too long (max ${MAX_CONTENT_LEN.toLocaleString()} characters).`,
+      );
+      saveBtn.disabled = false;
+      return;
+    }
+
     const [tab] = await chrome.tabs.query({
       active: true,
       currentWindow: true,
@@ -208,7 +228,9 @@ function setupSaveButton() {
         : new URL(tab.url).hostname || "Unknown";
 
     const note = {
-      id: Date.now().toString(),
+      // FIX: was Date.now().toString() — no entropy, collision risk on rapid save.
+      // Now uses the same standardised generator as dashboard.js.
+      id: generateNoteId("popup"),
       url: noteUrl,
       domain: noteDomain,
       title,
@@ -224,7 +246,6 @@ function setupSaveButton() {
     cachedNotes = notes;
     await chrome.storage.local.set({ [STORAGE_KEY]: notes });
 
-    // Visual feedback on button
     saveBtn.innerHTML = `
       <svg viewBox="0 0 24 24" width="14" height="14" style="stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;">
         <polyline points="20 6 9 17 4 12"/>
@@ -258,7 +279,6 @@ async function loadPageNotes() {
   const label = document.getElementById("notesLabel");
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-
   if (!tab?.url) {
     notesList.innerHTML = emptyState("Cannot read notes on this page.");
     return;
@@ -273,7 +293,6 @@ async function loadPageNotes() {
     (n) => n.url !== "general://notes",
   );
 
-  // Update label with count
   if (label) {
     const domain = tab.url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0];
     const short = domain.length > 28 ? domain.slice(0, 28) + "…" : domain;
@@ -298,13 +317,16 @@ async function loadPageNotes() {
       card.style.animationDelay = `${i * 45}ms`;
 
       const hasFooter = n.pinned || n.folder;
-
       card.innerHTML = `
         <div class="note-card-top">
           <div class="note-title-row">
             <div class="note-title">${esc(n.title)}</div>
             <div class="note-actions">
-              <button class="btn-edit" data-id="${n.id}" data-title="${esc(n.title)}" data-content="${esc(n.content)}" title="Edit">
+              <button class="btn-edit"
+                data-id="${n.id}"
+                data-title="${esc(n.title)}"
+                data-content="${esc(n.content)}"
+                title="Edit">
                 <svg viewBox="0 0 24 24" width="10" height="10" style="stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;pointer-events:none;">
                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -317,8 +339,8 @@ async function loadPageNotes() {
               </button>
             </div>
           </div>
-          ${n.selection ? `<div class="note-selection" style="white-space: pre-wrap; word-break: break-word;">"${esc(n.selection)}"</div>` : ""}
-          ${n.content ? `<div class="note-content" style="white-space: pre-wrap; word-break: break-word;">${esc(n.content)}</div>` : ""}
+          ${n.selection ? `<div class="note-selection" style="white-space:pre-wrap;word-break:break-word;">"${esc(n.selection)}"</div>` : ""}
+          ${n.content ? `<div class="note-content"   style="white-space:pre-wrap;word-break:break-word;">${esc(n.content)}</div>` : ""}
         </div>
         ${
           hasFooter
@@ -360,10 +382,25 @@ function setupEditDeleteHandler() {
 
     if (editBtn) {
       const id = editBtn.dataset.id;
+
+      // FIX: validate prompt input length before writing back to storage.
+      // Previously there was no length check — a very long title or content
+      // would be stored and then silently truncated by the backend on sync.
       const title = prompt("Edit title:", editBtn.dataset.title);
       if (title === null) return;
+      if (title.trim().length > MAX_TITLE_LEN) {
+        alert(`Title too long (max ${MAX_TITLE_LEN} characters).`);
+        return;
+      }
+
       const content = prompt("Edit content:", editBtn.dataset.content);
       if (content === null) return;
+      if (content.trim().length > MAX_CONTENT_LEN) {
+        alert(
+          `Content too long (max ${MAX_CONTENT_LEN.toLocaleString()} characters).`,
+        );
+        return;
+      }
 
       let notes = await getNotes();
       const note = notes.find((n) => String(n.id) === String(id));
@@ -402,7 +439,6 @@ if (aiGenerateBtn) {
 
     const isYouTube = tab.url.includes("youtube.com");
 
-    // Lock UI
     aiGenerateBtn.disabled = true;
     aiNotesContainer.style.display = "none";
     aiNotesContainer.innerHTML = "";
@@ -474,6 +510,7 @@ if (aiGenerateBtn) {
       } catch (e) {
         return resetAiBtn("❌ Extension lacks permission for this page.");
       }
+
       if (pageText.trim().length < 50)
         return resetAiBtn("❌ Not enough text on this page.");
       setAiBtnState("✨ Generating notes…");
@@ -488,7 +525,6 @@ if (aiGenerateBtn) {
       return resetAiBtn("❌ AI returned no notes. Please try again.");
     }
 
-    // Render review cards
     aiGenerateBtn.style.display = "none";
     aiNotesContainer.style.display = "block";
 
@@ -496,7 +532,6 @@ if (aiGenerateBtn) {
       ? "🎬 Video Notes Preview"
       : "✨ AI Generated Concepts";
 
-    // Header
     const headerEl = document.createElement("div");
     headerEl.className = "ai-preview-header";
     headerEl.innerHTML = `
@@ -504,7 +539,6 @@ if (aiGenerateBtn) {
       <button class="ai-cancel-btn" id="cancelAiBtn">Cancel</button>`;
     aiNotesContainer.appendChild(headerEl);
 
-    // Note cards
     generatedNotes.forEach((n, idx) => {
       const card = document.createElement("div");
       card.className = "ai-review-card";
@@ -524,27 +558,28 @@ if (aiGenerateBtn) {
       aiNotesContainer.appendChild(card);
     });
 
-    // Save button
-    const saveBtn = document.createElement("button");
-    saveBtn.className = "ai-save-btn";
-    saveBtn.innerHTML = `
+    const saveBtnEl = document.createElement("button");
+    saveBtnEl.className = "ai-save-btn";
+    saveBtnEl.innerHTML = `
       <svg viewBox="0 0 24 24" width="13" height="13" style="stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;">
         <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
         <polyline points="17 21 17 13 7 13 7 21"/>
         <polyline points="7 3 7 8 15 8"/>
       </svg>
       Save Selected Notes`;
-    aiNotesContainer.appendChild(saveBtn);
+    aiNotesContainer.appendChild(saveBtnEl);
 
-    saveBtn.addEventListener("click", async () => {
-      saveBtn.disabled = true;
-      saveBtn.innerHTML = "Saving…";
+    saveBtnEl.addEventListener("click", async () => {
+      saveBtnEl.disabled = true;
+      saveBtnEl.innerHTML = "Saving…";
       const folderName = isYouTube ? "YouTube Notes" : null;
 
       const notesToSave = generatedNotes
         .filter((_, idx) => document.getElementById(`ai-chk-${idx}`)?.checked)
         .map((n, idx) => ({
-          id: `${Date.now()}-${Math.floor(Math.random() * 10000)}-${idx}`,
+          // FIX: standardised ID with entropy — was Date.now()-idx which still
+          // risks collision and produces non-unique IDs across sessions.
+          id: generateNoteId("ai"),
           url: tab.url,
           domain: new URL(tab.url).hostname || "Unknown",
           title: (isYouTube ? "🎬 " : "✨ ") + (n.title || "AI Note"),
@@ -577,11 +612,10 @@ if (aiGenerateBtn) {
       aiNotesContainer.innerHTML = "";
       aiGenerateBtn.style.display = "flex";
       aiGenerateBtn.disabled = false;
-      resetAiBtn(null); // restore original text
+      resetAiBtn(null);
       loadPageNotes();
     });
 
-    // Cancel
     document.getElementById("cancelAiBtn").addEventListener("click", () => {
       aiNotesContainer.style.display = "none";
       aiNotesContainer.innerHTML = "";
@@ -656,8 +690,8 @@ function showNoTranscriptUI(tab) {
 
       if (pageText.trim().length < 50)
         return resetAiBtn("❌ Not enough page text.");
-
       setAiBtnState("✨ Generating notes…");
+
       let fallbackNotes = null;
       try {
         fallbackNotes = await AIService.generateNotesFromPage(pageText);
@@ -668,7 +702,6 @@ function showNoTranscriptUI(tab) {
       if (!Array.isArray(fallbackNotes) || fallbackNotes.length === 0)
         return resetAiBtn("❌ AI returned no notes.");
 
-      // Re-use the main flow — reset btn, let user click again with page text ready
       resetAiBtn(null);
     });
 
