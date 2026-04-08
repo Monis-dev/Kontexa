@@ -56,7 +56,7 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
         "keepalives_count": 5
     }
 }
-# db = SQLAlchemy(app)
+db = SQLAlchemy(app)
 
 # ─── Razorpay ─────────────────────────────────────────────────────────────────
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
@@ -761,3 +761,9 @@ def rename_folder():
         db.session.rollback()
         app.logger.error(f"rename_folder error: {e}")
         return jsonify({"error": "An internal error occurred"}), 500
+    
+if __name__ == "__main__":
+    # Render provides the PORT env var; we must use it
+    port = int(os.environ.get("PORT", 5000))
+    # '0.0.0.0' is required for Render to see the app
+    app.run(host='0.0.0.0', port=port)
