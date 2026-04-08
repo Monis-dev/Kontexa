@@ -56,7 +56,7 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
         "keepalives_count": 5
     }
 }
-db = SQLAlchemy(app)
+# db = SQLAlchemy(app)
 
 # ─── Razorpay ─────────────────────────────────────────────────────────────────
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
