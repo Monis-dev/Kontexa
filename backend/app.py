@@ -763,7 +763,15 @@ def rename_folder():
         return jsonify({"error": "An internal error occurred"}), 500
     
 if __name__ == "__main__":
-    # Render provides the PORT env var; we must use it
     port = int(os.environ.get("PORT", 5000))
-    # '0.0.0.0' is required for Render to see the app
+    
+    # Run DB init inside the app context so it doesn't 
+    # block the server process from initializing
+    with app.app_context():
+        try:
+            db.create_all()
+            print("Database tables verified.")
+        except Exception as e:
+            print(f"Database connection skipped or failed: {e}")
+
     app.run(host='0.0.0.0', port=port)
