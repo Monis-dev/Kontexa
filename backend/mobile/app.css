@@ -273,18 +273,29 @@ body {
   min-width: 0;
 }
 .logo-mark {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  flex-shrink: 0;
-  background: linear-gradient(135deg, var(--logo1), var(--logo2));
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
-  transition:
-    background 0.3s,
-    transform 0.2s;
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, var(--logo1), var(--logo2));
+  clip-path: polygon(0 0, 60% 0, 100% 40%, 100% 100%, 0 100%);
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  animation: logoBg 4s ease-in-out infinite;
+}
+.logo-mark::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 35%;
+  height: 35%;
+  background-color: rgba(0, 0, 0, 0.25);
+  border-bottom-left-radius: 3px;
+  z-index: 2;
 }
 .logo-mark:active {
   transform: scale(0.92);
