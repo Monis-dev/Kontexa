@@ -44,10 +44,17 @@ app.config["SQLALCHEMY_DATABASE_URI"] = uri
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_pre_ping": True,
-    "pool_size": 10,
-    "max_overflow": 20,
+    "pool_size": 2,           
+    "max_overflow": 5,        
     "pool_recycle": 300,
-    "connect_args": {"sslmode": "require"}
+    "pool_timeout": 30,       
+    "connect_args": {
+        "sslmode": "require",
+        "keepalives": 1,
+        "keepalives_idle": 30,
+        "keepalives_interval": 10,
+        "keepalives_count": 5
+    }
 }
 db = SQLAlchemy(app)
 
@@ -63,6 +70,7 @@ EXTENSION_ID     = os.getenv("EXTENSION_ID", "")
 EXTENSION_ID_DEV = os.getenv("EXTENSION_ID_DEV", "")
 
 _allowed_origins = [
+    "https://www.kontexa.online",
     "https://kontexa.online",
     "http://127.0.0.1:5000",
     "http://localhost:5000",
@@ -153,25 +161,25 @@ def home():
     return render_template("index.html")
 
 
-# ─── Self-ping (keep-alive for Render free tier) ──────────────────────────────
-# Prefer an external uptime monitor (e.g. UptimeRobot) over this thread.
-# If you upgrade to a paid Render plan, delete this block entirely.
-import threading
-import requests
-import time
+# # ─── Self-ping (keep-alive for Render free tier) ──────────────────────────────
+# # Prefer an external uptime monitor (e.g. UptimeRobot) over this thread.
+# # If you upgrade to a paid Render plan, delete this block entirely.
+# import threading
+# import requests
+# import time
 
-_stop_ping = threading.Event()
+# _stop_ping = threading.Event()
 
-def self_ping():
-    while not _stop_ping.wait(600):   # 10 minutes; stops cleanly on shutdown
-        try:
-            requests.get("https://kontexa.online/weakUp", timeout=10)
-            app.logger.info("Self-ping OK")
-        except Exception as e:
-            app.logger.warning(f"Self-ping failed: {e}")
+# def self_ping():
+#     while not _stop_ping.wait(600):   # 10 minutes; stops cleanly on shutdown
+#         try:
+#             requests.get("https://kontexa.online/weakUp", timeout=10)
+#             app.logger.info("Self-ping OK")
+#         except Exception as e:
+#             app.logger.warning(f"Self-ping failed: {e}")
 
-ping_thread = threading.Thread(target=self_ping, daemon=True)
-ping_thread.start()
+# ping_thread = threading.Thread(target=self_ping, daemon=True)
+# ping_thread.start()
 
 
 # ─── Mobile PWA ───────────────────────────────────────────────────────────────
