@@ -177,7 +177,7 @@ def home():
 #             app.logger.info("Self-ping OK")
 #         except Exception as e:
 #             app.logger.warning(f"Self-ping failed: {e}")
-
+ 
 # ping_thread = threading.Thread(target=self_ping, daemon=True)
 # ping_thread.start()
 
