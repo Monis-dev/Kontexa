@@ -160,6 +160,9 @@ def wakeUp():
 def home():
     return render_template("index.html")
 
+@app.route('/sitemap.xml')
+def static_from_root():
+    return send_from_directory(app.static_folder, 'sitemap.xml')
 
 # # ─── Self-ping (keep-alive for Render free tier) ──────────────────────────────
 # # Prefer an external uptime monitor (e.g. UptimeRobot) over this thread.
