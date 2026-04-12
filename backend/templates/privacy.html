@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Privacy Policy — Kontexa</title>
+    <meta name="description" content="Kontexa Privacy Policy — how we handle your data." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600&display=swap" rel="stylesheet" />
+    <style>
+      @import url("https://fonts.cdnfonts.com/css/neoneon");
+
+      :root {
+        --ink: #0d0f12;
+        --ink2: #3a3d45;
+        --muted: #767b87;
+        --surface: #ffffff;
+        --bg: #f7f7f5;
+        --bdr: #e8e8e4;
+        --acc: #4f46e5;
+        --acc-light: #eef2ff;
+      }
+
+      *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+
+      body {
+        font-family: "DM Sans", sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        line-height: 1.7;
+        overflow-x: hidden;
+      }
+
+      /* ── NAV ── */
+      nav {
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 40px;
+        height: 64px;
+        background: rgba(247,247,245,.92);
+        backdrop-filter: blur(18px);
+        border-bottom: 1px solid var(--bdr);
+      }
+
+      .nav-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        text-decoration: none;
+      }
+
+      .nav-logo-mark {
+        width: 34px;
+        height: 34px;
+        background: linear-gradient(135deg, #6366f1, #4f46e5);
+        clip-path: polygon(0 0, 62% 0, 100% 38%, 100% 100%, 0 100%);
+        display: grid;
+        place-items: center;
+        border-radius: 6px;
+        flex-shrink: 0;
+      }
+
+      .nav-logo-mark span {
+        font-family: "Neoneon", sans-serif;
+        color: #fff;
+        font-size: 15px;
+        line-height: 1;
+        margin-top: 3px;
+        margin-left: -1px;
+      }
+
+      .nav-logo-name {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--ink);
+        letter-spacing: -0.3px;
+      }
+
+      .nav-back {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--muted);
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: color 0.15s;
+      }
+
+      .nav-back:hover { color: var(--acc); }
+
+      /* ── PAGE ── */
+      .page {
+        max-width: 740px;
+        margin: 0 auto;
+        padding: 110px 24px 100px;
+      }
+
+      .page-label {
+        font-size: 11.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--acc);
+        margin-bottom: 14px;
+      }
+
+      .page-title {
+        font-family: "Instrument Serif", serif;
+        font-size: clamp(36px, 5vw, 54px);
+        line-height: 1.08;
+        letter-spacing: -1px;
+        color: var(--ink);
+        margin-bottom: 12px;
+      }
+
+      .page-meta {
+        font-size: 13.5px;
+        color: var(--muted);
+        margin-bottom: 56px;
+        padding-bottom: 32px;
+        border-bottom: 1px solid var(--bdr);
+      }
+
+      /* ── SECTIONS ── */
+      .policy-section {
+        margin-bottom: 48px;
+      }
+
+      .policy-section h2 {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--ink);
+        letter-spacing: -0.3px;
+        margin-bottom: 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .policy-section h2 .num {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        background: var(--acc-light);
+        border: 1px solid rgba(79,70,229,.2);
+        display: grid;
+        place-items: center;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--acc);
+        flex-shrink: 0;
+      }
+
+      .policy-section p {
+        font-size: 15px;
+        color: var(--ink2);
+        line-height: 1.8;
+        margin-bottom: 14px;
+      }
+
+      .policy-section p:last-child { margin-bottom: 0; }
+
+      .policy-section ul {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+
+      .policy-section ul li {
+        font-size: 15px;
+        color: var(--ink2);
+        padding-left: 22px;
+        position: relative;
+        line-height: 1.7;
+      }
+
+      .policy-section ul li::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 10px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--acc);
+        opacity: 0.5;
+      }
+
+      /* ── HIGHLIGHT BOX ── */
+      .highlight-box {
+        background: var(--acc-light);
+        border: 1px solid rgba(79,70,229,.18);
+        border-left: 4px solid var(--acc);
+        border-radius: 0 12px 12px 0;
+        padding: 18px 22px;
+        margin-bottom: 48px;
+        font-size: 15px;
+        color: var(--ink2);
+        line-height: 1.75;
+      }
+
+      .highlight-box strong {
+        color: var(--acc);
+        font-weight: 700;
+      }
+
+      /* ── CONTACT CARD ── */
+      .contact-card {
+        background: var(--surface);
+        border: 1.5px solid var(--bdr);
+        border-radius: 16px;
+        padding: 28px 32px;
+        margin-top: 56px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+
+      .contact-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        background: var(--acc-light);
+        border: 1px solid rgba(79,70,229,.2);
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        font-size: 22px;
+      }
+
+      .contact-text { flex: 1; }
+
+      .contact-text h3 {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--ink);
+        margin-bottom: 4px;
+      }
+
+      .contact-text p {
+        font-size: 13.5px;
+        color: var(--muted);
+        margin: 0;
+      }
+
+      .contact-text a {
+        color: var(--acc);
+        text-decoration: none;
+        font-weight: 600;
+      }
+
+      .contact-text a:hover { text-decoration: underline; }
+
+      /* ── DIVIDER ── */
+      .divider {
+        height: 1px;
+        background: linear-gradient(90deg, transparent, var(--bdr), transparent);
+        margin: 40px 0;
+      }
+
+      /* ── FOOTER ── */
+      footer {
+        background: var(--ink);
+        padding: 32px 40px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .footer-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .footer-logo-mark {
+        width: 28px; height: 28px;
+        background: linear-gradient(135deg, #6366f1, #4f46e5);
+        clip-path: polygon(0 0, 62% 0, 100% 38%, 100% 100%, 0 100%);
+        display: grid;
+        place-items: center;
+        border-radius: 5px;
+      }
+
+      .footer-logo-mark span {
+        font-family: "Neoneon", sans-serif;
+        color: #fff;
+        font-size: 12px;
+        line-height: 1;
+      }
+
+      .footer-logo-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: rgba(255,255,255,.7);
+      }
+
+      .footer-copy { font-size: 13px; color: rgba(255,255,255,.3); }
+
+      .footer-links { display: flex; gap: 24px; }
+
+      .footer-links a {
+        font-size: 13px;
+        color: rgba(255,255,255,.4);
+        text-decoration: none;
+        transition: color 0.15s;
+      }
+
+      .footer-links a:hover { color: rgba(255,255,255,.8); }
+
+      @media (max-width: 600px) {
+        nav { padding: 0 20px; }
+        footer { flex-direction: column; text-align: center; }
+        .contact-card { flex-direction: column; }
+      }
+    </style>
+  </head>
+  <body>
+
+    <!-- ── NAV ── -->
+    <nav>
+      <a href="/" class="nav-logo">
+        <div class="nav-logo-mark"><span>K</span></div>
+        <span class="nav-logo-name">Kontexa</span>
+      </a>
+      <a href="/" class="nav-back">← Back to Home</a>
+    </nav>
+
+    <!-- ── CONTENT ── -->
+    <div class="page">
+
+      <div class="page-label">Legal</div>
+      <h1 class="page-title">Privacy Policy</h1>
+      <p class="page-meta">Last updated: April 2025 &nbsp;·&nbsp; Effective immediately</p>
+
+      <div class="highlight-box">
+        <strong>Short version:</strong> Your notes stay on your device by default. We never sell your data. Cloud sync is optional and only happens if you choose to log in. Your Gemini API key is stored locally — we never see it.
+      </div>
+
+      <!-- 1 -->
+      <div class="policy-section">
+        <h2><span class="num">1</span> What We Collect</h2>
+        <p>Kontexa is designed to collect as little as possible. Here is exactly what we store:</p>
+        <ul>
+          <li><strong>Locally on your device:</strong> All notes, highlights, screenshots, folders, and settings are saved to your browser's local storage by default. No account needed.</li>
+          <li><strong>If you sign in with Google:</strong> We receive your name and email address from Google OAuth. We store your email to identify your account and link your synced notes.</li>
+          <li><strong>If you use cloud sync (Pro):</strong> Your notes are stored on our servers so you can access them across devices. This is strictly opt-in.</li>
+          <li><strong>Feedback you submit:</strong> If you send feedback through the app, we store your message and email so we can respond.</li>
+        </ul>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 2 -->
+      <div class="policy-section">
+        <h2><span class="num">2</span> What We Never Collect</h2>
+        <ul>
+          <li>We never sell your data to third parties — ever.</li>
+          <li>We never use your notes to train AI models.</li>
+          <li>We never read your notes for advertising purposes.</li>
+          <li>We never store your Gemini API key — it lives only in your browser's local storage.</li>
+          <li>We never track your browsing history or the pages you visit.</li>
+        </ul>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 3 -->
+      <div class="policy-section">
+        <h2><span class="num">3</span> How We Use Your Data</h2>
+        <p>The data we collect is used only for:</p>
+        <ul>
+          <li>Syncing your notes across your devices (Pro users only)</li>
+          <li>Identifying your account when you log in</li>
+          <li>Responding to feedback you send us</li>
+          <li>Understanding how many users are using the service (aggregate counts only — no personal tracking)</li>
+        </ul>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 4 -->
+      <div class="policy-section">
+        <h2><span class="num">4</span> AI Assistant & Your Notes</h2>
+        <p>The AI assistant in Kontexa uses your own Google Gemini API key. When you ask a question, your notes are sent directly from your browser to Google's Gemini API.</p>
+        <ul>
+          <li>Your notes go to Google's API — not to our servers.</li>
+          <li>Your API key is stored only in your browser's local storage.</li>
+          <li>We never see, store, or log your AI conversations.</li>
+          <li>Google's use of data sent to Gemini is governed by <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's Privacy Policy</a>.</li>
+        </ul>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 5 -->
+      <div class="policy-section">
+        <h2><span class="num">5</span> Data Storage & Security</h2>
+        <p>Local notes are stored in your browser's <code>chrome.storage.local</code> — accessible only to the Kontexa extension on your device.</p>
+        <p>Cloud notes (Pro) are stored on our servers hosted on Render. We use HTTPS for all data in transit. While we take reasonable precautions, no cloud service can guarantee 100% security. We recommend exporting your notes to Markdown periodically as a local backup.</p>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 6 -->
+      <div class="policy-section">
+        <h2><span class="num">6</span> Data Retention & Deletion</h2>
+        <p>You are in full control of your data:</p>
+        <ul>
+          <li><strong>Local notes:</strong> Deleted the moment you clear your browser storage or uninstall the extension.</li>
+          <li><strong>Cloud notes:</strong> When you log out, you can choose to wipe local data. To permanently delete your cloud data, email us and we will remove it within 7 days.</li>
+          <li><strong>Account deletion:</strong> Email us to request full account deletion. All associated data will be permanently removed.</li>
+        </ul>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 7 -->
+      <div class="policy-section">
+        <h2><span class="num">7</span> Third-Party Services</h2>
+        <p>Kontexa uses the following third-party services:</p>
+        <ul>
+          <li><strong>Google OAuth</strong> — for optional sign-in. Governed by Google's Privacy Policy.</li>
+          <li><strong>Google Gemini API</strong> — for the AI assistant, using your own key.</li>
+          <li><strong>Render</strong> — for backend hosting and database storage.</li>
+          <li><strong>Cloudflare</strong> — for DNS and traffic routing.</li>
+        </ul>
+        <p>We do not use any advertising networks, analytics trackers, or third-party data brokers.</p>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 8 -->
+      <div class="policy-section">
+        <h2><span class="num">8</span> Children's Privacy</h2>
+        <p>Kontexa is not directed at children under 13. We do not knowingly collect personal information from children. If you believe a child has provided us with personal data, please contact us and we will delete it promptly.</p>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 9 -->
+      <div class="policy-section">
+        <h2><span class="num">9</span> Changes to This Policy</h2>
+        <p>If we make material changes to this policy, we will update the "Last updated" date at the top of this page. For significant changes, we will notify Pro users via email. Continued use of Kontexa after changes means you accept the updated policy.</p>
+      </div>
+
+      <!-- CONTACT -->
+      <div class="contact-card">
+        <div class="contact-icon">✉️</div>
+        <div class="contact-text">
+          <h3>Questions about your privacy?</h3>
+          <p>Email us at <a href="mailto:privacy@kontexa.online">privacy@kontexa.online</a> — we respond within 48 hours.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── FOOTER ── -->
+    <footer>
+      <div class="footer-logo">
+        <div class="footer-logo-mark"><span>K</span></div>
+        <span class="footer-logo-name">Kontexa</span>
+      </div>
+      <div class="footer-copy">© 2025 Kontexa. All rights reserved.</div>
+      <div class="footer-links">
+        <a href="/privacy">Privacy Policy</a>
+        <a href="#">Terms</a>
+        <a href="#">Support</a>
+      </div>
+    </footer>
+
+  </body>
+</html>

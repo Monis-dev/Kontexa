@@ -13,7 +13,10 @@ from authlib.integrations.flask_client import OAuth
 from flask_cors import CORS
 from dotenv import load_dotenv
 from markupsafe import escape
-# from ai_agent import get_ai_answer, get_ai_summary
+
+from datetime import datetime, timedelta
+from markupsafe import escape
+
 
 load_dotenv()
 app = Flask(__name__)
@@ -141,6 +144,15 @@ class Note(db.Model):
     deleted    = db.Column(db.Boolean, default=False)
     deleted_at = db.Column(db.DateTime, nullable=True)
 
+class Feedback(db.Model):
+    __tablename__ = 'feedback'
+    id         = db.Column(db.Integer, primary_key=True)
+    user_id    = db.Column(db.String, db.ForeignKey('users.id'), nullable=True)
+    email      = db.Column(db.String(255), nullable=True)
+    type       = db.Column(db.String(50), default='feature')
+    subject    = db.Column(db.String(255), nullable=True)
+    message    = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -160,9 +172,18 @@ def wakeUp():
 def home():
     return render_template("index.html")
 
+@app.route('/privacy')
+def privacy():
+    return send_from_directory('.', 'privacy.html')
+
 @app.route('/sitemap.xml')
 def static_from_root():
     return send_from_directory(app.static_folder, 'sitemap.xml')
+
+@app.route("/api/user-count")
+def user_count():
+    count = db.session.query(User).count()  # adjust to your ORM
+    return jsonify({"count": count})
 
 # # ─── Self-ping (keep-alive for Render free tier) ──────────────────────────────
 # # Prefer an external uptime monitor (e.g. UptimeRobot) over this thread.
@@ -424,26 +445,53 @@ def time_travel(days_left):
 
 # ─── FeedBack ────────────────────────────────────────────────────────────────
 
-# @app.route('/api/feedback', methods=['POST'])
-# def submit_feedback():
-#     data       = request.get_json(silent=True) or {}
-#     fb_type    = escape(data.get('type',    'other'))
-#     subject    = escape(data.get('subject', ''))
-#     message    = escape(data.get('message', ''))
+@app.route('/api/feedback', methods=['POST'])
+def submit_feedback():
+    data    = request.get_json(silent=True) or {}
+    fb_type = escape(data.get('type', 'feature'))
+    subject = escape(data.get('subject', ''))
+    message = escape(data.get('message', ''))
 
-#     if not message:
-#         return jsonify({'error': 'Message required'}), 400
+    if not message:
+        return jsonify({'error': 'Message is required'}), 400
 
-#     feedback = Feedback(
-#         user_id = session['user_id'],
-#         type    = fb_type,
-#         subject = subject,
-#         message = message,
-#     )
-#     db.session.add(feedback)
-#     db.session.commit()
+    # Get email from session user if logged in
+    email = None
+    if 'user_id' in session:
+        user  = User.query.get(session['user_id'])
+        email = user.email if user else None
 
-#     return jsonify({'ok': True}), 201
+    feedback = Feedback(
+        user_id = session.get('user_id'),
+        email   = email,
+        type    = fb_type,
+        subject = subject,
+        message = message,
+    )
+    db.session.add(feedback)
+    db.session.commit()
+    return jsonify({'ok': True}), 201
+
+@app.route('/api/admin/feedback-digest', methods=['GET'])
+def feedback_digest():
+    # Simple secret check — add ADMIN_SECRET to your Render env vars
+    secret = request.args.get('secret')
+    if secret != os.environ.get('ADMIN_SECRET'):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    one_week_ago = datetime.utcnow() - timedelta(days=7)
+    rows = Feedback.query.filter(
+        Feedback.created_at >= one_week_ago
+    ).order_by(Feedback.created_at.desc()).all()
+
+    return jsonify([{
+        'id':         f.id,
+        'email':      f.email or 'Anonymous',
+        'type':       f.type,
+        'subject':    f.subject,
+        'message':    f.message,
+        'created_at': f.created_at.isoformat(),
+    } for f in rows])
 
 
 # ─── Notes API ────────────────────────────────────────────────────────────────
