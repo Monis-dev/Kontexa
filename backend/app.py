@@ -174,7 +174,7 @@ def home():
 
 @app.route('/privacy')
 def privacy():
-    return send_from_directory('.', 'privacy.html')
+    return render_template("privacy.html")
 
 @app.route('/sitemap.xml')
 def static_from_root():
