@@ -125,38 +125,31 @@
         border-bottom: 1px solid var(--bdr);
       }
 
-      .nav-logo {
+      .logo {
+        position: relative;
         display: flex;
         align-items: center;
-        gap: 10px;
-        text-decoration: none;
-      }
-
-      .nav-logo-mark {
-        width: 34px;
-        height: 34px;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
         background: linear-gradient(135deg, #6366f1, #4f46e5);
-        clip-path: polygon(0 0, 62% 0, 100% 38%, 100% 100%, 0 100%);
-        display: grid;
-        place-items: center;
+        clip-path: polygon(0 0, 60% 0, 100% 40%, 100% 100%, 0 100%);
         border-radius: 6px;
+        overflow: hidden;
         flex-shrink: 0;
+        animation: logoBg 4s ease-in-out infinite;
       }
 
-      .nav-logo-mark span {
-        font-family: "Neoneon", sans-serif;
-        color: #fff;
-        font-size: 15px;
-        line-height: 1;
-        margin-top: 3px;
-        margin-left: -1px;
-      }
-
-      .nav-logo-name {
-        font-size: 16px;
-        font-weight: 600;
-        color: var(--ink);
-        letter-spacing: -0.3px;
+      .logo::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 35%;
+        height: 35%;
+        background-color: rgba(0, 0, 0, 0.25);
+        border-bottom-left-radius: 3px;
+        z-index: 2;
       }
 
       .nav-links {
@@ -1684,8 +1677,20 @@
     <!-- ── NAVIGATION ── -->
     <nav>
       <a href="#" class="nav-logo">
-        <div class="nav-logo-mark">
-          <span>K</span>
+        <div class="logo" id="logo">
+          <span
+            style="
+              font-family: &quot;Neoneon&quot;, sans-serif;
+              color: #fff;
+              font-size: 16px;
+              line-height: 1;
+              position: relative;
+              z-index: 1;
+              margin-top: 4px;
+              margin-left: -2px;
+            "
+            >K</span
+          >
         </div>
         <span class="nav-logo-name">Kontexa</span>
       </a>
@@ -1704,7 +1709,10 @@
     <section class="hero">
       <div class="hero-layout">
         <div class="hero-logo-wrap">
-          <img src="{{ url_for('static', filename='images/Main-logo.png') }}" alt="Kontexa Logo">
+          <img
+            src="{{ url_for('static', filename='images/Main-logo.png') }}"
+            alt="Kontexa Logo"
+          />
         </div>
         <div class="hero-text">
           <h1 class="hero-headline">
@@ -2517,7 +2525,21 @@
     <!-- ── FOOTER ── -->
     <footer>
       <div class="footer-logo">
-        <div class="footer-logo-mark"><span>K</span></div>
+        <div class="logo">
+          <span
+            style="
+              font-family: &quot;Neoneon&quot;, sans-serif;
+              color: #fff;
+              font-size: 14px;
+              line-height: 1;
+              position: relative;
+              z-index: 1;
+              margin-top: 3px;
+              margin-left: -2px;
+            "
+            >K</span
+          >
+        </div>
         <span class="footer-logo-name">Kontexa</span>
       </div>
       <div class="footer-copy">© 2025 Kontexa. All rights reserved.</div>

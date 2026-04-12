@@ -14,8 +14,6 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 from markupsafe import escape
 
-from datetime import datetime, timedelta
-from markupsafe import escape
 
 
 load_dotenv()
