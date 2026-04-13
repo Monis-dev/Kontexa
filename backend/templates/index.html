@@ -17,7 +17,7 @@
     <link rel="canonical" href="https://kontexa.online/" />
     <meta
       property="og:title"
-      content="Kontexa — Capture Ideas, Remember Everything"
+      content="Kontexa - Capture Ideas, Remember Everything"
     />
     <meta
       property="og:description"
@@ -36,14 +36,12 @@
       content="Your personal knowledge layer for the web."
     />
     <meta name="twitter:image" content="https://kontexa.online/preview.png" />
-
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap"
       rel="stylesheet"
     />
-
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -55,7 +53,6 @@
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
       }
     </script>
-
     <style>
       @import url("https://fonts.cdnfonts.com/css/neoneon");
 
@@ -88,7 +85,6 @@
       html {
         scroll-behavior: smooth;
       }
-
       body {
         font-family: "DM Sans", sans-serif;
         background: var(--bg);
@@ -97,7 +93,6 @@
         overflow-x: hidden;
       }
 
-      /* subtle grain */
       body::before {
         content: "";
         position: fixed;
@@ -106,6 +101,33 @@
         pointer-events: none;
         z-index: 9999;
         opacity: 0.4;
+      }
+
+      /* ── LOGO ── */
+      .logo {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        background: linear-gradient(135deg, #6366f1, #4f46e5);
+        clip-path: polygon(0 0, 68% 0, 100% 32%, 100% 100%, 0 100%);
+        border-radius: 6px;
+        overflow: hidden;
+        flex-shrink: 0;
+        animation: logoBg 4s ease-in-out infinite;
+      }
+      .logo::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 32%;
+        height: 32%;
+        background: #312e81;
+        opacity: 0.55;
+        z-index: 2;
       }
 
       /* ── NAV ── */
@@ -124,41 +146,24 @@
         backdrop-filter: blur(18px);
         border-bottom: 1px solid var(--bdr);
       }
-
-      .logo {
-        position: relative;
+      .nav-logo {
         display: flex;
         align-items: center;
-        justify-content: center;
-        width: 32px;
-        height: 32px;
-        background: linear-gradient(135deg, #6366f1, #4f46e5);
-        clip-path: polygon(0 0, 60% 0, 100% 40%, 100% 100%, 0 100%);
-        border-radius: 6px;
-        overflow: hidden;
-        flex-shrink: 0;
-        animation: logoBg 4s ease-in-out infinite;
+        gap: 10px;
+        text-decoration: none;
       }
-
-      .logo::before {
-        content: "";
-        position: absolute;
-        top: 0;
-        right: 0;
-        width: 35%;
-        height: 35%;
-        background-color: rgba(0, 0, 0, 0.25);
-        border-bottom-left-radius: 3px;
-        z-index: 2;
+      .nav-logo-name {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--ink);
+        letter-spacing: -0.3px;
       }
-
       .nav-links {
         display: flex;
         align-items: center;
         gap: 28px;
         list-style: none;
       }
-
       .nav-links a {
         font-size: 14px;
         font-weight: 500;
@@ -166,11 +171,9 @@
         text-decoration: none;
         transition: color 0.15s;
       }
-
       .nav-links a:hover {
         color: var(--acc);
       }
-
       .nav-cta {
         background: var(--acc);
         color: white !important;
@@ -183,7 +186,6 @@
           background 0.15s,
           transform 0.15s;
       }
-
       .nav-cta:hover {
         background: #4338ca;
         transform: translateY(-1px);
@@ -201,7 +203,6 @@
         position: relative;
         overflow: hidden;
       }
-
       .hero::after {
         content: "";
         position: absolute;
@@ -217,7 +218,6 @@
         );
         pointer-events: none;
       }
-
       .hero-layout {
         display: flex;
         align-items: center;
@@ -227,11 +227,9 @@
         margin-bottom: 48px;
         animation: fadeUp 0.7s ease both;
       }
-
       .hero-logo-wrap {
         flex-shrink: 0;
       }
-
       .hero-logo-wrap img {
         width: clamp(200px, 26vw, 320px);
         border-radius: 28px;
@@ -239,12 +237,10 @@
         mix-blend-mode: multiply;
         filter: drop-shadow(0 20px 48px rgba(79, 70, 229, 0.18));
       }
-
       .hero-text {
         text-align: left;
         max-width: 460px;
       }
-
       .hero-headline {
         font-family: "Instrument Serif", serif;
         font-size: clamp(38px, 5.5vw, 68px);
@@ -254,12 +250,10 @@
         margin-bottom: 20px;
         animation: fadeUp 0.7s 0.1s ease both;
       }
-
       .hero-headline em {
         font-style: italic;
         color: var(--acc);
       }
-
       .hero-sub {
         font-size: 17px;
         color: var(--muted);
@@ -268,7 +262,6 @@
         margin-bottom: 36px;
         animation: fadeUp 0.7s 0.2s ease both;
       }
-
       .hero-actions {
         display: flex;
         gap: 12px;
@@ -276,7 +269,6 @@
         flex-wrap: wrap;
         animation: fadeUp 0.7s 0.3s ease both;
       }
-
       .btn-primary {
         display: inline-flex;
         align-items: center;
@@ -291,19 +283,16 @@
         transition: all 0.2s;
         box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);
       }
-
       .btn-primary:hover {
         background: #4338ca;
         transform: translateY(-2px);
         box-shadow: 0 8px 24px rgba(79, 70, 229, 0.35);
       }
-
       .btn-primary svg {
         width: 17px;
         height: 17px;
         fill: currentColor;
       }
-
       .btn-secondary {
         display: inline-flex;
         align-items: center;
@@ -318,13 +307,11 @@
         border: 1.5px solid var(--bdr);
         transition: all 0.2s;
       }
-
       .btn-secondary:hover {
         border-color: var(--acc);
         color: var(--acc);
         transform: translateY(-2px);
       }
-
       .hero-trust {
         display: flex;
         align-items: center;
@@ -335,7 +322,6 @@
         color: var(--muted);
         animation: fadeUp 0.7s 0.4s ease both;
       }
-
       .hero-trust-dot {
         width: 3px;
         height: 3px;
@@ -343,14 +329,13 @@
         background: var(--bdr);
       }
 
-      /* ── DASHBOARD PREVIEW ── */
+      /* ── PREVIEW ── */
       .preview-wrap {
         padding: 0 24px 100px;
         display: flex;
         justify-content: center;
         animation: fadeUp 0.8s 0.5s ease both;
       }
-
       .preview-frame {
         width: 100%;
         max-width: 1040px;
@@ -362,7 +347,6 @@
           0 0 0 1px rgba(0, 0, 0, 0.03);
         overflow: hidden;
       }
-
       .preview-bar {
         background: #f1f1ef;
         border-bottom: 1px solid var(--bdr);
@@ -371,7 +355,6 @@
         align-items: center;
         gap: 12px;
       }
-
       .preview-dots {
         display: flex;
         gap: 6px;
@@ -390,7 +373,6 @@
       .preview-dots span:nth-child(3) {
         background: #28c840;
       }
-
       .preview-url {
         flex: 1;
         background: white;
@@ -401,19 +383,16 @@
         color: var(--muted);
         max-width: 340px;
       }
-
       .preview-body {
         display: grid;
         grid-template-columns: 200px 1fr;
         min-height: 400px;
       }
-
       .preview-sidebar {
         background: var(--surface);
         border-right: 1px solid var(--bdr);
         padding: 16px 10px;
       }
-
       .preview-sidebar-label {
         font-size: 9px;
         font-weight: 700;
@@ -423,7 +402,6 @@
         padding: 0 8px;
         margin-bottom: 8px;
       }
-
       .preview-nav-item {
         display: flex;
         align-items: center;
@@ -432,11 +410,9 @@
         border-radius: 7px;
         margin-bottom: 2px;
       }
-
       .preview-nav-item.active {
         background: var(--acc-light);
       }
-
       .preview-nav-dot {
         width: 6px;
         height: 6px;
@@ -444,11 +420,9 @@
         background: var(--bdr);
         flex-shrink: 0;
       }
-
       .preview-nav-item.active .preview-nav-dot {
         background: var(--acc);
       }
-
       .preview-nav-label {
         font-size: 12px;
         font-weight: 500;
@@ -458,12 +432,10 @@
         overflow: hidden;
         text-overflow: ellipsis;
       }
-
       .preview-nav-item.active .preview-nav-label {
         color: var(--acc);
         font-weight: 600;
       }
-
       .preview-nav-badge {
         font-size: 10px;
         font-weight: 600;
@@ -473,19 +445,16 @@
         padding: 1px 6px;
         color: var(--muted);
       }
-
       .preview-main {
         padding: 20px;
         background: var(--bg);
       }
-
       .preview-topbar {
         display: flex;
         align-items: center;
         justify-content: space-between;
         margin-bottom: 14px;
       }
-
       .preview-title {
         font-size: 16px;
         font-weight: 700;
@@ -495,12 +464,10 @@
         font-size: 11px;
         color: var(--muted);
       }
-
       .preview-btn-group {
         display: flex;
         gap: 6px;
       }
-
       .preview-btn {
         padding: 5px 12px;
         border-radius: 6px;
@@ -510,33 +477,28 @@
         background: white;
         color: var(--ink2);
       }
-
       .preview-btn.pri {
         background: var(--acc);
         color: white;
         border-color: var(--acc);
       }
-
       .preview-cards {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 10px;
       }
-
       .preview-card {
         background: white;
         border: 1.5px solid var(--bdr);
         border-radius: 10px;
         padding: 14px;
       }
-
       .preview-card-title {
         font-size: 12px;
         font-weight: 700;
         color: var(--ink);
         margin-bottom: 6px;
       }
-
       .preview-card-quote {
         font-size: 10.5px;
         font-style: italic;
@@ -548,13 +510,11 @@
         margin-bottom: 6px;
         line-height: 1.5;
       }
-
       .preview-card-body {
         font-size: 10.5px;
         color: var(--ink2);
         line-height: 1.5;
       }
-
       .preview-card-tag {
         display: inline-block;
         font-size: 9.5px;
@@ -571,12 +531,10 @@
       section {
         padding: 100px 24px;
       }
-
       .section-inner {
         max-width: 1060px;
         margin: 0 auto;
       }
-
       .section-label {
         font-size: 11.5px;
         font-weight: 700;
@@ -585,7 +543,6 @@
         color: var(--acc);
         margin-bottom: 14px;
       }
-
       .section-headline {
         font-family: "Instrument Serif", serif;
         font-size: clamp(30px, 4vw, 50px);
@@ -594,12 +551,10 @@
         color: var(--ink);
         margin-bottom: 16px;
       }
-
       .section-headline em {
         font-style: italic;
         color: var(--acc);
       }
-
       .section-sub {
         font-size: 17px;
         color: var(--muted);
@@ -607,11 +562,10 @@
         line-height: 1.7;
       }
 
-      /* ── HOW IT WORKS ── */
+      /* ── HOW ── */
       #how {
         background: var(--surface);
       }
-
       .steps {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -619,7 +573,6 @@
         margin-top: 60px;
         position: relative;
       }
-
       .steps::before {
         content: "";
         position: absolute;
@@ -635,13 +588,11 @@
           transparent
         );
       }
-
       .step {
         text-align: center;
         padding: 0 24px;
         position: relative;
       }
-
       .step-num {
         width: 56px;
         height: 56px;
@@ -658,14 +609,12 @@
         z-index: 1;
         transition: all 0.2s;
       }
-
       .step:hover .step-num {
         background: var(--acc);
         color: white;
         border-color: var(--acc);
         transform: scale(1.1);
       }
-
       .step-title {
         font-size: 15px;
         font-weight: 600;
@@ -682,14 +631,12 @@
       #features {
         background: var(--bg);
       }
-
       .features-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
         gap: 20px;
         margin-top: 60px;
       }
-
       .feature-card {
         background: var(--surface);
         border: 1px solid var(--bdr);
@@ -699,7 +646,6 @@
         position: relative;
         overflow: hidden;
       }
-
       .feature-card::before {
         content: "";
         position: absolute;
@@ -708,17 +654,14 @@
         opacity: 0;
         transition: opacity 0.3s;
       }
-
       .feature-card:hover {
         border-color: rgba(79, 70, 229, 0.3);
         transform: translateY(-3px);
         box-shadow: var(--shadow);
       }
-
       .feature-card:hover::before {
         opacity: 1;
       }
-
       .feature-icon {
         width: 44px;
         height: 44px;
@@ -729,7 +672,6 @@
         margin-bottom: 16px;
         position: relative;
       }
-
       .feature-icon svg {
         width: 20px;
         height: 20px;
@@ -739,7 +681,6 @@
         stroke-linecap: round;
         stroke-linejoin: round;
       }
-
       .feature-title {
         font-size: 15.5px;
         font-weight: 600;
@@ -751,7 +692,6 @@
         color: var(--muted);
         line-height: 1.65;
       }
-
       .feature-card.large {
         grid-column: span 2;
         display: grid;
@@ -759,20 +699,17 @@
         gap: 32px;
         align-items: center;
       }
-
       .feature-card.large .feature-visual {
         background: var(--bg);
         border: 1px solid var(--bdr);
         border-radius: 10px;
         padding: 20px;
       }
-
       .mini-chat {
         display: flex;
         flex-direction: column;
         gap: 8px;
       }
-
       .mini-msg {
         max-width: 85%;
         padding: 8px 12px;
@@ -780,14 +717,12 @@
         font-size: 12px;
         line-height: 1.5;
       }
-
       .mini-msg.user {
         align-self: flex-end;
         background: var(--acc);
         color: white;
         border-bottom-right-radius: 2px;
       }
-
       .mini-msg.ai {
         align-self: flex-start;
         background: white;
@@ -795,7 +730,6 @@
         color: var(--ink2);
         border-bottom-left-radius: 2px;
       }
-
       .mini-msg.ai strong {
         color: var(--acc);
       }
@@ -804,7 +738,6 @@
       #themes {
         background: var(--surface);
       }
-
       .themes-showcase {
         display: flex;
         gap: 14px;
@@ -812,7 +745,6 @@
         overflow-x: auto;
         padding-bottom: 8px;
       }
-
       .themes-showcase::-webkit-scrollbar {
         height: 4px;
       }
@@ -820,7 +752,6 @@
         background: var(--bdr);
         border-radius: 4px;
       }
-
       .theme-pill {
         display: flex;
         align-items: center;
@@ -834,20 +765,17 @@
         flex-shrink: 0;
         background: white;
       }
-
       .theme-pill:hover,
       .theme-pill.active {
         border-width: 2px;
         transform: translateY(-2px);
       }
-
       .theme-swatch {
         width: 16px;
         height: 16px;
         border-radius: 50%;
         border: 2px solid rgba(0, 0, 0, 0.08);
       }
-
       .theme-name {
         font-size: 13px;
         font-weight: 600;
@@ -861,7 +789,6 @@
         position: relative;
         overflow: hidden;
       }
-
       #mobile-app::before {
         content: "";
         position: absolute;
@@ -877,7 +804,6 @@
         );
         pointer-events: none;
       }
-
       .mobile-inner {
         max-width: 960px;
         margin: 0 auto;
@@ -886,7 +812,6 @@
         gap: 72px;
         align-items: center;
       }
-
       .mobile-text .section-label {
         color: var(--acc2);
       }
@@ -896,20 +821,17 @@
       .mobile-text .section-sub {
         color: rgba(255, 255, 255, 0.5);
       }
-
       .mobile-steps {
         display: flex;
         flex-direction: column;
         gap: 20px;
         margin-top: 32px;
       }
-
       .mobile-step {
         display: flex;
         gap: 14px;
         align-items: flex-start;
       }
-
       .mobile-step-num {
         width: 28px;
         height: 28px;
@@ -923,7 +845,6 @@
         font-weight: 700;
         color: var(--acc2);
       }
-
       .mobile-step-text {
         font-size: 14px;
         color: rgba(255, 255, 255, 0.55);
@@ -933,14 +854,12 @@
         color: rgba(255, 255, 255, 0.88);
         font-weight: 600;
       }
-
       .mobile-cta {
         display: flex;
         flex-direction: column;
         gap: 12px;
         margin-top: 36px;
       }
-
       .btn-mobile {
         display: inline-flex;
         align-items: center;
@@ -953,32 +872,27 @@
         transition: all 0.2s;
         max-width: 300px;
       }
-
       .btn-mobile.primary {
         background: var(--acc);
         color: white;
         box-shadow: 0 4px 20px rgba(79, 70, 229, 0.4);
         border: 1.5px solid rgba(255, 255, 255, 0.1);
       }
-
       .btn-mobile.primary:hover {
         background: #4338ca;
         transform: translateY(-2px);
         box-shadow: 0 8px 28px rgba(79, 70, 229, 0.5);
       }
-
       .btn-mobile.secondary {
         background: rgba(255, 255, 255, 0.05);
         border: 1.5px solid rgba(255, 255, 255, 0.1);
         color: rgba(255, 255, 255, 0.65);
       }
-
       .btn-mobile.secondary:hover {
         border-color: rgba(255, 255, 255, 0.25);
         color: white;
         transform: translateY(-2px);
       }
-
       .btn-mobile-icon {
         width: 38px;
         height: 38px;
@@ -988,12 +902,10 @@
         place-items: center;
         flex-shrink: 0;
       }
-
       .btn-mobile-icon svg {
         width: 19px;
         height: 19px;
       }
-
       .btn-mobile-lbl {
         display: flex;
         flex-direction: column;
@@ -1010,14 +922,11 @@
         font-weight: 700;
         line-height: 1.3;
       }
-
-      /* phone mockup */
       .mobile-phone {
         position: relative;
         display: flex;
         justify-content: center;
       }
-
       .phone-shell {
         width: 244px;
         background: #13131f;
@@ -1029,7 +938,6 @@
         overflow: hidden;
         position: relative;
       }
-
       .phone-notch {
         width: 80px;
         height: 22px;
@@ -1039,7 +947,6 @@
         position: relative;
         z-index: 2;
       }
-
       .phone-screen {
         background: #0f0f13;
         padding: 8px;
@@ -1047,7 +954,6 @@
         position: relative;
         padding-bottom: 44px;
       }
-
       .phone-topbar {
         display: flex;
         align-items: center;
@@ -1056,42 +962,49 @@
         border-bottom: 1px solid #1e1e2e;
         margin-bottom: 7px;
       }
-
       .phone-logo {
         display: flex;
         align-items: center;
         gap: 5px;
       }
-
       .phone-logo-mark {
         width: 19px;
         height: 19px;
         border-radius: 4px;
         background: linear-gradient(135deg, #6366f1, #4f46e5);
-        clip-path: polygon(0 0, 62% 0, 100% 38%, 100% 100%, 0 100%);
+        clip-path: polygon(0 0, 68% 0, 100% 32%, 100% 100%, 0 100%);
         display: grid;
         place-items: center;
         flex-shrink: 0;
+        position: relative;
       }
-
+      .phone-logo-mark::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 32%;
+        height: 32%;
+        background: #312e81;
+        opacity: 0.55;
+      }
       .phone-logo-mark span {
         font-family: "Neoneon", sans-serif;
         color: #fff;
         font-size: 7px;
         line-height: 1;
+        position: relative;
+        z-index: 1;
       }
-
       .phone-logo-txt {
         font-size: 9.5px;
         font-weight: 700;
         color: #f0eff8;
       }
-
       .phone-icons {
         display: flex;
         gap: 4px;
       }
-
       .phone-icon {
         width: 21px;
         height: 21px;
@@ -1099,7 +1012,6 @@
         background: #1e1e28;
         border: 1px solid #2a2a38;
       }
-
       .phone-search {
         background: #1e1e28;
         border: 1px solid #2a2a38;
@@ -1112,14 +1024,12 @@
         align-items: center;
         gap: 5px;
       }
-
       .phone-grp-hd {
         display: flex;
         align-items: center;
         gap: 6px;
         padding: 3px 2px 6px;
       }
-
       .phone-grp-ico {
         width: 22px;
         height: 22px;
@@ -1129,7 +1039,6 @@
         display: grid;
         place-items: center;
       }
-
       .phone-grp-ico svg {
         width: 11px;
         height: 11px;
@@ -1138,7 +1047,6 @@
         stroke-width: 2;
         stroke-linecap: round;
       }
-
       .phone-grp-name {
         font-size: 8px;
         font-weight: 700;
@@ -1148,7 +1056,6 @@
         font-size: 6.5px;
         color: #7b79a0;
       }
-
       .phone-grp-cnt {
         font-size: 7px;
         background: #1a0a3c;
@@ -1157,7 +1064,6 @@
         padding: 2px 6px;
         border-radius: 99px;
       }
-
       .phone-card {
         background: #1a1a24;
         border: 1px solid #2a2a38;
@@ -1165,7 +1071,6 @@
         padding: 9px 10px;
         margin-bottom: 6px;
       }
-
       .phone-card.pinned {
         border-left: 2px solid #fbbf24;
       }
@@ -1175,7 +1080,6 @@
         color: #f0eff8;
         margin-bottom: 3px;
       }
-
       .phone-card-sel {
         font-size: 7px;
         font-style: italic;
@@ -1187,13 +1091,11 @@
         margin-bottom: 3px;
         line-height: 1.4;
       }
-
       .phone-card-body {
         font-size: 7px;
         color: #7b79a0;
         line-height: 1.4;
       }
-
       .phone-card-tag {
         display: inline-block;
         font-size: 6.5px;
@@ -1204,7 +1106,6 @@
         border-radius: 99px;
         margin-top: 4px;
       }
-
       .phone-nav {
         position: absolute;
         bottom: 0;
@@ -1215,7 +1116,6 @@
         display: flex;
         padding: 7px 0 10px;
       }
-
       .phone-nav-t {
         flex: 1;
         display: flex;
@@ -1223,7 +1123,6 @@
         align-items: center;
         gap: 3px;
       }
-
       .phone-nav-dot {
         width: 20px;
         height: 20px;
@@ -1242,21 +1141,10 @@
         color: #a08ff8;
       }
 
-      @media (max-width: 768px) {
-        .mobile-inner {
-          grid-template-columns: 1fr;
-          gap: 40px;
-        }
-        .mobile-phone {
-          order: -1;
-        }
-      }
-
       /* ── PRICING ── */
       #pricing {
         background: var(--bg);
       }
-
       .pricing-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -1266,7 +1154,6 @@
         margin-left: auto;
         margin-right: auto;
       }
-
       .pricing-card {
         background: var(--surface);
         border: 1.5px solid var(--bdr);
@@ -1275,17 +1162,14 @@
         position: relative;
         transition: all 0.2s;
       }
-
       .pricing-card:hover {
         transform: translateY(-3px);
         box-shadow: var(--shadow);
       }
-
       .pricing-card.featured {
         border-color: var(--acc);
         box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.08);
       }
-
       .pricing-badge {
         position: absolute;
         top: -12px;
@@ -1300,7 +1184,6 @@
         letter-spacing: 0.04em;
         white-space: nowrap;
       }
-
       .pricing-plan {
         font-size: 12px;
         font-weight: 700;
@@ -1309,7 +1192,6 @@
         color: var(--muted);
         margin-bottom: 10px;
       }
-
       .pricing-price {
         font-family: "Instrument Serif", serif;
         font-size: 48px;
@@ -1317,7 +1199,6 @@
         line-height: 1;
         margin-bottom: 4px;
       }
-
       .pricing-price sup {
         font-size: 20px;
         vertical-align: top;
@@ -1326,20 +1207,17 @@
         font-family: "DM Sans", sans-serif;
         font-weight: 600;
       }
-
       .pricing-price span {
         font-size: 16px;
         color: var(--muted);
         font-family: "DM Sans", sans-serif;
       }
-
       .pricing-desc {
         font-size: 13.5px;
         color: var(--muted);
         margin-bottom: 28px;
         line-height: 1.6;
       }
-
       .pricing-features {
         list-style: none;
         margin-bottom: 28px;
@@ -1347,7 +1225,6 @@
         flex-direction: column;
         gap: 11px;
       }
-
       .pricing-features li {
         display: flex;
         align-items: flex-start;
@@ -1355,7 +1232,6 @@
         font-size: 13.5px;
         color: var(--ink2);
       }
-
       .pricing-features li::before {
         content: "";
         width: 16px;
@@ -1366,16 +1242,13 @@
         margin-top: 2px;
         background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3.5 8l3 3 6-6' stroke='%23059669' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
       }
-
       .pricing-features li.na {
         color: var(--muted);
       }
-
       .pricing-features li.na::before {
         background-color: var(--bg);
         background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5 11l6-6M11 11L5 5' stroke='%2398a2b3' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
       }
-
       .pricing-btn {
         width: 100%;
         padding: 12px;
@@ -1389,19 +1262,16 @@
         color: var(--ink);
         transition: all 0.2s;
       }
-
       .pricing-btn:hover {
         border-color: var(--acc);
         color: var(--acc);
       }
-
       .pricing-btn.pri {
         background: var(--acc);
         color: white;
         border-color: var(--acc);
         box-shadow: 0 4px 14px rgba(79, 70, 229, 0.25);
       }
-
       .pricing-btn.pri:hover {
         background: #4338ca;
         transform: translateY(-1px);
@@ -1411,7 +1281,6 @@
       #faq {
         background: var(--surface);
       }
-
       .faq-list {
         max-width: 680px;
         margin-top: 50px;
@@ -1419,14 +1288,12 @@
         flex-direction: column;
         gap: 2px;
       }
-
       .faq-item {
         border: 1px solid var(--bdr);
         border-radius: 10px;
         overflow: hidden;
         background: white;
       }
-
       .faq-q {
         padding: 18px 22px;
         font-size: 15px;
@@ -1440,11 +1307,9 @@
         user-select: none;
         transition: background 0.15s;
       }
-
       .faq-q:hover {
         background: var(--bg);
       }
-
       .faq-q svg {
         width: 16px;
         height: 16px;
@@ -1455,12 +1320,10 @@
         stroke-linecap: round;
         transition: transform 0.25s;
       }
-
       .faq-item.open .faq-q svg {
         transform: rotate(45deg);
         stroke: var(--acc);
       }
-
       .faq-a {
         max-height: 0;
         overflow: hidden;
@@ -1472,13 +1335,12 @@
         line-height: 1.7;
         padding: 0 22px;
       }
-
       .faq-item.open .faq-a {
         max-height: 200px;
         padding: 0 22px 18px;
       }
 
-      /* ── CTA BANNER ── */
+      /* ── CTA ── */
       .cta-banner {
         background: var(--ink);
         padding: 100px 24px;
@@ -1486,7 +1348,6 @@
         position: relative;
         overflow: hidden;
       }
-
       .cta-banner::before {
         content: "";
         position: absolute;
@@ -1502,7 +1363,6 @@
         );
         pointer-events: none;
       }
-
       .cta-banner h2 {
         font-family: "Instrument Serif", serif;
         font-size: clamp(34px, 5vw, 58px);
@@ -1512,19 +1372,16 @@
         margin-bottom: 16px;
         position: relative;
       }
-
       .cta-banner h2 em {
         font-style: italic;
         color: var(--acc2);
       }
-
       .cta-banner p {
         font-size: 17px;
         color: rgba(255, 255, 255, 0.5);
         margin-bottom: 40px;
         position: relative;
       }
-
       .cta-actions {
         display: flex;
         gap: 12px;
@@ -1545,53 +1402,30 @@
         flex-wrap: wrap;
         gap: 16px;
       }
-
       .footer-logo {
         display: flex;
         align-items: center;
         gap: 10px;
       }
-
-      .footer-logo-mark {
-        width: 28px;
-        height: 28px;
-        background: linear-gradient(135deg, #6366f1, #4f46e5);
-        clip-path: polygon(0 0, 62% 0, 100% 38%, 100% 100%, 0 100%);
-        display: grid;
-        place-items: center;
-        border-radius: 5px;
-      }
-
-      .footer-logo-mark span {
-        font-family: "Neoneon", sans-serif;
-        color: #fff;
-        font-size: 12px;
-        line-height: 1;
-      }
-
       .footer-logo-name {
         font-size: 14px;
         font-weight: 600;
         color: rgba(255, 255, 255, 0.7);
       }
-
       .footer-copy {
         font-size: 13px;
         color: rgba(255, 255, 255, 0.3);
       }
-
       .footer-links {
         display: flex;
         gap: 24px;
       }
-
       .footer-links a {
         font-size: 13px;
         color: rgba(255, 255, 255, 0.4);
         text-decoration: none;
         transition: color 0.15s;
       }
-
       .footer-links a:hover {
         color: rgba(255, 255, 255, 0.8);
       }
@@ -1607,7 +1441,6 @@
           transform: translateY(0);
         }
       }
-
       .reveal {
         opacity: 0;
         transform: translateY(24px);
@@ -1615,7 +1448,6 @@
           opacity 0.7s ease,
           transform 0.7s ease;
       }
-
       .reveal.visible {
         opacity: 1;
         transform: translateY(0);
@@ -1633,7 +1465,6 @@
           justify-content: center;
         }
       }
-
       @media (max-width: 768px) {
         nav {
           padding: 0 20px;
@@ -1664,8 +1495,14 @@
         .hero-logo-wrap img {
           width: clamp(160px, 60vw, 240px);
         }
+        .mobile-inner {
+          grid-template-columns: 1fr;
+          gap: 40px;
+        }
+        .mobile-phone {
+          order: -1;
+        }
       }
-
       @media (max-width: 480px) {
         .preview-cards {
           grid-template-columns: 1fr;
@@ -1735,7 +1572,6 @@
           </div>
         </div>
       </div>
-
       <div class="hero-trust">
         <span>🔒 Stored locally by default</span>
         <div class="hero-trust-dot"></div>
@@ -1761,23 +1597,23 @@
             <div class="preview-sidebar-label">Sources</div>
             <div class="preview-nav-item active">
               <div class="preview-nav-dot"></div>
-              <span class="preview-nav-label">notion.so</span>
-              <span class="preview-nav-badge">4</span>
+              <span class="preview-nav-label">notion.so</span
+              ><span class="preview-nav-badge">4</span>
             </div>
             <div class="preview-nav-item">
               <div class="preview-nav-dot"></div>
-              <span class="preview-nav-label">github.com</span>
-              <span class="preview-nav-badge">2</span>
+              <span class="preview-nav-label">github.com</span
+              ><span class="preview-nav-badge">2</span>
             </div>
             <div class="preview-nav-item">
               <div class="preview-nav-dot"></div>
-              <span class="preview-nav-label">medium.com</span>
-              <span class="preview-nav-badge">6</span>
+              <span class="preview-nav-label">medium.com</span
+              ><span class="preview-nav-badge">6</span>
             </div>
             <div class="preview-nav-item">
               <div class="preview-nav-dot"></div>
-              <span class="preview-nav-label">youtube.com</span>
-              <span class="preview-nav-badge">1</span>
+              <span class="preview-nav-label">youtube.com</span
+              ><span class="preview-nav-badge">1</span>
             </div>
             <div
               style="height: 1px; background: var(--bdr); margin: 12px 8px"
@@ -1788,16 +1624,16 @@
                 class="preview-nav-dot"
                 style="border-radius: 2px; background: var(--muted)"
               ></div>
-              <span class="preview-nav-label">Research</span>
-              <span class="preview-nav-badge">5</span>
+              <span class="preview-nav-label">Research</span
+              ><span class="preview-nav-badge">5</span>
             </div>
             <div class="preview-nav-item">
               <div
                 class="preview-nav-dot"
                 style="border-radius: 2px; background: var(--muted)"
               ></div>
-              <span class="preview-nav-label">Reading List</span>
-              <span class="preview-nav-badge">3</span>
+              <span class="preview-nav-label">Reading List</span
+              ><span class="preview-nav-badge">3</span>
             </div>
           </div>
           <div class="preview-main">
@@ -1937,7 +1773,6 @@
               </div>
             </div>
           </div>
-
           <div class="feature-card reveal">
             <div class="feature-icon">
               <svg viewBox="0 0 24 24">
@@ -1953,7 +1788,6 @@
               screenshots directly from video pages.
             </div>
           </div>
-
           <div class="feature-card reveal">
             <div class="feature-icon">
               <svg viewBox="0 0 24 24">
@@ -1968,7 +1802,6 @@
               can belong to both a source URL and a folder at the same time.
             </div>
           </div>
-
           <div class="feature-card reveal">
             <div class="feature-icon">
               <svg viewBox="0 0 24 24">
@@ -1983,7 +1816,6 @@
               any source or folder view.
             </div>
           </div>
-
           <div class="feature-card reveal">
             <div class="feature-icon">
               <svg viewBox="0 0 24 24">
@@ -1997,7 +1829,6 @@
               Notion, or any editor.
             </div>
           </div>
-
           <div class="feature-card reveal">
             <div class="feature-icon">
               <svg viewBox="0 0 24 24">
@@ -2010,7 +1841,6 @@
               in with Google to back up across devices, or stay local forever.
             </div>
           </div>
-
           <div class="feature-card reveal">
             <div class="feature-icon">
               <svg viewBox="0 0 24 24">
@@ -2024,7 +1854,6 @@
               across titles and content as you type — no reload, no waiting.
             </div>
           </div>
-
           <div class="feature-card reveal">
             <div class="feature-icon">
               <svg viewBox="0 0 24 24">
@@ -2038,7 +1867,6 @@
               mobile URL in Safari or Chrome and tap "Add to Home Screen".
             </div>
           </div>
-
           <div class="feature-card reveal">
             <div class="feature-icon">
               <svg viewBox="0 0 24 24">
@@ -2141,7 +1969,6 @@
             Your notes<br /><em style="color: var(--acc2)">on the go.</em>
           </h2>
           <p class="section-sub">No App Store. Works on iOS and Android.</p>
-
           <div class="mobile-steps">
             <div class="mobile-step">
               <div class="mobile-step-num">1</div>
@@ -2166,7 +1993,6 @@
               </div>
             </div>
           </div>
-
           <div class="mobile-cta">
             <a
               href="https://kontexa.online/mobile"
@@ -2188,8 +2014,8 @@
                 </svg>
               </div>
               <div class="btn-mobile-lbl">
-                <small>Open in your browser</small>
-                <span>Get the Mobile App →</span>
+                <small>Open in your browser</small
+                ><span>Get the Mobile App →</span>
               </div>
             </a>
             <a
@@ -2217,8 +2043,8 @@
                 class="btn-mobile-lbl"
                 style="color: rgba(255, 255, 255, 0.65)"
               >
-                <small>iOS Safari &amp; Android Chrome</small>
-                <span>Install as PWA</span>
+                <small>iOS Safari &amp; Android Chrome</small
+                ><span>Install as PWA</span>
               </div>
             </a>
             <p
@@ -2232,7 +2058,6 @@
             </p>
           </div>
         </div>
-
         <div class="mobile-phone reveal">
           <div class="phone-shell">
             <div class="phone-notch"></div>
@@ -2335,7 +2160,6 @@
             </ul>
             <button class="pricing-btn">Add to Chrome — Free</button>
           </div>
-
           <div class="pricing-card featured">
             <div class="pricing-badge">Most Popular</div>
             <div class="pricing-plan">Pro — Monthly</div>
@@ -2358,7 +2182,6 @@
               </button></a
             >
           </div>
-
           <div class="pricing-card featured">
             <div class="pricing-plan">Pro — Lifetime</div>
             <div class="pricing-price"><sup>$</sup>40<span> once</span></div>
@@ -2515,9 +2338,8 @@
               border-color: rgba(255, 255, 255, 0.15);
               color: rgba(255, 255, 255, 0.65);
             "
+            >📱 Get Mobile App →</a
           >
-            📱 Get Mobile App →
-          </a>
         </div>
       </div>
     </div>
@@ -2525,7 +2347,7 @@
     <!-- ── FOOTER ── -->
     <footer>
       <div class="footer-logo">
-        <div class="logo">
+        <div class="logo" style="width: 28px; height: 28px">
           <span
             style="
               font-family: &quot;Neoneon&quot;, sans-serif;
@@ -2544,14 +2366,12 @@
       </div>
       <div class="footer-copy">© 2025 Kontexa. All rights reserved.</div>
       <div class="footer-links">
-        <a href="#">Privacy Policy</a>
-        <a href="#">Terms</a>
+        <a href="/privacy">Privacy Policy</a>
         <a href="#">Support</a>
       </div>
     </footer>
 
     <script>
-      // Scroll reveal
       const observer = new IntersectionObserver(
         (entries) =>
           entries.forEach((e) => {
@@ -2565,8 +2385,6 @@
       document
         .querySelectorAll(".reveal")
         .forEach((el) => observer.observe(el));
-
-      // FAQ accordion
       document.querySelectorAll(".faq-q").forEach((q) => {
         q.addEventListener("click", () => {
           const item = q.closest(".faq-item");
@@ -2577,8 +2395,6 @@
           if (!isOpen) item.classList.add("open");
         });
       });
-
-      // Theme pills
       document.querySelectorAll(".theme-pill").forEach((pill) => {
         pill.addEventListener("click", () => {
           document
@@ -2587,8 +2403,6 @@
           pill.classList.add("active");
         });
       });
-
-      // Nav active link on scroll
       const sections = document.querySelectorAll("section[id]");
       const navLinks = document.querySelectorAll('.nav-links a[href^="#"]');
       window.addEventListener(
