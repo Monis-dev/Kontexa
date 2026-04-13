@@ -45,18 +45,24 @@
 
     <link
       rel="icon"
+      href="{{ url_for('static', filename='favicon.ico') }}"
+      sizes="48x48"
+    />
+    <link
+      rel="icon"
       type="image/svg+xml"
-      href="{{ url_for('static', filename='icons/Kontexa-128.svg') }}"
+      href="{{ url_for('static', filename='icons/Kontexa.svg') }}"
     />
     <link
       rel="icon"
       type="image/png"
-      sizes="128x128"
-      href="{{ url_for('static', filename='icons/Kontexa-128.png') }}"
+      sizes="192x192"
+      href="{{ url_for('static', filename='icons/Kontexa-192.png') }}"
     />
     <link
       rel="apple-touch-icon"
-      href="{{ url_for('static', filename='icons/Kontexa-128.png') }}"
+      sizes="180x180"
+      href="{{ url_for('static', filename='icons/Kontexa-180.png') }}"
     />
     <script type="application/ld+json">
       {
