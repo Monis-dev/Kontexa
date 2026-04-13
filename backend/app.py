@@ -145,9 +145,10 @@ class Note(db.Model):
 class Feedback(db.Model):
     __tablename__ = 'feedback'
     id         = db.Column(db.Integer, primary_key=True)
-    user_id    = db.Column(db.String, db.ForeignKey('users.id'), nullable=True)
+    # THIS LINE MUST BE INTEGER AND POINT TO 'user.id'
+    user_id    = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True) 
     email      = db.Column(db.String(255), nullable=True)
-    type       = db.Column(db.String(50), default='feature')
+    fb_type    = db.Column(db.String(50), default='feature')
     subject    = db.Column(db.String(255), nullable=True)
     message    = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -445,31 +446,40 @@ def time_travel(days_left):
 
 @app.route('/api/feedback', methods=['POST'])
 def submit_feedback():
-    data    = request.get_json(silent=True) or {}
-    fb_type = escape(data.get('type', 'feature'))
-    subject = escape(data.get('subject', ''))
-    message = escape(data.get('message', ''))
+    try:
+        data    = request.get_json(silent=True) or {}
+        
+        fb_type = str(escape(data.get('type', 'feature')))
+        subject = str(escape(data.get('subject', '')))
+        message = str(escape(data.get('message', '')))
 
-    if not message:
-        return jsonify({'error': 'Message is required'}), 400
+        if not message:
+            return jsonify({'error': 'Message is required'}), 400
 
-    # Get email from session user if logged in
-    email = None
-    if 'user_id' in session:
-        user  = User.query.get(session['user_id'])
-        email = user.email if user else None
+        email = None
+        user_id = session.get('user_id')
 
-    feedback = Feedback(
-        user_id = session.get('user_id'),
-        email   = email,
-        type    = fb_type,
-        subject = subject,
-        message = message,
-    )
-    db.session.add(feedback)
-    db.session.commit()
-    return jsonify({'ok': True}), 201
+        if user_id:
+            user  = db.session.get(User, user_id)
+            email = user.email if user else None
 
+        feedback = Feedback(
+            user_id = user_id,
+            email   = email,
+            fb_type = fb_type,
+            subject = subject,
+            message = message,
+        )
+        
+        db.session.add(feedback)
+        db.session.commit()
+        return jsonify({'ok': True}), 201
+
+    except Exception as e:
+        # 3. FIX: Rollback the database if it crashes, otherwise your server locks up
+        db.session.rollback()
+        app.logger.error(f"Feedback error: {e}")
+        return jsonify({'error': 'Internal Server Error'}), 500
 @app.route('/api/admin/feedback-digest', methods=['GET'])
 def feedback_digest():
     # Simple secret check — add ADMIN_SECRET to your Render env vars
@@ -485,7 +495,7 @@ def feedback_digest():
     return jsonify([{
         'id':         f.id,
         'email':      f.email or 'Anonymous',
-        'type':       f.type,
+        'type':       f.fb_type,
         'subject':    f.subject,
         'message':    f.message,
         'created_at': f.created_at.isoformat(),
