@@ -1260,6 +1260,49 @@ async function checkAuthAndSync() {
       // It is never read from chrome.storage, preventing local spoofing.
       isProUserUI = user.is_pro;
 
+      // First 100 users celebration
+      if (user.is_pro) {
+        chrome.storage.local.get(["cn_pro_celebrated"], async (res) => {
+          if (!res.cn_pro_celebrated) {
+            try {
+              const countRes = await fetch(`${API_BASE}/api/user-count`, {
+                credentials: "include",
+              });
+              const { count } = await countRes.json();
+              if (count <= 100) {
+                chrome.storage.local.set({ cn_pro_celebrated: true });
+                setTimeout(() => {
+                  if (!window.CN_Celebrate) return;
+                  window.CN_Celebrate.confetti();
+                  const pill = document.createElement("div");
+                  pill.className = "cn-celebrate-pill";
+                  pill.innerHTML = `
+              <div class="cn-pill-icon">🎉</div>
+              <div class="cn-pill-text">
+                <span class="cn-pill-main">You're a founding member!</span>
+                <span class="cn-pill-sub">First 100 users get Pro free forever 🚀</span>
+              </div>
+            `;
+                  document.body.appendChild(pill);
+                  requestAnimationFrame(() =>
+                    requestAnimationFrame(() =>
+                      pill.classList.add("cn-pill-in"),
+                    ),
+                  );
+                  setTimeout(() => {
+                    pill.classList.remove("cn-pill-in");
+                    pill.classList.add("cn-pill-out");
+                    setTimeout(() => pill.remove(), 600);
+                  }, 5500);
+                }, 1500);
+              }
+            } catch (e) {
+              console.warn("Could not fetch user count", e);
+            }
+          }
+        });
+      }
+
       const wasPro = await new Promise((r) =>
         chrome.storage.local.get(PRO_CACHE_KEY, (res) => r(res[PRO_CACHE_KEY])),
       );
