@@ -2150,6 +2150,7 @@
           </p>
         </div>
         <div class="pricing-grid reveal">
+          <!-- FREE PLAN (Unchanged) -->
           <div class="pricing-card">
             <div class="pricing-plan">Free</div>
             <div class="pricing-price"><sup>$</sup>0<span>/mo</span></div>
@@ -2171,10 +2172,40 @@
             </ul>
             <button class="pricing-btn">Add to Chrome — Free</button>
           </div>
+
+          <!-- PRO MONTHLY PLAN -->
           <div class="pricing-card featured">
-            <div class="pricing-badge">Most Popular</div>
+            <div
+              class="pricing-badge"
+              {%
+              if
+              pricing.monthly.discount_usd
+              %}style="background: #ea580c"
+              {%
+              endif
+              %}
+            >
+              {{ pricing.monthly.badge }}
+            </div>
             <div class="pricing-plan">Pro — Monthly</div>
-            <div class="pricing-price"><sup>$</sup>2<span>/mo</span></div>
+
+            <div class="pricing-price">
+              {% if pricing.monthly.discount_usd %}
+              <span
+                style="
+                  text-decoration: line-through;
+                  font-size: 24px;
+                  color: var(--mut);
+                  margin-right: 8px;
+                "
+                ><sup>$</sup>{{ pricing.monthly.base_usd }}</span
+              >
+              <sup>$</sup>{{ pricing.monthly.discount_usd }}<span>/mo</span>
+              {% else %}
+              <sup>$</sup>{{ pricing.monthly.base_usd }}<span>/mo</span>
+              {% endif %}
+            </div>
+
             <div class="pricing-desc">
               Sync across all your devices and unlock every feature.
             </div>
@@ -2187,15 +2218,48 @@
               <li>Mobile PWA with note sync</li>
               <li>Priority support</li>
             </ul>
-            <a href="/pricing"
-              ><button class="pricing-btn pri">
-                Upgrade to Pro — $2/mo
-              </button></a
-            >
+            <a href="/pricing">
+              <button class="pricing-btn pri">
+                Upgrade to Pro — ${% if pricing.monthly.discount_usd %}{{
+                pricing.monthly.discount_usd }}{% else %}{{
+                pricing.monthly.base_usd }}{% endif %}/mo
+              </button>
+            </a>
           </div>
+
+          <!-- PRO LIFETIME PLAN -->
           <div class="pricing-card featured">
+            <div
+              class="pricing-badge"
+              {%
+              if
+              pricing.lifetime.discount_usd
+              %}style="background: #ea580c"
+              {%
+              endif
+              %}
+            >
+              {{ pricing.lifetime.badge }}
+            </div>
             <div class="pricing-plan">Pro — Lifetime</div>
-            <div class="pricing-price"><sup>$</sup>40<span> once</span></div>
+
+            <div class="pricing-price">
+              {% if pricing.lifetime.discount_usd %}
+              <span
+                style="
+                  text-decoration: line-through;
+                  font-size: 24px;
+                  color: var(--mut);
+                  margin-right: 8px;
+                "
+                ><sup>$</sup>{{ pricing.lifetime.base_usd }}</span
+              >
+              <sup>$</sup>{{ pricing.lifetime.discount_usd }}<span> once</span>
+              {% else %}
+              <sup>$</sup>{{ pricing.lifetime.base_usd }}<span> once</span>
+              {% endif %}
+            </div>
+
             <div class="pricing-desc">
               Pay once, use forever. No recurring charges.
             </div>
@@ -2205,11 +2269,13 @@
               <li>No recurring payments</li>
               <li>Priority feature access</li>
             </ul>
-            <a href="/pricing"
-              ><button class="pricing-btn pri">
-                Get Lifetime Access — $40
-              </button></a
-            >
+            <a href="/pricing">
+              <button class="pricing-btn pri">
+                Get Lifetime Access — ${% if pricing.lifetime.discount_usd %}{{
+                pricing.lifetime.discount_usd }}{% else %}{{
+                pricing.lifetime.base_usd }}{% endif %}
+              </button>
+            </a>
           </div>
         </div>
       </div>

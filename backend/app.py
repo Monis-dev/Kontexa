@@ -153,6 +153,26 @@ class Feedback(db.Model):
     message    = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+
+# ─── Pricing Config ───────────────────────────────────────────────────────────────────
+PRICING_CONFIG = {
+    "monthly": {
+        "base_usd": 2,
+        "base_inr_paise": 18000,  # 180.00 INR
+        "discount_usd": None,     # Set to an integer (e.g., 1) to run a sale
+        "discount_inr_paise": None, 
+        "promo_badge": "Most Popular"
+    },
+    "lifetime": {
+        "base_usd": 40,
+        "base_inr_paise": 350000, # 3500.00 INR
+        "discount_usd": 25,       # EXAMPLE ACTIVE SALE: Reduced to $25
+        "discount_inr_paise": 210000, # Reduced to 2100.00 INR
+        "promo_badge": "🔥 Launch Sale!"
+    }
+}
+
+
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 
 google = oauth.register(
@@ -169,7 +189,7 @@ def wakeUp():
 
 @app.route("/")
 def home():
-    return render_template("index.html")
+    return render_template("index.html", pricing=PRICING_CONFIG)
 
 @app.route('/privacy')
 def privacy():
@@ -323,8 +343,8 @@ def pricing():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     user = db.session.get(User, session['user_id'])
-    
-    return render_template('pricing.html', email=user.email, razorpay_key_id=RAZORPAY_KEY_ID)
+
+    return render_template('pricing.html', email=user.email, razorpay_key_id=RAZORPAY_KEY_ID, pricing=PRICING_CONFIG)
 
 @app.route('/create-order', methods=['POST'])
 def create_order():
@@ -334,15 +354,16 @@ def create_order():
     data = request.json
     if not data:
         return jsonify({"error": "Invalid request"}), 400
+    
     plan_type = data.get("plan_type")
-    if plan_type == "lifetime":
-        amount   = 350000
-        currency = "INR"
-    elif plan_type == "monthly":
-        amount   = 18000
-        currency = "INR"
-    else:
+    plan_data = PRICING_CONFIG.get(plan_type)
+    
+    if not plan_data:
         return jsonify({"error": "Invalid plan"}), 400
+
+    amount = plan_data["discount_inr_paise"] if plan_data["discount_inr_paise"] else plan_data["base_inr_paise"]
+    currency = "INR"
+
     order = client.order.create({
         "amount": amount,
         "currency": currency,

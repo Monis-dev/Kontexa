@@ -6,81 +6,108 @@
     <title>Upgrade to Kontexa Pro</title>
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <style>
+      * {
+        box-sizing: border-box;
+      }
+
       body {
         font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
         background: #f8fafc;
         color: #0f172a;
         margin: 0;
-        padding: 60px 20px;
+        padding: 40px 16px;
       }
+
       .container {
-        max-width: 800px;
+        max-width: 960px;
         margin: 0 auto;
         text-align: center;
       }
+
       h1 {
         color: #1e293b;
-        font-size: 36px;
-        margin-bottom: 10px;
+        font-size: clamp(24px, 5vw, 36px);
+        margin-bottom: 8px;
       }
+
       p.subtitle {
         color: #64748b;
-        font-size: 16px;
-        margin-bottom: 50px;
+        font-size: clamp(13px, 3vw, 16px);
+        margin-bottom: 40px;
       }
+
       .grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 30px;
-        align-items: center;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+        align-items: start;
       }
-      @media (max-width: 600px) {
+
+      @media (max-width: 780px) {
         .grid {
           grid-template-columns: 1fr;
+          max-width: 420px;
+          margin: 0 auto;
+        }
+      }
+
+      @media (min-width: 781px) and (max-width: 960px) {
+        .grid {
+          grid-template-columns: 1fr 1fr;
+        }
+        .card:first-child {
+          grid-column: 1 / -1;
+          max-width: 420px;
+          margin: 0 auto;
+          width: 100%;
         }
       }
 
       .card {
         background: #fff;
         border-radius: 16px;
-        padding: 40px;
+        padding: 32px 28px;
         text-align: left;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
         border: 1px solid #e2e8f0;
+        position: relative;
       }
+
       .card.pro {
         border: 2px solid #4f46e5;
         box-shadow: 0 20px 50px rgba(79, 70, 229, 0.15);
-        position: relative;
         background: #fafaff;
       }
+
       .badge {
         position: absolute;
-        top: -12px;
+        top: -13px;
         left: 50%;
         transform: translateX(-50%);
         background: #4f46e5;
         color: white;
-        padding: 6px 16px;
+        padding: 5px 14px;
         border-radius: 20px;
-        font-size: 13px;
+        font-size: 12px;
         font-weight: bold;
         white-space: nowrap;
       }
 
       h2 {
-        margin: 0 0 10px;
-        font-size: 24px;
+        margin: 0 0 8px;
+        font-size: clamp(18px, 3vw, 22px);
         color: #0f172a;
       }
+
       .price {
-        font-size: 42px;
+        font-size: clamp(32px, 5vw, 40px);
         font-weight: bold;
-        margin-bottom: 24px;
+        margin-bottom: 20px;
         color: #0f172a;
       }
+
       .price span {
-        font-size: 16px;
+        font-size: 14px;
         color: #64748b;
         font-weight: normal;
       }
@@ -88,43 +115,59 @@
       ul {
         list-style: none;
         padding: 0;
-        margin: 0 0 30px;
+        margin: 0 0 24px;
       }
+
       li {
-        margin-bottom: 14px;
-        font-size: 15px;
+        margin-bottom: 12px;
+        font-size: clamp(13px, 2vw, 15px);
         color: #334155;
         display: flex;
-        align-items: center;
-        gap: 10px;
+        align-items: flex-start;
+        gap: 8px;
+        line-height: 1.4;
       }
+
       li::before {
         content: "✅";
-        font-size: 14px;
+        font-size: 13px;
+        flex-shrink: 0;
+        margin-top: 1px;
       }
 
       button {
         width: 100%;
-        padding: 14px;
+        padding: 13px;
         border-radius: 10px;
         font-weight: bold;
-        font-size: 16px;
+        font-size: clamp(14px, 2vw, 16px);
         cursor: pointer;
         border: none;
         transition: 0.2s;
       }
+
       .btn-outline {
         background: #f1f5f9;
         color: #475569;
       }
+
       .btn-primary {
         background: #4f46e5;
         color: white;
         box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);
       }
+
       .btn-primary:hover {
         background: #4338ca;
         transform: translateY(-2px);
+      }
+
+      .card-note {
+        text-align: center;
+        font-size: 12px;
+        color: #64748b;
+        margin-top: 12px;
+        margin-bottom: 0;
       }
     </style>
   </head>
@@ -133,31 +176,51 @@
       <h1>Supercharge Your Research</h1>
       <p class="subtitle">Logged in as: <b>{{ email }}</b></p>
 
-      <div class="grid" style="grid-template-columns: 1fr 1fr 1fr">
+      <div class="grid">
         <!-- Free Tier -->
         <div class="card">
           <h2>Free Edition</h2>
           <div class="price">$0<span>/forever</span></div>
-
           <ul>
             <li>Unlimited local highlights</li>
-            <li>Save text notes & screenshots</li>
+            <li>Save text notes &amp; screenshots</li>
             <li>Group by domain</li>
             <li>Beautiful local dashboard</li>
             <li>Color themes</li>
           </ul>
-
           <button class="btn-outline" disabled>Your Current Plan</button>
         </div>
 
         <!-- Monthly Plan -->
         <div class="card pro">
-          <div class="badge">⭐ Most Popular</div>
-
+          <div
+            class="badge"
+            {%
+            if
+            pricing.monthly.discount_usd
+            %}style="background: #ea580c"
+            {%
+            endif
+            %}
+          >
+            {{ pricing.monthly.badge }}
+          </div>
           <h2>Pro Monthly</h2>
-
-          <div class="price">$2<span>/month</span></div>
-
+          <div class="price">
+            {% if pricing.monthly.discount_usd %}
+            <span
+              style="
+                text-decoration: line-through;
+                font-size: 22px;
+                color: #94a3b8;
+                margin-right: 8px;
+              "
+              >${{ pricing.monthly.base_usd }}</span
+            >
+            ${{ pricing.monthly.discount_usd }}<span>/month</span> {% else %}
+            ${{ pricing.monthly.base_usd }}<span>/month</span>
+            {% endif %}
+          </div>
           <ul>
             <li><b>Everything in Free, plus:</b></li>
             <li>☁️ Cloud Sync</li>
@@ -166,31 +229,42 @@
             <li>✨ AI page summaries</li>
             <li>🔑 Bring your own API key</li>
           </ul>
-
           <button class="btn-primary" onclick="startPayment('monthly')">
             Start Monthly Plan
           </button>
-
-          <p
-            style="
-              text-align: center;
-              font-size: 12px;
-              color: #64748b;
-              margin-top: 15px;
-            "
-          >
-            Cancel anytime
-          </p>
+          <p class="card-note">Cancel anytime</p>
         </div>
 
         <!-- Lifetime Plan -->
         <div class="card">
-          <div class="badge">🚀 Best Value</div>
-
+          <div
+            class="badge"
+            {%
+            if
+            pricing.lifetime.discount_usd
+            %}style="background: #ea580c"
+            {%
+            endif
+            %}
+          >
+            {{ pricing.lifetime.badge }}
+          </div>
           <h2>Pro Lifetime</h2>
-
-          <div class="price">$40<span>/one-time</span></div>
-
+          <div class="price">
+            {% if pricing.lifetime.discount_usd %}
+            <span
+              style="
+                text-decoration: line-through;
+                font-size: 22px;
+                color: #94a3b8;
+                margin-right: 8px;
+              "
+              >${{ pricing.lifetime.base_usd }}</span
+            >
+            ${{ pricing.lifetime.discount_usd }}<span>/one-time</span> {% else
+            %} ${{ pricing.lifetime.base_usd }}<span>/one-time</span>
+            {% endif %}
+          </div>
           <ul>
             <li><b>Everything in Monthly, plus:</b></li>
             <li>♾ Lifetime access</li>
@@ -198,96 +272,56 @@
             <li>🚀 Priority feature access</li>
             <li>💎 One-time payment</li>
           </ul>
-
           <button class="btn-primary" onclick="startPayment('lifetime')">
             Buy Lifetime Access
           </button>
-
-          <p
-            style="
-              text-align: center;
-              font-size: 12px;
-              color: #64748b;
-              margin-top: 15px;
-            "
-          >
-            Pay once, use forever
-          </p>
+          <p class="card-note">Pay once, use forever</p>
         </div>
       </div>
     </div>
+
     <script>
       async function startPayment(planType) {
         try {
-          // Create order on backend
           const res = await fetch("/create-order", {
             method: "POST",
-
             credentials: "include",
-
-            headers: {
-              "Content-Type": "application/json",
-            },
-
-            body: JSON.stringify({
-              plan_type: planType,
-            }),
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ plan_type: planType }),
           });
 
           const order = await res.json();
-
           if (!order.id) {
             alert("Order creation failed");
             return;
           }
 
           const options = {
-            key: "{{ razorpay_key_id }}", // replace later
-
+            key: "{{ razorpay_key_id }}",
             amount: order.amount,
-
             currency: order.currency,
-
-            name: "ContextNote",
-
-            description: "Pro Lifetime Access",
-
+            name: "Kontexa",
+            description: "Pro Access",
             order_id: order.id,
-
             handler: async function (response) {
-              // Verify payment
               const verifyRes = await fetch("/verify-payment", {
                 method: "POST",
-
                 credentials: "include",
-
-                headers: {
-                  "Content-Type": "application/json",
-                },
-
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(response),
               });
-
               const result = await verifyRes.json();
-
-              if (result.status === "success") {
+              if (result.status === "success")
                 window.location.href = "/success";
-              } else {
-                alert("Payment verification failed");
-              }
+              else alert("Payment verification failed");
             },
-
-            theme: {
-              color: "#4f46e5",
-            },
+            theme: { color: "#4f46e5" },
           };
 
           const rzp = new Razorpay(options);
-
           rzp.open();
         } catch (err) {
           console.error(err);
-
           alert("Payment failed");
         }
       }
