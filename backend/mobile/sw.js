@@ -1,27 +1,32 @@
-// ContextNote PWA — Service Worker v1.4
-const CACHE = 'cn-pwa-v1.4';
-const STATIC = [
-  "./",
-  "./index.html",
-  "./app.css",
-  "./app.js",
-  "./ai_agent.js",
-  "./manifest.json",
+// ContextNote PWA — Service Worker v1.5 (BUMPED VERSION to force update)
+const CACHE = "cn-pwa-v1.5";
 
-  "./icons/icon-192.png",
-  "./icons/icon-512.png",
+// Use absolute paths relative to the domain to avoid confusion
+const STATIC = [
+  "/mobile/",
+  "/mobile/index.html",
+  "/mobile/app.css",
+  "/mobile/app.js",
+  "/mobile/ai_agent.js",
+  "/mobile/manifest.json",
+  "/mobile/icons/icon-192.png",
+  "/mobile/icons/icon-512.png",
 ];
 
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)));
+self.addEventListener("install", (e) => {
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(STATIC)));
   self.skipWaiting();
 });
 
-self.addEventListener('activate', e => {
+self.addEventListener("activate", (e) => {
   e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    )
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)),
+        ),
+      ),
   );
   self.clients.claim();
 });
@@ -37,30 +42,30 @@ self.addEventListener("fetch", (e) => {
     url.hostname.includes("api.openai.com") ||
     url.hostname.includes("accounts.google.com")
   ) {
-    e.respondWith(
-      fetch(req)
-        .then((res) => {
-          return res;
-        })
-        .catch(() => caches.match(req)),
-    );
+    e.respondWith(fetch(req).catch(() => caches.match(req)));
     return;
   }
 
   // Everything else → cache first
   e.respondWith(
-    caches.match(req).then((cached) => {
+    // ignoreSearch: true is CRITICAL for PWA home screen launches
+    caches.match(req, { ignoreSearch: true }).then((cached) => {
       if (cached) return cached;
 
       return fetch(req)
         .then((res) => {
+          // Dynamically cache new files as we fetch them
           return caches.open(CACHE).then((cache) => {
             cache.put(req, res.clone());
             return res;
           });
         })
         .catch(() => {
-          return caches.match("./index.html");
+          // If totally offline and file isn't cached, return index.html
+          // Use mode 'navigate' to only return index.html for page requests, not missing images/css
+          if (req.mode === "navigate") {
+            return caches.match("/mobile/index.html", { ignoreSearch: true });
+          }
         });
     }),
   );

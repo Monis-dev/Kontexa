@@ -2,7 +2,7 @@
   "name": "Kontexa",
   "short_name": "Kontexa",
   "description": "Your saved notes, everywhere.",
-  "start_url": "/mobile/",
+  "start_url": "/mobile/index.html",
   "scope": "/mobile/",
   "display": "standalone",
   "orientation": "portrait",
@@ -25,6 +25,6 @@
     }
   ],
   "shortcuts": [
-    { "name": "Ask AI", "short_name": "Ask AI", "url": "./index.html#ai" }
+    { "name": "Ask AI", "short_name": "Ask AI", "url": "/mobile/index.html#ai" }
   ]
 }
