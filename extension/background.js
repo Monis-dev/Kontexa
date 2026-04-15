@@ -267,7 +267,7 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
 
       if (!selectionText && media.timestamp) {
         selectionText = `Saved at timestamp ${media.timestamp}`;
-      } 
+      }
 
       // ── Build dialog ──
       const dialog = document.createElement("dialog");
@@ -289,8 +289,9 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
         color: var(--ink);
         z-index: 2147483647;
         position: fixed;
-        top: 20px;
-        right: 20px;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
         margin: 0;
         box-sizing: border-box;
       `;
@@ -317,7 +318,6 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
         ? `<div style="font-size:12px;font-style:italic;color:#92400e;background:#fffbeb;padding:10px;border-left:3px solid #f59e0b;margin-bottom:12px;border-radius:4px;max-height:80px;overflow-y:auto;line-height:1.4; white-space: pre-wrap;">"${selectionText}"</div>`
         : "";
 
-
       let folderHtml = "";
       if (isProUser && folders.length > 0) {
         folderHtml = `
@@ -338,8 +338,8 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
 
         ${selectionBoxHtml}
 
-        <input type="text" id="cn-title" placeholder="Note Heading..." style="width:100%;box-sizing:border-box;padding:10px;margin-bottom:8px;border:1px solid var(--bdr);border-radius:6px;font-size:13px;outline:none;background:var(--sur);color:var(--ink);" />
-        <textarea id="cn-desc" placeholder="Add a description..." style="width:100%;box-sizing:border-box;padding:10px;height:70px;margin-bottom:8px;border:1px solid var(--bdr);border-radius:6px;resize:none;font-size:13px;font-family:inherit;outline:none;background:var(--sur);color:var(--ink);"></textarea>
+        <input type="text" id="cn-title" placeholder="Note Heading..." style="display:block; width:100%; box-sizing:border-box; padding:10px; margin:0 0 8px 0; border:1px solid var(--bdr); border-radius:6px; font-size:13px; font-family:inherit; outline:none; background:var(--sur); color:var(--ink);" />
+        <textarea id="cn-desc" placeholder="Add a description..." style="display:block; width:100%; box-sizing:border-box; padding:10px; height:70px; margin:0 0 8px 0; border:1px solid var(--bdr); border-radius:6px; resize:none; font-size:13px; font-family:inherit; outline:none; background:var(--sur); color:var(--ink);"></textarea>
 
         ${generalToggleHtml}
         ${folderHtml}

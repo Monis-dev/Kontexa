@@ -613,245 +613,288 @@
 
     <!-- Data Guide Modal -->
     <div class="mbg" id="guideModal">
-      <div class="modal" style="max-width: 420px">
-        <h3 style="margin-bottom: 6px">Sign in to Kontexa</h3>
-        <p
-          style="
-            font-size: 13px;
-            color: var(--mut);
-            margin: 0 0 20px;
-            line-height: 1.5;
-          "
-        >
-          Your notes are already saved locally. Signing in unlocks sync and Pro
-          features.
-        </p>
-
-        <!-- Row: Free account -->
+      <div
+        class="modal"
+        style="
+          max-width: 690px;
+          padding: 0;
+          overflow: hidden;
+          border-radius: 16px;
+          margin: 0;
+        "
+      >
         <div
-          style="
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-            padding: 13px 0;
-            border-bottom: 1px solid var(--bdr);
-          "
+          id="guideSlider"
+          style="position: relative; overflow: hidden; width: 100%"
         >
           <div
+            id="guideSlides"
             style="
+              display: flex;
+              transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+              will-change: transform;
+            "
+          >
+            <!-- Slide 1 -->
+            <div
+              class="guide-slide"
+              style="min-width: 100%; display: flex; flex-direction: column"
+            >
+              <div
+                style="
+                  position: relative;
+                  background: #000;
+                  aspect-ratio: 16/9;
+                  overflow: hidden;
+                "
+              >
+                <div
+                  class="guide-video-placeholder"
+                  data-index="0"
+                  style="
+                    width: 100%;
+                    height: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                  "
+                >
+                  <div
+                    style="
+                      width: 48px;
+                      height: 48px;
+                      border-radius: 50%;
+                      background: rgba(255, 255, 255, 0.12);
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="white"
+                    >
+                      <polygon points="5 3 19 12 5 21 5 3" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              <div style="padding: 6px 12px 2px">
+                <p
+                  style="
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: var(--ink);
+                    margin: 0 0 2px;
+                  "
+                >
+                  1 — Highlight &amp; Save
+                </p>
+                <p
+                  style="
+                    font-size: 12px;
+                    color: var(--mut);
+                    margin: 0;
+                    line-height: 1.5;
+                  "
+                >
+                  Select any text on a webpage, right-click or press <strong>ALT + SHIFT + S</strong>, and choose
+                  <strong>Save to Kontexa</strong>. Add a title and note, then
+                  hit save.
+                </p>
+              </div>
+            </div>
+
+            <!-- Slide 2 -->
+            <div
+              class="guide-slide"
+              style="min-width: 100%; display: flex; flex-direction: column"
+            >
+              <div
+                style="
+                  position: relative;
+                  background: #000;
+                  aspect-ratio: 16/9;
+                  overflow: hidden;
+                "
+              >
+                <div
+                  class="guide-video-placeholder"
+                  data-index="1"
+                  style="
+                    width: 100%;
+                    height: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                  "
+                >
+                  <div
+                    style="
+                      width: 48px;
+                      height: 48px;
+                      border-radius: 50%;
+                      background: rgba(255, 255, 255, 0.12);
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="white"
+                    >
+                      <polygon points="5 3 19 12 5 21 5 3" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              <div style="padding: 6px 12px 2px">
+                <p
+                  style="
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: var(--ink);
+                    margin: 0 0 2px;
+                  "
+                >
+                  2 — Open Dashboard
+                </p>
+                <p
+                  style="
+                    font-size: 12px;
+                    color: var(--mut);
+                    margin: 0;
+                    line-height: 1.5;
+                  "
+                >
+                  Click the Kontexa icon in your toolbar to open your dashboard,
+                  browse notes by source, search, and export.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Prev arrow -->
+          <button
+            id="guidePrev"
+            style="
+              position: absolute;
+              left: 8px;
+              top: calc(50% - 44px);
+              transform: translateY(-50%);
               width: 32px;
               height: 32px;
-              border-radius: 8px;
-              background: #eaf3de;
+              border-radius: 50%;
+              background: rgba(0, 0, 0, 0.45);
+              border: none;
+              cursor: pointer;
               display: flex;
               align-items: center;
               justify-content: center;
-              flex-shrink: 0;
+              opacity: 0;
+              pointer-events: none;
+              transition: opacity 0.2s;
             "
           >
             <svg
-              width="15"
-              height="15"
+              width="14"
+              height="14"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#3B6D11"
-              stroke-width="2"
+              stroke="white"
+              stroke-width="2.5"
               stroke-linecap="round"
-              stroke-linejoin="round"
             >
-              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
+              <polyline points="15 18 9 12 15 6" />
             </svg>
-          </div>
-          <div>
-            <p
-              style="
-                font-size: 13px;
-                font-weight: 600;
-                color: var(--ink);
-                margin: 0 0 3px;
-              "
-            >
-              Free account
-            </p>
-            <p
-              style="
-                font-size: 12px;
-                color: var(--mut);
-                margin: 0;
-                line-height: 1.5;
-              "
-            >
-              Sign in with Google to confirm your identity and keep notes safe
-              across reinstalls.
-            </p>
-          </div>
-        </div>
+          </button>
 
-        <!-- Row: Pro -->
-        <div
-          style="
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-            padding: 13px 0;
-            border-bottom: 1px solid var(--bdr);
-          "
-        >
-          <div
+          <!-- Next arrow -->
+          <button
+            id="guideNext"
             style="
+              position: absolute;
+              right: 8px;
+              top: calc(50% - 44px);
+              transform: translateY(-50%);
               width: 32px;
               height: 32px;
-              border-radius: 8px;
-              background: #eeedfe;
+              border-radius: 50%;
+              background: rgba(0, 0, 0, 0.45);
+              border: none;
+              cursor: pointer;
               display: flex;
               align-items: center;
               justify-content: center;
-              flex-shrink: 0;
+              transition: opacity 0.2s;
             "
           >
             <svg
-              width="15"
-              height="15"
+              width="14"
+              height="14"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#534AB7"
-              stroke-width="2"
+              stroke="white"
+              stroke-width="2.5"
               stroke-linecap="round"
-              stroke-linejoin="round"
             >
-              <rect x="2" y="3" width="20" height="14" rx="2" />
-              <line x1="8" y1="21" x2="16" y2="21" />
-              <line x1="12" y1="17" x2="12" y2="21" />
+              <polyline points="9 18 15 12 9 6" />
             </svg>
-          </div>
-          <div>
-            <p
-              style="
-                font-size: 13px;
-                font-weight: 600;
-                color: var(--ink);
-                margin: 0 0 3px;
-              "
-            >
-              Pro — sync &amp; cross-device access
-            </p>
-            <p
-              style="
-                font-size: 12px;
-                color: var(--mut);
-                margin: 0;
-                line-height: 1.5;
-              "
-            >
-              Upgrade after signing in to unlock cloud sync, mobile app, AI
-              notes, and more.
-            </p>
-          </div>
-        </div>
+          </button>
 
-        <!-- Row: No Pro -->
-        <div
-          style="
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-            padding: 13px 0;
-          "
-        >
+          <!-- Dots -->
           <div
             style="
-              width: 32px;
-              height: 32px;
-              border-radius: 8px;
-              background: #e6f1fb;
+              position: absolute;
+              bottom: 0;
+              left: 0;
+              right: 0;
               display: flex;
-              align-items: center;
               justify-content: center;
-              flex-shrink: 0;
+              gap: 6px;
+              padding: 6px 0;
             "
           >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#185FA5"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <rect x="3" y="11" width="18" height="11" rx="2" />
-              <path d="M7 11V7a5 5 0 0110 0v4" />
-            </svg>
-          </div>
-          <div>
-            <p
+            <div
+              class="guide-dot active"
+              data-dot="0"
               style="
-                font-size: 13px;
-                font-weight: 600;
-                color: var(--ink);
-                margin: 0 0 3px;
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background: rgba(255, 255, 255, 0.9);
+                transition: background 0.2s;
+                cursor: pointer;
               "
-            >
-              No Pro? No problem
-            </p>
-            <p
+            ></div>
+            <div
+              class="guide-dot"
+              data-dot="1"
               style="
-                font-size: 12px;
-                color: var(--mut);
-                margin: 0;
-                line-height: 1.5;
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background: rgba(255, 255, 255, 0.35);
+                transition: background 0.2s;
+                cursor: pointer;
               "
-            >
-              If you sign in without upgrading, you'll be asked to upgrade or
-              log out — your local notes stay untouched either way.
-            </p>
+            ></div>
           </div>
         </div>
 
-        <!-- Warning notice -->
+        <!-- Footer -->
         <div
           style="
+            padding: 6px 12px 10px;
             display: flex;
-            align-items: flex-start;
-            gap: 10px;
-            background: var(--hbg);
-            border: 1px solid var(--hbdr);
-            border-radius: 8px;
-            padding: 12px 14px;
-            margin: 16px 0 20px;
+            flex-direction: column;
+            gap: 6px;
           "
-        >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#b45309"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            style="flex-shrink: 0; margin-top: 1px"
-          >
-            <path
-              d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
-            />
-            <line x1="12" y1="9" x2="12" y2="13" />
-            <line x1="12" y1="17" x2="12.01" y2="17" />
-          </svg>
-          <p
-            style="font-size: 12px; color: #92400e; margin: 0; line-height: 1.5"
-          >
-            Signing in alone does not sync your notes — cloud sync requires a
-            Pro subscription.
-          </p>
-        </div>
-
-        <div
-          class="macts"
-          id="guideActs"
-          style="flex-direction: column; gap: 8px"
         >
           <button
             class="btn pri"
@@ -861,11 +904,12 @@
             Continue with Google
           </button>
           <button class="btn" id="closeGuideBtn" style="width: 100%">
-            Maybe later
+            Close
           </button>
         </div>
       </div>
     </div>
+
     <!-- Logout Modal -->
     <div class="mbg" id="logoutModal">
       <div class="modal">

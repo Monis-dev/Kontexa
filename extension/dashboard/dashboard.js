@@ -1093,6 +1093,8 @@ function loadLocalUI() {
     if (JSON.stringify(persistedFolders) !== JSON.stringify(userFolders)) {
       chrome.storage.local.set({ [FOLDERS_KEY]: userFolders });
     }
+    userFolders = userFolders.filter((f) => (folderCounts[f] || 0) > 0);
+    chrome.storage.local.set({ [FOLDERS_KEY]: userFolders });
     userFolders.forEach((f) => {
       if (!groupedFolders[f]) {
         groupedFolders[f] = {
@@ -1105,7 +1107,10 @@ function loadLocalUI() {
       }
     });
 
-    render(Object.values(groupedUrls), Object.values(groupedFolders));
+    render(
+      Object.values(groupedUrls),
+      Object.values(groupedFolders).filter((g) => g.notes.length > 0),
+    );
     renderFoldersSidebar();
   });
 }
@@ -2327,3 +2332,140 @@ E($("manageSubBtn"), "click", () => {
   window.open(`${API_BASE}/pricing`, "_blank");
   closeSettingsPanel();
 });
+
+
+/* ═══════════════════════════════════════
+   GUIDE MODAL — lazy video slider
+═══════════════════════════════════════ */
+(function () {
+  // ── Video sources: swap in your real URLs ──────────────────────────────────
+  const GUIDE_VIDEOS = [
+    {
+      src: chrome.runtime.getURL("dashboard/guide/Highlight-save.mp4"),
+      poster: "",
+    },
+    {
+      src: chrome.runtime.getURL("dashboard/guide/dashboard-open.mp4"),
+      poster: "",
+    },
+  ];
+  let currentSlide = 0;
+  const totalSlides = GUIDE_VIDEOS.length;
+  let videosLoaded = [false, false];
+
+  function getSlides()    { return document.querySelectorAll(".guide-slide"); }
+  function getDots()      { return document.querySelectorAll(".guide-dot"); }
+  function getVideos()    { return document.querySelectorAll(".guide-slide video"); }
+  function getSlideEl(i) { return getSlides()[i]; }
+
+  // Inject a <video> into slide i the first time it becomes visible
+  function loadVideoForSlide(i) {
+    if (videosLoaded[i]) return;
+    videosLoaded[i] = true;
+
+    const placeholder = getSlideEl(i)?.querySelector(".guide-video-placeholder");
+    if (!placeholder) return;
+
+    const cfg = GUIDE_VIDEOS[i];
+    const vid = document.createElement("video");
+    vid.src        = cfg.src;
+    vid.loop       = true;
+    vid.muted      = true;
+    vid.autoplay   = false;
+    vid.playsinline = true;
+    vid.controls   = false;
+    if (cfg.poster) vid.poster = cfg.poster;
+    vid.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;";
+
+    // Remove the play-icon placeholder, insert video
+    placeholder.replaceWith(vid);
+  }
+
+  function goToSlide(i) {
+    // Pause video leaving
+    const leaving = getSlideEl(currentSlide)?.querySelector("video");
+    if (leaving) leaving.pause();
+
+    currentSlide = i;
+
+    // Slide the wrapper
+    const slidesEl = document.getElementById("guideSlides");
+    if (slidesEl) slidesEl.style.transform = `translateX(-${i * 100}%)`;
+
+    // Dots
+    getDots().forEach((d) => {
+      const isActive = parseInt(d.dataset.dot) === i;
+      d.style.background = isActive ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.35)";
+    });
+
+    // Arrows
+    const prev = document.getElementById("guidePrev");
+    const next = document.getElementById("guideNext");
+    if (prev) { prev.style.opacity = i === 0 ? "0" : "1"; prev.style.pointerEvents = i === 0 ? "none" : "auto"; }
+    if (next) { next.style.opacity = i === totalSlides - 1 ? "0" : "1"; next.style.pointerEvents = i === totalSlides - 1 ? "none" : "auto"; }
+
+    // Lazy-load and play
+    loadVideoForSlide(i);
+    const arriving = getSlideEl(i)?.querySelector("video");
+    if (arriving) arriving.play().catch(() => {});
+  }
+
+  // Open: load + play slide 0, reset to start
+  function onGuideOpen() {
+    goToSlide(0);
+  }
+
+  // Close: pause all videos
+  function onGuideClose() {
+    getVideos().forEach((v) => v.pause());
+  }
+
+  // Wire up existing close button + overlay click (supplement existing listeners)
+  const closeBtn = document.getElementById("closeGuideBtn");
+  if (closeBtn) closeBtn.addEventListener("click", onGuideClose);
+
+  const overlay = document.getElementById("guideModal");
+  if (overlay) {
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) onGuideClose();
+    });
+  }
+
+  // Intercept the infoBtn click to also trigger onGuideOpen
+  const infoBtn = document.getElementById("infoBtn");
+  if (infoBtn) {
+    infoBtn.addEventListener("click", onGuideOpen);
+  }
+  // Also hook proceedLoginBtn open path (the guide can open from paywall flow too)
+  const proceedBtn = document.getElementById("proceedLoginBtn");
+  if (proceedBtn) {
+    proceedBtn.addEventListener("click", onGuideClose);
+  }
+
+  // Prev / Next buttons
+  document.getElementById("guidePrev")?.addEventListener("click", () => {
+    if (currentSlide > 0) goToSlide(currentSlide - 1);
+  });
+  document.getElementById("guideNext")?.addEventListener("click", () => {
+    if (currentSlide < totalSlides - 1) goToSlide(currentSlide + 1);
+  });
+
+  // Dot clicks
+  document.querySelectorAll(".guide-dot").forEach((dot) => {
+    dot.addEventListener("click", () => goToSlide(parseInt(dot.dataset.dot)));
+  });
+
+  // Touch swipe support
+  let touchStartX = 0;
+  const sliderEl = document.getElementById("guideSlider");
+  if (sliderEl) {
+    sliderEl.addEventListener("touchstart", (e) => { touchStartX = e.touches[0].clientX; }, { passive: true });
+    sliderEl.addEventListener("touchend", (e) => {
+      const diff = touchStartX - e.changedTouches[0].clientX;
+      if (Math.abs(diff) > 40) {
+        if (diff > 0 && currentSlide < totalSlides - 1) goToSlide(currentSlide + 1);
+        if (diff < 0 && currentSlide > 0) goToSlide(currentSlide - 1);
+      }
+    }, { passive: true });
+  }
+})();
