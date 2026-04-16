@@ -13,6 +13,8 @@ from authlib.integrations.flask_client import OAuth
 from flask_cors import CORS
 from dotenv import load_dotenv
 from markupsafe import escape
+from sqlalchemy import func, text as sa_text
+
 
 
 
@@ -118,6 +120,7 @@ class User(db.Model):
     plan_type      = db.Column(db.String(20), default='free') # 'free', 'monthly', 'lifetime'
     pro_expires_at = db.Column(db.DateTime, nullable=True)
     websites       = db.relationship('Website', backref='user', lazy=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Website(db.Model):
     id          = db.Column(db.Integer, primary_key=True)
@@ -145,13 +148,22 @@ class Note(db.Model):
 class Feedback(db.Model):
     __tablename__ = 'feedback'
     id         = db.Column(db.Integer, primary_key=True)
-    # THIS LINE MUST BE INTEGER AND POINT TO 'user.id'
     user_id    = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True) 
     email      = db.Column(db.String(255), nullable=True)
     fb_type    = db.Column(db.String(50), default='feature')
     subject    = db.Column(db.String(255), nullable=True)
     message    = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class PricingConfig(db.Model):
+    __tablename__      = 'pricing_config'
+    id                 = db.Column(db.Integer, primary_key=True)
+    plan_type          = db.Column(db.String(20), unique=True, nullable=False) # 'monthly' or 'lifetime'
+    base_usd           = db.Column(db.Integer, nullable=False)
+    base_inr_paise     = db.Column(db.Integer, nullable=False)
+    discount_usd       = db.Column(db.Integer, nullable=True)
+    discount_inr_paise = db.Column(db.Integer, nullable=True)
+    promo_badge        = db.Column(db.String(100), nullable=True)
 
 
 # ─── Pricing Config ───────────────────────────────────────────────────────────────────
@@ -172,6 +184,39 @@ PRICING_CONFIG = {
     }
 }
 
+DEFAULT_PRICING = {
+    "monthly": {
+        "base_usd": 2, "base_inr_paise": 18000, 
+        "discount_usd": None, "discount_inr_paise": None, "promo_badge": "Most Popular"
+    },
+    "lifetime": {
+        "base_usd": 40, "base_inr_paise": 350000, 
+        "discount_usd": 25, "discount_inr_paise": 210000, "promo_badge": "🔥 Launch Sale!"
+    }
+}
+
+def get_pricing_config():
+    """Fetches pricing from the DB, falls back to DEFAULT_PRICING if DB is empty."""
+    try:
+        plans = PricingConfig.query.all()
+        if not plans:
+            return DEFAULT_PRICING
+            
+        config = {}
+        for p in plans:
+            config[p.plan_type] = {
+                "base_usd": p.base_usd,
+                "base_inr_paise": p.base_inr_paise,
+                "discount_usd": p.discount_usd,
+                "discount_inr_paise": p.discount_inr_paise,
+                "promo_badge": p.promo_badge
+            }
+        return config
+    except Exception as e:
+        app.logger.error(f"Error fetching pricing: {e}")
+        return DEFAULT_PRICING
+
+
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -189,7 +234,7 @@ def wakeUp():
 
 @app.route("/")
 def home():
-    return render_template("index.html", pricing=PRICING_CONFIG)
+    return render_template("index.html", pricing=get_pricing_config())
 
 @app.route('/privacy')
 def privacy():
@@ -238,6 +283,174 @@ def mobile_app():
 @app.route("/mobile/<path:filename>")
 def mobile_static(filename):
     return send_from_directory(MOBILE_DIR, filename)
+
+
+# ─── Admin Dashboard ─────────────────────────────────────────────────────────────────
+
+@app.route('/api/admin/stats')
+def admin_stats():
+    if not _admin_token_required():
+        return jsonify({"error": "Forbidden"}), 403
+ 
+    try:
+        total_users    = User.query.count()
+        pro_users      = User.query.filter_by(is_pro=True).count()
+        lifetime_users = User.query.filter_by(plan_type='lifetime').count()
+        monthly_users  = User.query.filter_by(plan_type='monthly').count()
+        free_users     = User.query.filter_by(plan_type='free').count()
+        total_notes    = Note.query.count()
+        total_websites = Website.query.count()
+ 
+        expired_users = User.query.filter(
+            User.plan_type == 'monthly',
+            User.pro_expires_at != None,
+            User.pro_expires_at < datetime.utcnow()
+        ).count()
+
+        db_size_mb  = None
+        db_limit_mb = 512  # Neon/Supabase free tier is 512 MB — adjust if you upgrade
+ 
+        try:
+            result = db.session.execute(
+                sa_text("SELECT pg_database_size(current_database()) AS size")
+            ).fetchone()
+            if result:
+                db_size_mb = round(result.size / (1024 * 1024), 2)
+        except Exception as db_err:
+            app.logger.warning(f"Could not fetch DB size: {db_err}")
+ 
+        db_days_left = None
+        renewal_date_str = os.getenv("DB_RENEWAL_DATE")
+        if renewal_date_str:
+            try:
+                renewal_date = datetime.strptime(renewal_date_str, "%Y-%m-%d")
+                delta = renewal_date - datetime.utcnow()
+                db_days_left = max(0, delta.days)
+            except ValueError:
+                pass  # Bad date format in env — ignore
+ 
+        return jsonify({
+            "total_users":    total_users,
+            "pro_users":      pro_users,
+            "lifetime_users": lifetime_users,
+            "monthly_users":  monthly_users,
+            "free_users":     free_users,
+            "expired_users":  expired_users,
+            "total_notes":    total_notes,
+            "total_websites": total_websites,
+            "db_size_mb":     db_size_mb,
+            "db_limit_mb":    db_limit_mb,
+            "db_days_left":   db_days_left,
+        })
+ 
+    except Exception as e:
+        app.logger.error(f"admin_stats error: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+ 
+ 
+@app.route('/api/admin/users')
+def admin_users():
+    if not _admin_token_required():
+        return jsonify({"error": "Forbidden"}), 403
+ 
+    try:
+        users = User.query.order_by(User.id.desc()).all()
+        return jsonify([{
+            "id":            u.id,
+            "email":         u.email,
+            "is_pro":        u.is_pro,
+            "plan_type":     u.plan_type,
+            "pro_expires_at": u.pro_expires_at.isoformat() if u.pro_expires_at else None,
+            "created_at":    u.created_at.isoformat() if u.created_at else None,
+        } for u in users])
+ 
+    except Exception as e:
+        app.logger.error(f"admin_users error: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+ 
+@app.route('/api/admin/pricing', methods=['POST'])
+def admin_update_pricing():
+    """
+    Updates the pricing in the database.
+    Protected by X-Admin-Token header.
+    Expects body: { "plan_type": "lifetime", "discount_usd": 20, "discount_inr_paise": 180000, ... }
+    """
+    if not _admin_token_required():
+        return jsonify({"error": "Forbidden"}), 403
+
+    data = request.get_json(silent=True)
+    if not data or not data.get("plan_type"):
+        return jsonify({"error": "Invalid request body. 'plan_type' is required."}), 400
+
+    plan_type = data["plan_type"]
+    
+    try:
+        plan = PricingConfig.query.filter_by(plan_type=plan_type).first()
+        if not plan:
+            plan = PricingConfig(plan_type=plan_type, base_usd=0, base_inr_paise=0)
+            db.session.add(plan)
+
+        if 'base_usd' in data: plan.base_usd = data['base_usd']
+        if 'base_inr_paise' in data: plan.base_inr_paise = data['base_inr_paise']
+        
+        if 'discount_usd' in data: plan.discount_usd = data['discount_usd']
+        if 'discount_inr_paise' in data: plan.discount_inr_paise = data['discount_inr_paise']
+        
+        if 'promo_badge' in data: plan.promo_badge = data['promo_badge']
+
+        db.session.commit()
+        return jsonify({"ok": True, "message": f"{plan_type} pricing updated successfully!"})
+
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"admin_update_pricing error: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+ 
+@app.route('/api/admin/users/<int:user_id>/access', methods=['PATCH'])
+def admin_set_access(user_id):
+    if not _admin_token_required():
+        return jsonify({"error": "Forbidden"}), 403
+ 
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Invalid request body"}), 400
+ 
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+ 
+    try:
+        is_pro    = bool(data.get("is_pro", user.is_pro))
+        plan_type = str(data.get("plan_type", user.plan_type))
+ 
+        if plan_type not in ("free", "monthly", "lifetime"):
+            return jsonify({"error": "Invalid plan_type"}), 400
+ 
+        user.is_pro    = is_pro
+        user.plan_type = plan_type
+ 
+        if plan_type == "monthly" and is_pro:
+            # Grant 30 days from now
+            user.pro_expires_at = datetime.utcnow() + timedelta(days=30)
+        elif plan_type in ("lifetime", "free"):
+            user.pro_expires_at = None
+ 
+        db.session.commit()
+        app.logger.info(f"Admin updated user {user_id}: is_pro={is_pro}, plan={plan_type}")
+ 
+        return jsonify({
+            "ok": True,
+            "user_id":    user.id,
+            "is_pro":     user.is_pro,
+            "plan_type":  user.plan_type,
+        })
+ 
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"admin_set_access error: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
 
 
 # ─── Login / OAuth ────────────────────────────────────────────────────────────
@@ -344,7 +557,7 @@ def pricing():
         return redirect(url_for('login'))
     user = db.session.get(User, session['user_id'])
 
-    return render_template('pricing.html', email=user.email, razorpay_key_id=RAZORPAY_KEY_ID, pricing=PRICING_CONFIG)
+    return render_template('pricing.html', email=user.email, razorpay_key_id=RAZORPAY_KEY_ID, pricing=get_pricing_config())
 
 @app.route('/create-order', methods=['POST'])
 def create_order():
@@ -356,12 +569,20 @@ def create_order():
         return jsonify({"error": "Invalid request"}), 400
     
     plan_type = data.get("plan_type")
-    plan_data = PRICING_CONFIG.get(plan_type)
+    
+    # FETCH DYNAMIC PRICING HERE
+    current_pricing = get_pricing_config()
+    plan_data = current_pricing.get(plan_type)
     
     if not plan_data:
         return jsonify({"error": "Invalid plan"}), 400
 
-    amount = plan_data["discount_inr_paise"] if plan_data["discount_inr_paise"] else plan_data["base_inr_paise"]
+    # It is safer to check 'is not None' in case discount is exactly 0
+    if plan_data["discount_inr_paise"] is not None:
+        amount = plan_data["discount_inr_paise"]
+    else:
+        amount = plan_data["base_inr_paise"]
+        
     currency = "INR"
 
     order = client.order.create({
@@ -501,6 +722,7 @@ def submit_feedback():
         db.session.rollback()
         app.logger.error(f"Feedback error: {e}")
         return jsonify({'error': 'Internal Server Error'}), 500
+    
 @app.route('/api/admin/feedback-digest', methods=['GET'])
 def feedback_digest():
     # Simple secret check — add ADMIN_SECRET to your Render env vars

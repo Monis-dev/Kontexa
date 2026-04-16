@@ -1,0 +1,2323 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin — Kontexa</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gridstack@10.1.1/dist/gridstack-all.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/gridstack@10.1.1/dist/gridstack.min.css"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg: #f5f5f4;
+        --surface: #ffffff;
+        --border: #e5e5e3;
+        --border2: #d4d4d0;
+        --text: #18181b;
+        --text2: #71717a;
+        --text3: #a1a1aa;
+        --blue: #2563eb;
+        --green: #16a34a;
+        --red: #dc2626;
+        --amber: #d97706;
+        --radius: 8px;
+        --sans: "DM Sans", sans-serif;
+        --mono: "DM Mono", monospace;
+      }
+
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+        font-size: 13px;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ── LOGIN GATE ── */
+      #loginGate {
+        position: fixed;
+        inset: 0;
+        background: var(--bg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      }
+      #loginGate.hidden {
+        display: none;
+      }
+
+      .login-box {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 32px;
+        width: 340px;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+      }
+
+      .login-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 28px;
+      }
+      .login-mark {
+        width: 28px;
+        height: 28px;
+        background: var(--text);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .login-mark svg {
+        width: 14px;
+        height: 14px;
+      }
+      .login-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .login-label {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text2);
+        margin-bottom: 6px;
+        display: block;
+      }
+
+      .login-input {
+        width: 100%;
+        padding: 8px 11px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        font-family: var(--mono);
+        font-size: 13px;
+        color: var(--text);
+        outline: none;
+        letter-spacing: 2px;
+        margin-bottom: 12px;
+        transition: border-color 0.1s;
+      }
+      .login-input:focus {
+        border-color: var(--border2);
+      }
+      .login-input.error {
+        border-color: var(--red);
+      }
+
+      .login-error {
+        font-size: 11px;
+        color: var(--red);
+        margin-bottom: 10px;
+        min-height: 16px;
+      }
+
+      .login-btn {
+        width: 100%;
+        padding: 9px;
+        background: var(--text);
+        color: #fff;
+        font-family: var(--sans);
+        font-size: 13px;
+        font-weight: 500;
+        border: none;
+        border-radius: 7px;
+        cursor: pointer;
+        transition: background 0.1s;
+      }
+      .login-btn:hover {
+        background: #27272a;
+      }
+      .login-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .login-hint {
+        font-size: 11px;
+        color: var(--text3);
+        text-align: center;
+        margin-top: 14px;
+        font-family: var(--mono);
+      }
+
+      /* ── SIDEBAR ── */
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 216px;
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        z-index: 50;
+      }
+
+      .sidebar-logo {
+        padding: 18px 16px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .logo-mark {
+        width: 24px;
+        height: 24px;
+        background: var(--text);
+        border-radius: 5px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .logo-mark svg {
+        width: 13px;
+        height: 13px;
+      }
+      .logo-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text);
+        letter-spacing: -0.3px;
+      }
+
+      .sidebar-nav {
+        padding: 12px 8px;
+        flex: 1;
+      }
+      .nav-group-label {
+        font-size: 10px;
+        font-weight: 500;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        color: var(--text3);
+        padding: 6px 8px 4px;
+      }
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+        border-radius: 6px;
+        cursor: pointer;
+        color: var(--text2);
+        font-size: 13px;
+        font-weight: 400;
+        transition:
+          background 0.1s,
+          color 0.1s;
+        border: none;
+        background: none;
+        width: 100%;
+        text-align: left;
+        margin-bottom: 1px;
+      }
+      .nav-item:hover {
+        background: var(--bg);
+        color: var(--text);
+      }
+      .nav-item.active {
+        background: var(--bg);
+        color: var(--text);
+        font-weight: 500;
+      }
+      .nav-item svg {
+        width: 14px;
+        height: 14px;
+        opacity: 0.55;
+        flex-shrink: 0;
+      }
+      .nav-item.active svg {
+        opacity: 1;
+      }
+
+      .sidebar-footer {
+        padding: 12px 8px;
+        border-top: 1px solid var(--border);
+      }
+      .admin-row {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 6px 8px;
+      }
+      .admin-avatar {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--text2);
+        flex-shrink: 0;
+      }
+      .admin-name {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text);
+      }
+      .admin-role {
+        font-size: 10px;
+        color: var(--text3);
+      }
+      .logout-btn {
+        margin-left: auto;
+        background: none;
+        border: none;
+        font-size: 10px;
+        color: var(--text3);
+        cursor: pointer;
+        font-family: var(--sans);
+        transition: color 0.1s;
+        padding: 0;
+      }
+      .logout-btn:hover {
+        color: var(--red);
+      }
+
+      /* ── TOPBAR ── */
+      .topbar {
+        position: fixed;
+        top: 0;
+        left: 216px;
+        right: 0;
+        height: 46px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+        z-index: 40;
+      }
+      .topbar-left {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+      }
+      .topbar-crumb {
+        color: var(--text3);
+      }
+      .topbar-page {
+        color: var(--text);
+        font-weight: 500;
+      }
+      .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .status-row {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 11px;
+        color: var(--text3);
+        padding-right: 8px;
+        border-right: 1px solid var(--border);
+      }
+      .status-dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--green);
+      }
+      .status-dot.loading {
+        background: var(--amber);
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.4;
+        }
+      }
+
+      .tb-btn {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 10px;
+        font-family: var(--sans);
+        font-size: 12px;
+        font-weight: 500;
+        border-radius: 6px;
+        cursor: pointer;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--text2);
+        transition: all 0.1s;
+        white-space: nowrap;
+      }
+      .tb-btn:hover {
+        border-color: var(--border2);
+        color: var(--text);
+      }
+      .tb-btn.active {
+        background: var(--bg);
+        color: var(--text);
+        border-color: var(--border2);
+      }
+
+      .notif-pill {
+        background: var(--red);
+        color: #fff;
+        font-size: 9px;
+        font-weight: 600;
+        padding: 1px 5px;
+        border-radius: 8px;
+        font-family: var(--mono);
+      }
+
+      /* ── MAIN ── */
+      .main {
+        margin-left: 216px;
+        padding-top: 46px;
+      }
+      .canvas-area {
+        padding: 16px;
+      }
+
+      /* ── GRIDSTACK ── */
+      .grid-stack {
+        background: transparent !important;
+      }
+      .grid-stack-item-content {
+        border-radius: var(--radius) !important;
+        overflow: hidden !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+      }
+
+      /* ── CARD ── */
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+        min-height: 42px;
+      }
+      .card-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text);
+      }
+      .card-aux {
+        font-size: 11px;
+        color: var(--text3);
+        font-family: var(--mono);
+      }
+      .card-body {
+        flex: 1;
+        padding: 14px;
+        overflow: auto;
+        min-height: 0;
+      }
+      .card-body::-webkit-scrollbar {
+        width: 3px;
+      }
+      .card-body::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 2px;
+      }
+
+      /* ── KPI ── */
+      .kpi-value {
+        font-size: 26px;
+        font-weight: 600;
+        letter-spacing: -0.8px;
+        color: var(--text);
+        line-height: 1;
+      }
+      .kpi-sub-text {
+        font-size: 11px;
+        color: var(--text3);
+        margin-top: 3px;
+      }
+      .kpi-delta {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        font-size: 11px;
+        font-weight: 500;
+        margin-top: 8px;
+      }
+      .kpi-delta.up {
+        color: var(--green);
+      }
+      .kpi-delta.down {
+        color: var(--red);
+      }
+      .kpi-divider {
+        height: 1px;
+        background: var(--border);
+        margin: 12px 0;
+      }
+      .kpi-breakdown {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .kpi-item-label {
+        font-size: 10px;
+        color: var(--text3);
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        margin-bottom: 2px;
+      }
+      .kpi-item-value {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      /* Skeleton loader */
+      .skel {
+        background: linear-gradient(
+          90deg,
+          #f0f0ef 25%,
+          #e8e8e7 50%,
+          #f0f0ef 75%
+        );
+        background-size: 200% 100%;
+        animation: shimmer 1.4s infinite;
+        border-radius: 4px;
+        display: inline-block;
+      }
+      @keyframes shimmer {
+        0% {
+          background-position: 200% 0;
+        }
+        100% {
+          background-position: -200% 0;
+        }
+      }
+      .skel-val {
+        width: 80px;
+        height: 26px;
+      }
+      .skel-text {
+        width: 120px;
+        height: 12px;
+        margin-top: 4px;
+      }
+      .skel-row {
+        width: 160px;
+        height: 12px;
+        margin-top: 8px;
+      }
+
+      /* ── PROGRESS ── */
+      .progress-track {
+        height: 3px;
+        background: var(--bg);
+        border-radius: 2px;
+        overflow: hidden;
+        margin: 10px 0 5px;
+      }
+      .progress-fill {
+        height: 100%;
+        border-radius: 2px;
+        background: var(--text);
+        transition: width 0.6s ease;
+      }
+      .progress-fill.warn {
+        background: var(--amber);
+      }
+      .progress-fill.danger {
+        background: var(--red);
+      }
+
+      /* ── TABS ── */
+      .tab-group {
+        display: flex;
+        gap: 1px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 2px;
+      }
+      .tab {
+        padding: 3px 9px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text3);
+        cursor: pointer;
+        border: none;
+        background: none;
+        font-family: var(--sans);
+        transition: all 0.1s;
+      }
+      .tab:hover {
+        color: var(--text2);
+      }
+      .tab.active {
+        background: var(--surface);
+        color: var(--text);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+      }
+
+      /* ── USER TABLE ── */
+      .search-input {
+        width: 100%;
+        padding: 6px 10px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        font-family: var(--sans);
+        font-size: 12px;
+        color: var(--text);
+        outline: none;
+        margin-bottom: 10px;
+        transition: border-color 0.1s;
+      }
+      .search-input:focus {
+        border-color: var(--border2);
+      }
+      .search-input::placeholder {
+        color: var(--text3);
+      }
+
+      .u-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .u-table th {
+        font-size: 10px;
+        font-weight: 500;
+        color: var(--text3);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        text-align: left;
+        padding: 0 0 8px;
+        border-bottom: 1px solid var(--border);
+      }
+      .u-table td {
+        padding: 8px 0;
+        border-bottom: 1px solid var(--border);
+        vertical-align: middle;
+      }
+      .u-table tr:last-child td {
+        border-bottom: none;
+      }
+      .u-name {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text);
+      }
+      .u-email {
+        font-size: 11px;
+        color: var(--text3);
+        font-family: var(--mono);
+      }
+
+      .tier-tag {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 500;
+        padding: 1px 6px;
+        border-radius: 4px;
+        font-family: var(--mono);
+      }
+      .tier-monthly {
+        background: #eff6ff;
+        color: var(--blue);
+      }
+      .tier-lifetime {
+        background: #f0fdf4;
+        color: var(--green);
+      }
+      .tier-free {
+        background: var(--bg);
+        color: var(--text3);
+        border: 1px solid var(--border);
+      }
+
+      .status-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 10px;
+        font-weight: 500;
+        color: var(--text3);
+      }
+      .status-tag .dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--text3);
+      }
+      .status-tag.on .dot {
+        background: var(--green);
+      }
+      .status-tag.on {
+        color: var(--green);
+      }
+      .status-tag.expired .dot {
+        background: var(--amber);
+      }
+      .status-tag.expired {
+        color: var(--amber);
+      }
+
+      .row-actions {
+        display: flex;
+        gap: 4px;
+        justify-content: flex-end;
+      }
+      .act-btn {
+        padding: 3px 8px;
+        font-family: var(--sans);
+        font-size: 11px;
+        font-weight: 500;
+        border-radius: 5px;
+        cursor: pointer;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--text2);
+        transition: all 0.1s;
+      }
+      .act-btn:hover {
+        border-color: var(--border2);
+        color: var(--text);
+      }
+      .act-btn.red:hover {
+        border-color: #fca5a5;
+        color: var(--red);
+        background: #fff5f5;
+      }
+      .act-btn.grn:hover {
+        border-color: #86efac;
+        color: var(--green);
+        background: #f0fdf4;
+      }
+      .act-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      /* ── OFFER PANEL ── */
+      .f-row {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-bottom: 10px;
+      }
+      .f-label {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text2);
+      }
+      .f-ctrl {
+        padding: 6px 10px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        font-family: var(--sans);
+        font-size: 12px;
+        color: var(--text);
+        outline: none;
+        width: 100%;
+        -webkit-appearance: none;
+        transition: border-color 0.1s;
+      }
+      .f-ctrl:focus {
+        border-color: var(--border2);
+      }
+      .f-ctrl option {
+        background: #fff;
+      }
+
+      .price-block {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        padding: 10px 12px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        margin-bottom: 10px;
+      }
+      .p-orig {
+        font-size: 12px;
+        color: var(--text3);
+        text-decoration: line-through;
+        font-family: var(--mono);
+      }
+      .p-new {
+        font-size: 20px;
+        font-weight: 600;
+        color: var(--text);
+        letter-spacing: -0.5px;
+      }
+      .p-off {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--green);
+        margin-left: auto;
+        font-family: var(--mono);
+      }
+
+      .btn-primary {
+        width: 100%;
+        padding: 8px;
+        background: var(--text);
+        color: #fff;
+        font-family: var(--sans);
+        font-size: 12px;
+        font-weight: 500;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background 0.1s;
+      }
+      .btn-primary:hover {
+        background: #27272a;
+      }
+      .btn-primary:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      /* ── DB TIMER ── */
+      .timer-box {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 12px;
+        padding: 9px 11px;
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        border-radius: 6px;
+      }
+      .timer-label {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--amber);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 2px;
+      }
+      .timer-val {
+        font-size: 15px;
+        font-weight: 600;
+        color: #92400e;
+        font-family: var(--mono);
+      }
+      .btn-renew {
+        padding: 4px 10px;
+        font-size: 11px;
+        font-weight: 500;
+        background: var(--amber);
+        color: #fff;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-family: var(--sans);
+        transition: background 0.1s;
+      }
+      .btn-renew:hover {
+        background: #b45309;
+      }
+
+      .db-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .db-cell {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 9px;
+      }
+      .db-cell-lbl {
+        font-size: 10px;
+        color: var(--text3);
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        margin-bottom: 2px;
+      }
+      .db-cell-val {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      /* ── LOGS ── */
+      .log-list {
+        display: flex;
+        flex-direction: column;
+      }
+      .log-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 9px;
+        padding: 8px;
+        border-radius: 5px;
+        transition: background 0.1s;
+        cursor: default;
+      }
+      .log-row:hover {
+        background: var(--bg);
+      }
+      .log-dot {
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        margin-top: 6px;
+        flex-shrink: 0;
+      }
+      .log-dot.error {
+        background: var(--red);
+      }
+      .log-dot.warn {
+        background: var(--amber);
+      }
+      .log-dot.info {
+        background: var(--blue);
+      }
+      .log-dot.success {
+        background: var(--green);
+      }
+      .log-body {
+        flex: 1;
+        min-width: 0;
+      }
+      .log-msg {
+        font-size: 12px;
+        color: var(--text);
+        line-height: 1.4;
+      }
+      .log-time {
+        font-size: 10px;
+        color: var(--text3);
+        margin-top: 1px;
+        font-family: var(--mono);
+      }
+      .log-badge {
+        font-size: 9px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        padding: 1px 5px;
+        border-radius: 3px;
+        flex-shrink: 0;
+        margin-top: 3px;
+        font-family: var(--mono);
+      }
+      .log-badge.error {
+        background: #fee2e2;
+        color: var(--red);
+      }
+      .log-badge.warn {
+        background: #fef3c7;
+        color: var(--amber);
+      }
+      .log-badge.info {
+        background: #dbeafe;
+        color: var(--blue);
+      }
+      .log-badge.success {
+        background: #dcfce7;
+        color: var(--green);
+      }
+
+      .link-btn {
+        background: none;
+        border: none;
+        font-family: var(--sans);
+        font-size: 11px;
+        color: var(--text3);
+        cursor: pointer;
+        padding: 0;
+        transition: color 0.1s;
+      }
+      .link-btn:hover {
+        color: var(--red);
+      }
+
+      /* ── EMPTY STATE ── */
+      .empty-state {
+        padding: 24px;
+        text-align: center;
+        color: var(--text3);
+        font-size: 12px;
+      }
+
+      /* ── MODAL ── */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.25);
+        backdrop-filter: blur(3px);
+        z-index: 200;
+        display: none;
+        align-items: center;
+        justify-content: center;
+      }
+      .modal-overlay.open {
+        display: flex;
+      }
+      .modal {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 22px;
+        width: 360px;
+        max-width: 90vw;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+      }
+      .modal-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: 6px;
+      }
+      .modal-desc {
+        font-size: 12px;
+        color: var(--text2);
+        line-height: 1.6;
+        margin-bottom: 18px;
+      }
+      .modal-btns {
+        display: flex;
+        gap: 8px;
+      }
+      .m-btn {
+        flex: 1;
+        padding: 7px;
+        font-family: var(--sans);
+        font-size: 12px;
+        font-weight: 500;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.1s;
+      }
+      .m-btn.cancel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--text2);
+      }
+      .m-btn.cancel:hover {
+        background: var(--bg);
+        color: var(--text);
+      }
+      .m-btn.ok {
+        background: var(--text);
+        border: 1px solid var(--text);
+        color: #fff;
+      }
+      .m-btn.ok:hover {
+        background: #27272a;
+      }
+      .m-btn.ok.danger {
+        background: var(--red);
+        border-color: var(--red);
+      }
+      .m-btn.ok.danger:hover {
+        background: #b91c1c;
+      }
+
+      /* ── TOAST ── */
+      .toast-stack {
+        position: fixed;
+        bottom: 18px;
+        right: 18px;
+        z-index: 500;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .toast {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 9px 13px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        font-size: 12px;
+        color: var(--text);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        animation: slidein 0.18s ease;
+        max-width: 280px;
+      }
+      @keyframes slidein {
+        from {
+          transform: translateY(6px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+      .t-dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .t-dot.success {
+        background: var(--green);
+      }
+      .t-dot.error {
+        background: var(--red);
+      }
+      .t-dot.info {
+        background: var(--blue);
+      }
+      .t-dot.warn {
+        background: var(--amber);
+      }
+
+      /* ── EDIT MODE ── */
+      body.editing .card {
+        border-style: dashed;
+      }
+      .grid-stack-placeholder > .placeholder-content {
+        background: rgba(0, 0, 0, 0.02) !important;
+        border: 1px dashed var(--border2) !important;
+        border-radius: var(--radius) !important;
+        box-shadow: none !important;
+      }
+
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ══════════════════════════════════════════
+     LOGIN GATE — shown until token verified
+     ══════════════════════════════════════════ -->
+    <div id="loginGate">
+      <div class="login-box">
+        <div class="login-logo">
+          <div class="login-mark">
+            <svg viewBox="0 0 13 13" fill="none">
+              <rect x="0.5" y="0.5" width="5" height="5" rx="1" fill="white" />
+              <rect
+                x="7.5"
+                y="0.5"
+                width="5"
+                height="5"
+                rx="1"
+                fill="white"
+                opacity="0.5"
+              />
+              <rect
+                x="0.5"
+                y="7.5"
+                width="5"
+                height="5"
+                rx="1"
+                fill="white"
+                opacity="0.5"
+              />
+              <rect x="7.5" y="7.5" width="5" height="5" rx="1" fill="white" />
+            </svg>
+          </div>
+          <span class="login-title">Kontexa Admin</span>
+        </div>
+
+        <label class="login-label">Admin password</label>
+        <input
+          class="login-input"
+          id="loginInput"
+          type="password"
+          placeholder="Enter your ADMIN_SECRET"
+          autocomplete="current-password"
+        />
+        <div class="login-error" id="loginError"></div>
+        <button class="login-btn" id="loginBtn" onclick="attemptLogin()">
+          Sign in
+        </button>
+        <div class="login-hint">Token is cleared when the tab is closed</div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════
+     SIDEBAR
+     ══════════════════════════════════ -->
+    <nav class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-mark">
+          <svg viewBox="0 0 13 13" fill="none">
+            <rect x="0.5" y="0.5" width="5" height="5" rx="1" fill="white" />
+            <rect
+              x="7.5"
+              y="0.5"
+              width="5"
+              height="5"
+              rx="1"
+              fill="white"
+              opacity="0.5"
+            />
+            <rect
+              x="0.5"
+              y="7.5"
+              width="5"
+              height="5"
+              rx="1"
+              fill="white"
+              opacity="0.5"
+            />
+            <rect x="7.5" y="7.5" width="5" height="5" rx="1" fill="white" />
+          </svg>
+        </div>
+        <span class="logo-name">Kontexa</span>
+      </div>
+      <div class="sidebar-nav">
+        <div class="nav-group-label">General</div>
+        <button class="nav-item active">
+          <svg
+            viewBox="0 0 14 14"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.3"
+          >
+            <rect x="1" y="1" width="5" height="5" rx="1" />
+            <rect x="8" y="1" width="5" height="5" rx="1" />
+            <rect x="1" y="8" width="5" height="5" rx="1" />
+            <rect x="8" y="8" width="5" height="5" rx="1" />
+          </svg>
+          Overview
+        </button>
+        <button class="nav-item" onclick="scrollToCard('users')">
+          <svg
+            viewBox="0 0 14 14"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.3"
+          >
+            <circle cx="7" cy="5" r="2.5" />
+            <path
+              d="M1.5 12.5c0-3 2.5-4.5 5.5-4.5s5.5 1.5 5.5 4.5"
+              stroke-linecap="round"
+            />
+          </svg>
+          Users
+        </button>
+        <button class="nav-item" onclick="scrollToCard('logs')">
+          <svg
+            viewBox="0 0 14 14"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.3"
+          >
+            <rect x="1" y="2.5" width="12" height="9" rx="1.5" />
+            <path d="M3.5 6h7M3.5 8.5h4.5" stroke-linecap="round" />
+          </svg>
+          Feedback Logs
+        </button>
+        <div class="nav-group-label" style="margin-top: 12px">System</div>
+        <button class="nav-item" onclick="refreshAll()">
+          <svg
+            viewBox="0 0 14 14"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.3"
+          >
+            <path d="M2 7a5 5 0 1 0 1-3.46" stroke-linecap="round" />
+            <polyline
+              points="2,2 2,5 5,5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          Refresh data
+        </button>
+      </div>
+      <div class="sidebar-footer">
+        <div class="admin-row">
+          <div class="admin-avatar">A</div>
+          <div>
+            <div class="admin-name">Admin</div>
+            <div class="admin-role">Super admin</div>
+          </div>
+          <button class="logout-btn" onclick="doLogout()">Sign out</button>
+        </div>
+      </div>
+    </nav>
+
+    <!-- ══════════════════════════════════
+     TOPBAR
+     ══════════════════════════════════ -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <span class="topbar-crumb">Kontexa</span>
+        <span class="topbar-crumb">/</span>
+        <span class="topbar-page">Admin Overview</span>
+      </div>
+      <div class="topbar-right">
+        <div class="status-row">
+          <div class="status-dot loading" id="statusDot"></div>
+          <span id="statusText">Loading…</span>
+        </div>
+        <button class="tb-btn" onclick="openFeedbackModal()">
+          Feedback <span class="notif-pill" id="feedbackCount">—</span>
+        </button>
+        <button class="tb-btn" id="editBtn" onclick="toggleEdit()">
+          Edit layout
+        </button>
+      </div>
+    </header>
+
+    <!-- ══════════════════════════════════
+     MAIN GRID
+     ══════════════════════════════════ -->
+    <div class="main">
+      <div class="canvas-area">
+        <div class="grid-stack" id="grid"></div>
+      </div>
+    </div>
+
+    <!-- MODAL -->
+    <div
+      class="modal-overlay"
+      id="modalOverlay"
+      onclick="if (event.target === this) closeModal();"
+    >
+      <div class="modal">
+        <div class="modal-title" id="mTitle"></div>
+        <div class="modal-desc" id="mDesc"></div>
+        <div id="mExtra"></div>
+        <div class="modal-btns">
+          <button class="m-btn cancel" onclick="closeModal()">Cancel</button>
+          <button class="m-btn ok" id="mOk" onclick="handleOk()">
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOASTS -->
+    <div class="toast-stack" id="toasts"></div>
+
+    <script>
+      // ════════════════════════════════════════════════════════════
+      //  CONFIG — change BASE_URL to your deployed server URL
+      // ════════════════════════════════════════════════════════════
+      const BASE_URL = "https://kontexa.online"; // e.g. 'https://kontexa.online'
+
+      // ════════════════════════════════════════════════════════════
+      //  AUTH — token lives only in sessionStorage (cleared on tab close)
+      // ════════════════════════════════════════════════════════════
+      let ADMIN_TOKEN = sessionStorage.getItem("admin_token") || "";
+
+      function getHeaders() {
+        return {
+          "Content-Type": "application/json",
+          "X-Admin-Token": ADMIN_TOKEN,
+        };
+      }
+
+      async function attemptLogin() {
+        const input = document.getElementById("loginInput");
+        const errEl = document.getElementById("loginError");
+        const btn = document.getElementById("loginBtn");
+        const token = input.value.trim();
+
+        if (!token) {
+          errEl.textContent = "Password is required.";
+          input.classList.add("error");
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = "Verifying…";
+        errEl.textContent = "";
+
+        try {
+          // Verify token against the real API — uses your existing user-count endpoint
+          const res = await fetch(`${BASE_URL}/api/admin/stats`, {
+            headers: { "X-Admin-Token": token },
+          });
+
+          if (res.status === 403 || res.status === 401) {
+            errEl.textContent = "Incorrect password. Try again.";
+            input.classList.add("error");
+            input.value = "";
+            btn.disabled = false;
+            btn.textContent = "Sign in";
+            return;
+          }
+
+          // Token is valid
+          ADMIN_TOKEN = token;
+          sessionStorage.setItem("admin_token", token);
+          document.getElementById("loginGate").classList.add("hidden");
+          initDashboard();
+        } catch (e) {
+          errEl.textContent = "Could not reach server. Check BASE_URL.";
+          btn.disabled = false;
+          btn.textContent = "Sign in";
+        }
+      }
+
+      document.getElementById("loginInput").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") attemptLogin();
+        document.getElementById("loginInput").classList.remove("error");
+      });
+
+      function doLogout() {
+        sessionStorage.removeItem("admin_token");
+        ADMIN_TOKEN = "";
+        location.reload();
+      }
+
+      // Auto-restore session if token already in sessionStorage
+      if (ADMIN_TOKEN) {
+        document.getElementById("loginGate").classList.add("hidden");
+        window.addEventListener("DOMContentLoaded", initDashboard);
+      }
+
+      // ════════════════════════════════════════════════════════════
+      //  API HELPERS
+      // ════════════════════════════════════════════════════════════
+      async function api(path, opts = {}) {
+        const res = await fetch(`${BASE_URL}${path}`, {
+          ...opts,
+          headers: { ...getHeaders(), ...(opts.headers || {}) },
+        });
+        if (res.status === 401 || res.status === 403) {
+          doLogout();
+          throw new Error("Unauthorized");
+        }
+        if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
+        return res.json();
+      }
+
+      // ════════════════════════════════════════════════════════════
+      //  STATE
+      // ════════════════════════════════════════════════════════════
+      let STATE = {
+        stats: null, // from /api/admin/stats
+        users: [], // from /api/admin/users
+        feedback: [], // from /api/admin/feedback-digest
+      };
+
+      // ════════════════════════════════════════════════════════════
+      //  GRID
+      // ════════════════════════════════════════════════════════════
+      let grid,
+        editing = false;
+
+      const LAYOUT = [
+        { id: "kpi-users", x: 0, y: 0, w: 3, h: 3 },
+        { id: "kpi-api", x: 3, y: 0, w: 3, h: 3 },
+        { id: "kpi-db", x: 6, y: 0, w: 3, h: 3 },
+        { id: "kpi-revenue", x: 9, y: 0, w: 3, h: 3 },
+        { id: "chart-api", x: 0, y: 3, w: 6, h: 5 },
+        { id: "chart-growth", x: 6, y: 3, w: 6, h: 5 },
+        { id: "users", x: 0, y: 8, w: 7, h: 6 },
+        { id: "offer", x: 7, y: 8, w: 2, h: 6 },
+        { id: "logs", x: 9, y: 8, w: 3, h: 6 },
+      ];
+
+      function initDashboard() {
+        grid = GridStack.init(
+          {
+            cellHeight: 52,
+            margin: 6,
+            column: 12,
+            animate: false,
+            staticGrid: true,
+            resizable: { handles: "se" },
+            draggable: { handle: ".card-header" },
+          },
+          "#grid",
+        );
+
+        LAYOUT.forEach((w) => {
+          grid.addWidget({
+            id: w.id,
+            x: w.x,
+            y: w.y,
+            w: w.w,
+            h: w.h,
+            content: renderSkeleton(w.id),
+          });
+        });
+
+        requestAnimationFrame(() => {
+          initApiChart();
+          initGrowthChart();
+          loadAll();
+        });
+      }
+
+      function toggleEdit() {
+        editing = !editing;
+        document.body.classList.toggle("editing", editing);
+        const btn = document.getElementById("editBtn");
+        btn.textContent = editing ? "Done" : "Edit layout";
+        btn.classList.toggle("active", editing);
+        grid.setStatic(!editing);
+      }
+
+      function scrollToCard(id) {
+        const el = document.querySelector(`[gs-id="${id}"]`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      // ════════════════════════════════════════════════════════════
+      //  DATA LOADING
+      // ════════════════════════════════════════════════════════════
+      async function loadAll() {
+        setStatus("loading");
+        try {
+          const [stats, users, feedback] = await Promise.all([
+            api("/api/admin/stats"),
+            api("/api/admin/users"),
+            api(`/api/admin/feedback-digest?secret=${ADMIN_TOKEN}`),
+          ]);
+          STATE.stats = stats;
+          STATE.users = users;
+          STATE.feedback = feedback;
+          renderAll();
+          setStatus("ok");
+        } catch (e) {
+          setStatus("error");
+          toast("Failed to load data — check connection", "error");
+        }
+      }
+
+      async function refreshAll() {
+        toast("Refreshing data…", "info");
+        await loadAll();
+      }
+
+      function setStatus(state) {
+        const dot = document.getElementById("statusDot");
+        const text = document.getElementById("statusText");
+        if (state === "ok") {
+          dot.className = "status-dot";
+          text.textContent = "Connected";
+        } else if (state === "loading") {
+          dot.className = "status-dot loading";
+          text.textContent = "Loading…";
+        } else {
+          dot.className = "status-dot";
+          dot.style.background = "var(--red)";
+          text.textContent = "Error";
+        }
+      }
+
+      // ════════════════════════════════════════════════════════════
+      //  RENDER ALL
+      // ════════════════════════════════════════════════════════════
+      function renderAll() {
+        const s = STATE.stats;
+        replaceCard("kpi-users", kpiUsers(s));
+        replaceCard("kpi-api", kpiApi(s));
+        replaceCard("kpi-db", kpiDb(s));
+        replaceCard("kpi-revenue", kpiRevenue(s));
+        replaceCard("chart-api", chartApiCard());
+        replaceCard("chart-growth", chartGrowthCard());
+        replaceCard("users", usersCard());
+        replaceCard("offer", offerCard());
+        replaceCard("logs", logsCard());
+
+        // Update charts
+        requestAnimationFrame(() => {
+          updateApiChart("day");
+          updateGrowthChart();
+          calcOffer();
+          startTimer(s.db_days_left);
+        });
+
+        document.getElementById("feedbackCount").textContent =
+          STATE.feedback.length;
+      }
+
+      function replaceCard(id, html) {
+        const el = document.querySelector(
+          `[gs-id="${id}"] .grid-stack-item-content`,
+        );
+        if (el) el.innerHTML = html;
+      }
+
+      // ════════════════════════════════════════════════════════════
+      //  SKELETON (while loading)
+      // ════════════════════════════════════════════════════════════
+      function renderSkeleton(id) {
+        const isKpi = id.startsWith("kpi");
+        if (isKpi)
+          return `<div class="card">
+    <div class="card-header"><span class="card-title skel skel-text"></span></div>
+    <div class="card-body">
+      <div class="skel skel-val"></div>
+      <div class="skel skel-text" style="margin-top:6px"></div>
+      <div class="skel skel-row" style="margin-top:14px"></div>
+    </div>
+  </div>`;
+        return `<div class="card">
+    <div class="card-header"><span class="card-title skel skel-text"></span></div>
+    <div class="card-body" style="display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:12px">Loading…</div>
+  </div>`;
+      }
+
+      // ════════════════════════════════════════════════════════════
+      //  KPI CARDS
+      // ════════════════════════════════════════════════════════════
+      function kpiUsers(s) {
+        if (!s) return renderSkeleton("kpi-users");
+        return `<div class="card">
+    <div class="card-header"><span class="card-title">Users</span><span class="card-aux">${s.total_users} total</span></div>
+    <div class="card-body">
+      <div class="kpi-value">${s.total_users.toLocaleString()}</div>
+      <div class="kpi-sub-text">Registered accounts</div>
+      <div class="kpi-divider"></div>
+      <div class="kpi-breakdown">
+        <div><div class="kpi-item-label">Lifetime</div><div class="kpi-item-value">${s.lifetime_users}</div></div>
+        <div><div class="kpi-item-label">Monthly</div><div class="kpi-item-value">${s.monthly_users}</div></div>
+        <div><div class="kpi-item-label">Free</div><div class="kpi-item-value">${s.free_users}</div></div>
+      </div>
+    </div>
+  </div>`;
+      }
+
+      function kpiApi(s) {
+        if (!s) return renderSkeleton("kpi-api");
+        return `<div class="card">
+    <div class="card-header"><span class="card-title">API Activity</span><span class="card-aux">All time</span></div>
+    <div class="card-body">
+      <div class="kpi-value">${(s.total_notes || 0).toLocaleString()}</div>
+      <div class="kpi-sub-text">Total notes synced</div>
+      <div class="kpi-divider"></div>
+      <div class="kpi-breakdown">
+        <div><div class="kpi-item-label">Websites</div><div class="kpi-item-value">${(s.total_websites || 0).toLocaleString()}</div></div>
+        <div><div class="kpi-item-label">Pro users</div><div class="kpi-item-value">${s.pro_users || 0}</div></div>
+      </div>
+    </div>
+  </div>`;
+      }
+
+      function kpiDb(s) {
+        if (!s) return renderSkeleton("kpi-db");
+        const used = s.db_size_mb || 0;
+        const total = s.db_limit_mb || 512;
+        const pct = Math.min(100, Math.round((used / total) * 100));
+        const cls = pct >= 90 ? "danger" : pct >= 75 ? "warn" : "";
+        const note = pct >= 75 ? "Approaching limit" : "Within safe range";
+        const noteColor = pct >= 75 ? "var(--amber)" : "var(--text3)";
+        return `<div class="card">
+    <div class="card-header"><span class="card-title">Database</span><span class="card-aux" style="color:${pct >= 75 ? "var(--amber)" : "inherit"}">${pct}% used</span></div>
+    <div class="card-body">
+      <div class="kpi-value">${used.toFixed(1)} <span style="font-size:14px;font-weight:400;color:var(--text3)">MB</span></div>
+      <div class="kpi-sub-text">of ${total} MB total</div>
+      <div class="progress-track" style="margin-top:10px"><div class="progress-fill ${cls}" style="width:${pct}%"></div></div>
+      <div style="font-size:11px;color:${noteColor}">${note}</div>
+      ${
+        s.db_days_left != null
+          ? `<div class="timer-box">
+        <div><div class="timer-label">Renewal</div><div class="timer-val" id="dbTimer">—</div></div>
+        <button class="btn-renew" onclick="toast('Set a reminder in your calendar','info')">Remind</button>
+      </div>`
+          : '<div style="font-size:11px;color:var(--text3);margin-top:10px">Free tier — no expiry</div>'
+      }
+    </div>
+  </div>`;
+      }
+
+      function kpiRevenue(s) {
+        if (!s) return renderSkeleton("kpi-revenue");
+        return `<div class="card">
+    <div class="card-header"><span class="card-title">Subscriptions</span><span class="card-aux">Active</span></div>
+    <div class="card-body">
+      <div class="kpi-value">${(s.pro_users || 0).toLocaleString()}</div>
+      <div class="kpi-sub-text">Paid subscribers</div>
+      <div class="kpi-divider"></div>
+      <div class="kpi-breakdown">
+        <div><div class="kpi-item-label">Conversion</div>
+          <div class="kpi-item-value">${s.total_users > 0 ? ((s.pro_users / s.total_users) * 100).toFixed(1) : 0}%</div>
+        </div>
+        <div><div class="kpi-item-label">Expired</div><div class="kpi-item-value">${s.expired_users || 0}</div></div>
+      </div>
+    </div>
+  </div>`;
+      }
+
+      // ════════════════════════════════════════════════════════════
+      //  CHARTS
+      // ════════════════════════════════════════════════════════════
+      let apiChart, growthChart;
+
+      function chartApiCard() {
+        return `<div class="card">
+    <div class="card-header">
+      <span class="card-title">User growth by plan</span>
+      <div class="tab-group">
+        <button class="tab active" onclick="switchApiTab('monthly',this)">Monthly</button>
+        <button class="tab" onclick="switchApiTab('lifetime',this)">Lifetime</button>
+        <button class="tab" onclick="switchApiTab('free',this)">Free</button>
+      </div>
+    </div>
+    <div class="card-body" style="padding:10px"><canvas id="apiChart"></canvas></div>
+  </div>`;
+      }
+
+      function chartGrowthCard() {
+        return `<div class="card">
+    <div class="card-header">
+      <span class="card-title">Subscribers over time</span>
+      <div style="display:flex;gap:12px">
+        <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text3)">
+          <span style="width:12px;height:2px;background:var(--text);display:inline-block;border-radius:1px"></span>Total
+        </span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text3)">
+          <span style="width:12px;height:2px;background:var(--blue);display:inline-block;border-radius:1px"></span>Pro
+        </span>
+      </div>
+    </div>
+    <div class="card-body" style="padding:10px"><canvas id="growthChart"></canvas></div>
+  </div>`;
+      }
+
+      const cBase = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: "#fff",
+            borderColor: "#e5e5e3",
+            borderWidth: 1,
+            titleColor: "#18181b",
+            bodyColor: "#71717a",
+            titleFont: { family: "DM Sans", weight: "500", size: 12 },
+            bodyFont: { family: "DM Mono", size: 11 },
+            padding: 10,
+          },
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            border: { display: false },
+            ticks: { color: "#a1a1aa", font: { family: "DM Sans", size: 11 } },
+          },
+          y: {
+            grid: { color: "#f4f4f5" },
+            border: { display: false },
+            ticks: {
+              color: "#a1a1aa",
+              font: { family: "DM Mono", size: 10 },
+              callback: (v) => (v >= 1000 ? (v / 1000).toFixed(0) + "k" : v),
+            },
+          },
+        },
+      };
+
+      function initApiChart() {
+        const tryInit = () => {
+          const el = document.getElementById("apiChart");
+          if (!el) return setTimeout(tryInit, 100);
+          apiChart = new Chart(el, {
+            type: "bar",
+            data: {
+              labels: [],
+              datasets: [
+                {
+                  data: [],
+                  backgroundColor: "#e4e4e7",
+                  borderRadius: 3,
+                  borderSkipped: false,
+                },
+              ],
+            },
+            options: { ...cBase },
+          });
+        };
+        tryInit();
+      }
+
+      function updateApiChart(filter) {
+        if (!apiChart || !STATE.users.length) return;
+        // Group users by signup month for the selected plan type
+        const planMap = {
+          monthly: "monthly",
+          lifetime: "lifetime",
+          free: "free",
+        };
+        const plan = planMap[filter] || "monthly";
+        const filtered = STATE.users.filter((u) => u.plan_type === plan);
+
+        // Build month buckets (last 6 months)
+        const buckets = {};
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date();
+          d.setMonth(d.getMonth() - i);
+          const key = d.toLocaleString("en", {
+            month: "short",
+            year: "2-digit",
+          });
+          buckets[key] = 0;
+        }
+        filtered.forEach((u) => {
+          if (!u.created_at) return;
+          const d = new Date(u.created_at);
+          const key = d.toLocaleString("en", {
+            month: "short",
+            year: "2-digit",
+          });
+          if (key in buckets) buckets[key]++;
+        });
+
+        const labels = Object.keys(buckets);
+        const data = Object.values(buckets);
+        apiChart.data.labels = labels;
+        apiChart.data.datasets[0].data = data;
+        apiChart.data.datasets[0].backgroundColor = data.map((_, i) =>
+          i === data.length - 1 ? "#18181b" : "#e4e4e7",
+        );
+        apiChart.update("active");
+      }
+
+      function switchApiTab(filter, el) {
+        el.closest(".tab-group")
+          .querySelectorAll(".tab")
+          .forEach((t) => t.classList.remove("active"));
+        el.classList.add("active");
+        updateApiChart(filter);
+      }
+
+      function initGrowthChart() {
+        const tryInit = () => {
+          const el = document.getElementById("growthChart");
+          if (!el) return setTimeout(tryInit, 100);
+          growthChart = new Chart(el, {
+            type: "line",
+            data: {
+              labels: [],
+              datasets: [
+                {
+                  label: "Total",
+                  data: [],
+                  borderColor: "#18181b",
+                  borderWidth: 2,
+                  backgroundColor: "rgba(24,24,27,0.04)",
+                  pointRadius: 0,
+                  pointHoverRadius: 4,
+                  tension: 0.4,
+                  fill: true,
+                },
+                {
+                  label: "Pro",
+                  data: [],
+                  borderColor: "#2563eb",
+                  borderWidth: 2,
+                  backgroundColor: "rgba(37,99,235,0.04)",
+                  pointRadius: 0,
+                  pointHoverRadius: 4,
+                  tension: 0.4,
+                  fill: true,
+                },
+              ],
+            },
+            options: {
+              ...cBase,
+              interaction: { mode: "index", intersect: false },
+            },
+          });
+        };
+        tryInit();
+      }
+
+      function updateGrowthChart() {
+        if (!growthChart || !STATE.users.length) return;
+        // Cumulative total + pro over last 8 months
+        const months = [];
+        for (let i = 7; i >= 0; i--) {
+          const d = new Date();
+          d.setMonth(d.getMonth() - i);
+          months.push({
+            key: d.toLocaleString("en", { month: "short", year: "2-digit" }),
+            cutoff: new Date(d.getFullYear(), d.getMonth() + 1, 0),
+          });
+        }
+
+        const totalData = months.map(
+          (m) =>
+            STATE.users.filter(
+              (u) => u.created_at && new Date(u.created_at) <= m.cutoff,
+            ).length,
+        );
+        const proData = months.map(
+          (m) =>
+            STATE.users.filter(
+              (u) =>
+                u.plan_type !== "free" &&
+                u.created_at &&
+                new Date(u.created_at) <= m.cutoff,
+            ).length,
+        );
+
+        growthChart.data.labels = months.map((m) => m.key);
+        growthChart.data.datasets[0].data = totalData;
+        growthChart.data.datasets[1].data = proData;
+        growthChart.update("active");
+      }
+
+      // ════════════════════════════════════════════════════════════
+      //  USERS CARD
+      // ════════════════════════════════════════════════════════════
+      function usersCard() {
+        const rows = STATE.users
+          .map((u) => {
+            const isExpired =
+              u.plan_type === "monthly" &&
+              u.pro_expires_at &&
+              new Date(u.pro_expires_at) < new Date();
+            const statusCls = isExpired ? "expired" : u.is_pro ? "on" : "";
+            const statusLbl = isExpired
+              ? "Expired"
+              : u.is_pro
+                ? "Active"
+                : "Free";
+            return `<tr id="ur-${u.id}">
+      <td><div class="u-name">${u.email.split("@")[0]}</div><div class="u-email">${u.email}</div></td>
+      <td><span class="tier-tag tier-${u.plan_type}">${u.plan_type}</span></td>
+      <td><span class="status-tag ${statusCls}"><span class="dot"></span>${statusLbl}</span></td>
+      <td><div class="row-actions">
+        ${
+          u.is_pro
+            ? `<button class="act-btn red" onclick="doRevoke(${u.id},'${u.email}')">Revoke</button>`
+            : `<button class="act-btn grn" onclick="doGrant(${u.id},'${u.email}')">Grant Pro</button>`
+        }
+        <button class="act-btn" onclick="doOfferUser(${u.id},'${u.email}')">Offer</button>
+      </div></td>
+    </tr>`;
+          })
+          .join("");
+
+        return `<div class="card">
+    <div class="card-header"><span class="card-title">Users</span><span class="card-aux">${STATE.users.length} accounts</span></div>
+    <div class="card-body">
+      <input class="search-input" placeholder="Search by email…" oninput="filterUsers(this.value)"/>
+      <table class="u-table">
+        <thead><tr><th>Account</th><th>Plan</th><th>Status</th><th style="text-align:right">Actions</th></tr></thead>
+        <tbody id="uBody">${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+      }
+
+      function filterUsers(q) {
+        const query = q.toLowerCase();
+        document.querySelectorAll("#uBody tr").forEach((row) => {
+          row.style.display = row.textContent.toLowerCase().includes(query)
+            ? ""
+            : "none";
+        });
+      }
+
+      // ════════════════════════════════════════════════════════════
+      //  OFFER CARD
+      // ════════════════════════════════════════════════════════════
+      // Prices mirror your PRICING_CONFIG in app.py
+      const PLANS = {
+        monthly: { label: "Pro Monthly", inr: 18000, usd: 2 }, 
+        lifetime: { label: "Lifetime", inr: 350000, usd: 40 },
+      };
+
+      function offerCard() {
+        const opts = Object.entries(PLANS)
+          .map(
+            ([k, v]) =>
+              `<option value="${k}" data-inr="${v.inr}">${v.label}</option>`,
+          )
+          .join("");
+        return `<div class="card">
+    <div class="card-header"><span class="card-title">Apply Offer</span></div>
+    <div class="card-body">
+      <div class="f-row">
+        <label class="f-label">Plan</label>
+        <select class="f-ctrl" id="offerPlan" onchange="calcOffer()">${opts}</select>
+      </div>
+      <div class="f-row">
+        <label class="f-label">Discount (%)</label>
+        <input class="f-ctrl" type="number" id="offerPct" value="20" min="1" max="99" oninput="calcOffer()"/>
+      </div>
+      <div class="f-row">
+        <label class="f-label">Apply to</label>
+        <select class="f-ctrl" id="offerScope">
+          <option value="all">All users on this plan</option>
+          <option value="new">New signups only</option>
+        </select>
+      </div>
+      <div class="price-block">
+        <span class="p-orig" id="pOrig">₹180</span>
+        <span class="p-new"  id="pNew">₹144</span>
+        <span class="p-off"  id="pOff">−20%</span>
+      </div>
+      <button class="btn-primary" onclick="confirmOffer()">Apply offer</button>
+    </div>
+  </div>`;
+      }
+
+      function calcOffer() {
+        const planEl = document.getElementById("offerPlan");
+        const pctEl = document.getElementById("offerPct");
+        if (!planEl || !pctEl) return;
+        const inrPaise =
+          parseInt(
+            planEl.options[planEl.selectedIndex]?.getAttribute("data-inr"),
+          ) || 18000;
+        const inr = inrPaise / 100;
+        const pct = Math.min(99, Math.max(0, parseFloat(pctEl.value) || 0));
+        const after = (inr * (1 - pct / 100)).toFixed(0);
+        const o = document.getElementById("pOrig");
+        const n = document.getElementById("pNew");
+        const f = document.getElementById("pOff");
+        if (o) o.textContent = `₹${inr.toFixed(0)}`;
+        if (n) n.textContent = `₹${after}`;
+        if (f) f.textContent = `−${pct}%`;
+      }
+
+      // ════════════════════════════════════════════════════════════
+      //  LOGS CARD (Feedback Digest)
+      // ════════════════════════════════════════════════════════════
+      function logsCard() {
+        if (!STATE.feedback.length) {
+          return `<div class="card">
+      <div class="card-header"><span class="card-title">Feedback</span><span class="card-aux">0 items</span></div>
+      <div class="card-body"><div class="empty-state">No feedback this week</div></div>
+    </div>`;
+        }
+
+        const typeMap = {
+          feature: "info",
+          bug: "error",
+          general: "info",
+          complaint: "warn",
+        };
+
+        const rows = STATE.feedback
+          .slice(0, 20)
+          .map((f) => {
+            const t = typeMap[f.type] || "info";
+            const ago = timeAgo(new Date(f.created_at));
+            return `<div class="log-row">
+      <div class="log-dot ${t}"></div>
+      <div class="log-body">
+        <div class="log-msg">${f.subject || f.message.slice(0, 60)}</div>
+        <div class="log-time">${f.email} · ${ago}</div>
+      </div>
+      <span class="log-badge ${t}">${f.type}</span>
+    </div>`;
+          })
+          .join("");
+
+        return `<div class="card">
+    <div class="card-header">
+      <span class="card-title">Feedback</span>
+      <button class="link-btn" onclick="openFeedbackModal()">View all</button>
+    </div>
+    <div class="card-body" style="padding:6px"><div class="log-list">${rows}</div></div>
+  </div>`;
+      }
+
+      function openFeedbackModal() {
+        if (!STATE.feedback.length) {
+          openModal(
+            "Feedback",
+            "No feedback received this week.",
+            "Close",
+            "ok",
+            () => {},
+            true,
+          );
+          return;
+        }
+        const html = STATE.feedback
+          .map((f) => {
+            const ago = timeAgo(new Date(f.created_at));
+            return `<div style="padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+        <span style="font-size:12px;font-weight:500;color:var(--text)">${f.subject || "(no subject)"}</span>
+        <span style="font-size:10px;color:var(--text3);font-family:var(--mono)">${ago}</span>
+      </div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:3px">${f.message.slice(0, 120)}${f.message.length > 120 ? "…" : ""}</div>
+      <div style="font-size:10px;color:var(--text3);font-family:var(--mono)">${f.email} · ${f.type}</div>
+    </div>`;
+          })
+          .join("");
+
+        openModal("Feedback this week", html, "Close", "ok", () => {}, true);
+      }
+
+      // ════════════════════════════════════════════════════════════
+      //  DB TIMER
+      // ════════════════════════════════════════════════════════════
+      let timerInterval;
+      function startTimer(daysLeft) {
+        clearInterval(timerInterval);
+        if (daysLeft == null) return;
+        const end = new Date(Date.now() + daysLeft * 86400000);
+        const tick = () => {
+          const el = document.getElementById("dbTimer");
+          if (!el) return;
+          const ms = end - Date.now();
+          if (ms <= 0) {
+            el.textContent = "Expired";
+            clearInterval(timerInterval);
+            return;
+          }
+          const d = Math.floor(ms / 86400000);
+          const h = Math.floor((ms % 86400000) / 3600000);
+          const m = Math.floor((ms % 3600000) / 60000);
+          el.textContent = `${d}d ${h}h ${m}m`;
+        };
+        tick();
+        timerInterval = setInterval(tick, 60000);
+      }
+
+      // ════════════════════════════════════════════════════════════
+      //  USER ACTIONS — call real API
+      // ════════════════════════════════════════════════════════════
+      function doRevoke(id, email) {
+        openModal(
+          "Revoke Pro access",
+          `This will remove Pro access from <strong>${email}</strong> immediately. They will be downgraded to the free plan.`,
+          "Revoke",
+          "danger",
+          async () => {
+            try {
+              await api(`/api/admin/users/${id}/access`, {
+                method: "PATCH",
+                body: JSON.stringify({ is_pro: false, plan_type: "free" }),
+              });
+              const u = STATE.users.find((u) => u.id === id);
+              if (u) {
+                u.is_pro = false;
+                u.plan_type = "free";
+              }
+              replaceCard("users", usersCard());
+              toast(`Access revoked for ${email}`, "error");
+            } catch (e) {
+              toast("Failed to revoke access", "error");
+            }
+          },
+        );
+      }
+
+      function doGrant(id, email) {
+        openModal(
+          "Grant Pro access",
+          `Grant lifetime Pro access to <strong>${email}</strong>?`,
+          "Grant",
+          "ok",
+          async () => {
+            try {
+              await api(`/api/admin/users/${id}/access`, {
+                method: "PATCH",
+                body: JSON.stringify({ is_pro: true, plan_type: "lifetime" }),
+              });
+              const u = STATE.users.find((u) => u.id === id);
+              if (u) {
+                u.is_pro = true;
+                u.plan_type = "lifetime";
+              }
+              replaceCard("users", usersCard());
+              toast(`Pro access granted to ${email}`, "success");
+            } catch (e) {
+              toast("Failed to grant access", "error");
+            }
+          },
+        );
+      }
+
+      function doOfferUser(id, email) {
+        openModal(
+          `Apply offer — ${email}`,
+          `<div class="f-row" style="margin-top:2px">
+      <label class="f-label">Discount (%)</label>
+      <input class="f-ctrl" type="number" id="uDiscount" value="20" min="1" max="99"/>
+    </div>`,
+          "Apply",
+          "ok",
+          () => {
+            const d = document.getElementById("uDiscount")?.value || 20;
+            // This is a config-level change in your PRICING_CONFIG in app.py
+            // The dashboard surfaces it as a reminder to update the server config
+            toast(
+              `Set ${d}% discount in PRICING_CONFIG for this user's plan`,
+              "info",
+            );
+          },
+          true,
+        );
+      }
+
+      function confirmOffer() {
+        const planEl = document.getElementById("offerPlan");
+        const planLbl = planEl?.options[planEl.selectedIndex]?.text || "";
+        const planKey = planEl?.value || "lifetime";
+        
+        const pct = document.getElementById("offerPct")?.value || 0;
+        const discountPct = parseInt(pct);
+        
+        const scopeEl = document.getElementById("offerScope");
+        const scope = scopeEl?.options[scopeEl.selectedIndex]?.text || "";
+
+        openModal(
+          "Apply offer",
+          `Apply <strong>${discountPct}%</strong> discount to <strong>${planLbl}</strong> for <strong>${scope.toLowerCase()}</strong>?<br/><br/>
+    <span style="font-size:11px;color:var(--text3)">This will update the prices live on your website and checkout instantly. Set to 0% to turn the sale off.</span>`,
+          "Apply",
+          "ok",
+          async () => {
+            try {
+              // 1. Calculate actual discounted prices based on percentage
+              const baseInr = PLANS[planKey].inr;
+              const baseUsd = PLANS[planKey].usd;
+
+              let discount_inr_paise = null;
+              let discount_usd = null;
+              let promo_badge = null;
+
+              if (discountPct > 0) {
+                  // Calculate new prices (Math.round ensures we don't send decimals to Stripe/Razorpay)
+                  discount_inr_paise = Math.round(baseInr * (1 - discountPct / 100));
+                  discount_usd = Math.max(1, Math.round(baseUsd * (1 - discountPct / 100))); 
+                  promo_badge = "🔥 Limited Time Offer!";
+              } else {
+                  // If 0%, revert to default badges and remove discounts
+                  promo_badge = planKey === 'monthly' ? 'Most Popular' : '';
+              }
+
+              // 2. Send the exact payload the backend expects
+              await api("/api/admin/pricing", {
+                method: "POST",
+                body: JSON.stringify({
+                  plan_type: planKey,
+                  discount_usd: discount_usd,
+                  discount_inr_paise: discount_inr_paise,
+                  promo_badge: promo_badge
+                }),
+              });
+              
+              if (discountPct > 0) {
+                  toast(`${discountPct}% offer applied! Prices updated live.`, "success");
+              } else {
+                  toast(`Sale ended. Prices reverted to normal.`, "info");
+              }
+              
+            } catch (e) {
+              toast("Failed to update pricing. Check server logs.", "error");
+            }
+          },
+        );
+      }
+      // ════════════════════════════════════════════════════════════
+      //  MODAL
+      // ════════════════════════════════════════════════════════════
+      let _cb = null;
+
+      function openModal(title, body, confirmLabel, type, cb, rawBody = false) {
+        _cb = cb;
+        document.getElementById("mTitle").textContent = title;
+        document.getElementById("mDesc").innerHTML = body;
+        document.getElementById("mExtra").innerHTML = "";
+        const btn = document.getElementById("mOk");
+        btn.textContent = confirmLabel;
+        btn.className = `m-btn ok${type === "danger" ? " danger" : ""}`;
+        document.getElementById("modalOverlay").classList.add("open");
+      }
+
+      function closeModal() {
+        document.getElementById("modalOverlay").classList.remove("open");
+        _cb = null;
+      }
+
+      function handleOk() {
+        if (_cb) _cb();
+        closeModal();
+      }
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeModal();
+      });
+
+      // ════════════════════════════════════════════════════════════
+      //  TOAST
+      // ════════════════════════════════════════════════════════════
+      function toast(msg, type = "success") {
+        const el = document.createElement("div");
+        el.className = "toast";
+        el.innerHTML = `<span class="t-dot ${type}"></span>${msg}`;
+        document.getElementById("toasts").appendChild(el);
+        setTimeout(() => {
+          el.style.transition = "opacity 0.15s, transform 0.15s";
+          el.style.opacity = "0";
+          el.style.transform = "translateY(4px)";
+          setTimeout(() => el.remove(), 150);
+        }, 3500);
+      }
+
+      // ════════════════════════════════════════════════════════════
+      //  UTILS
+      // ════════════════════════════════════════════════════════════
+      function timeAgo(date) {
+        const s = Math.floor((Date.now() - date) / 1000);
+        if (s < 60) return `${s}s ago`;
+        if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+        if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+        return `${Math.floor(s / 86400)}d ago`;
+      }
+    </script>
+  </body>
+</html>
