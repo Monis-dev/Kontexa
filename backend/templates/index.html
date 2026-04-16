@@ -1533,6 +1533,139 @@
     </style>
   </head>
   <body>
+    <!-- ── EARLY BIRD BANNER ── -->
+    <div
+      id="earlyBirdBanner"
+      style="
+        background: #0d0f12;
+        padding: 12px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        flex-wrap: wrap;
+        border-bottom: 1px solid #1e2028;
+        position: relative;
+        z-index: 101;
+      "
+    >
+      <span
+        id="ebPulse"
+        style="
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #22c55e;
+          flex-shrink: 0;
+          animation: ebPulse 2s infinite;
+        "
+      ></span>
+      <span
+        style="
+          font-size: 14px;
+          color: rgba(255, 255, 255, 0.75);
+          font-family: &quot;DM Sans&quot;, sans-serif;
+        "
+      >
+        <strong style="color: #fff">Early Bird:</strong> First 100 users get
+        Lifetime Pro <strong style="color: #fff">free — forever.</strong>
+      </span>
+      <span
+        style="
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background: rgba(234, 179, 8, 0.1);
+          border: 1px solid rgba(234, 179, 8, 0.3);
+          border-radius: 99px;
+          padding: 4px 14px;
+        "
+      >
+        <span
+          id="ebSpotsNum"
+          style="
+            font-size: 18px;
+            font-weight: 700;
+            color: #fbbf24;
+            font-variant-numeric: tabular-nums;
+          "
+          >—</span
+        >
+        <span
+          style="
+            font-size: 12px;
+            color: rgba(234, 179, 8, 0.8);
+            font-weight: 500;
+          "
+          >spots left</span
+        >
+      </span>
+      <span style="display: flex; flex-direction: column; gap: 4px">
+        <span
+          style="
+            width: 140px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+            display: block;
+          "
+        >
+          <span
+            id="ebBarFill"
+            style="
+              display: block;
+              height: 100%;
+              width: 0%;
+              background: #4f46e5;
+              border-radius: 3px;
+              transition: width 0.6s ease;
+            "
+          ></span>
+        </span>
+        <span
+          id="ebBarMeta"
+          style="
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.35);
+            font-family: &quot;DM Sans&quot;, sans-serif;
+          "
+          >Loading…</span
+        >
+      </span>
+      <a
+        href="/login"
+        style="
+          background: #4f46e5;
+          color: #fff;
+          font-size: 13px;
+          font-weight: 600;
+          padding: 7px 18px;
+          border-radius: 8px;
+          text-decoration: none;
+          font-family: &quot;DM Sans&quot;, sans-serif;
+          white-space: nowrap;
+          transition: background 0.15s;
+        "
+        onmouseover="this.style.background = '#4338ca'"
+        onmouseout="this.style.background = '#4f46e5'"
+      >
+        Claim yours →
+      </a>
+    </div>
+    <style>
+      @keyframes ebPulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.6;
+          transform: scale(1.4);
+        }
+      }
+    </style>
     <!-- ── NAVIGATION ── -->
     <nav>
       <a href="#" class="nav-logo">
@@ -1574,6 +1707,41 @@
           />
         </div>
         <div class="hero-text">
+          <!-- Early bird badge — shown only while spots remain -->
+          <div
+            id="heroBadge"
+            style="
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
+              background: rgba(234, 179, 8, 0.1);
+              border: 1px solid rgba(234, 179, 8, 0.3);
+              border-radius: 99px;
+              padding: 5px 14px;
+              margin-bottom: 20px;
+              animation: fadeUp 0.7s ease both;
+            "
+          >
+            <span
+              style="
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background: #fbbf24;
+                animation: ebPulse 2s infinite;
+                flex-shrink: 0;
+              "
+            ></span>
+            <span
+              style="
+                font-size: 13px;
+                color: #fbbf24;
+                font-weight: 600;
+                font-family: &quot;DM Sans&quot;, sans-serif;
+              "
+              >Early Bird — Lifetime Pro Free</span
+            >
+          </div>
           <h1 class="hero-headline">
             Capture ideas, <em>remember everything.</em>
           </h1>
@@ -1581,6 +1749,100 @@
             Highlight text, save notes, and organize what you find online — all
             in one place.
           </p>
+          <!-- Early Bird counter card — hidden once 100 is reached -->
+          <div
+            id="heroEbCard"
+            style="
+              display: inline-flex;
+              align-items: center;
+              gap: 20px;
+              background: #fff;
+              border: 1.5px solid #e8e8e4;
+              border-radius: 16px;
+              padding: 16px 28px;
+              margin-bottom: 28px;
+              box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+              animation: fadeUp 0.7s 0.25s ease both;
+            "
+          >
+            <span
+              id="heroSpotsNum"
+              style="
+                font-size: 44px;
+                font-weight: 700;
+                color: #0d0f12;
+                font-variant-numeric: tabular-nums;
+                line-height: 1;
+                font-family: &quot;DM Sans&quot;, sans-serif;
+              "
+              >—</span
+            >
+            <span
+              style="
+                text-align: left;
+                line-height: 1.4;
+                font-family: &quot;DM Sans&quot;, sans-serif;
+              "
+            >
+              <strong
+                style="
+                  display: block;
+                  font-size: 15px;
+                  color: #0d0f12;
+                  font-weight: 600;
+                  margin-bottom: 2px;
+                "
+                >spots remaining</strong
+              >
+              <span style="font-size: 13px; color: #767b87"
+                >out of 100 early bird seats</span
+              >
+            </span>
+          </div>
+
+          <!-- Progress bar -->
+          <div
+            id="heroEbProgress"
+            style="margin-bottom: 32px; animation: fadeUp 0.7s 0.3s ease both"
+          >
+            <div
+              style="
+                width: 100%;
+                max-width: 340px;
+                height: 7px;
+                background: #e8e8e4;
+                border-radius: 4px;
+                overflow: hidden;
+                margin: 0 auto 8px;
+              "
+            >
+              <div
+                id="heroBarFill"
+                style="
+                  height: 100%;
+                  width: 0%;
+                  background: #4f46e5;
+                  border-radius: 4px;
+                  transition: width 0.6s ease;
+                "
+              ></div>
+            </div>
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                max-width: 340px;
+                margin: 0 auto;
+                font-size: 12px;
+                color: #767b87;
+                font-family: &quot;DM Sans&quot;, sans-serif;
+              "
+            >
+              <span>0</span>
+              <span id="heroClaimedLabel">Loading…</span>
+              <span>100</span>
+            </div>
+          </div>
           <div class="hero-actions">
             <a href="#" class="btn-primary">
               <svg viewBox="0 0 24 24">
@@ -2509,6 +2771,63 @@
         },
         { passive: true },
       );
+
+      (function () {
+        const TOTAL = 100;
+
+        function applyCount(count) {
+          const left = Math.max(0, TOTAL - count);
+          const pct = Math.min(100, Math.round((count / TOTAL) * 100));
+          const isFull = left <= 0;
+
+          // Banner
+          const banner = document.getElementById("earlyBirdBanner");
+          if (banner) banner.style.display = isFull ? "none" : "";
+          const bNum = document.getElementById("ebSpotsNum");
+          if (bNum) bNum.textContent = left;
+          const bFill = document.getElementById("ebBarFill");
+          if (bFill) bFill.style.width = pct + "%";
+          const bMeta = document.getElementById("ebBarMeta");
+          if (bMeta) bMeta.textContent = count + " / 100 claimed";
+
+          // Hero card + progress
+          const hCard = document.getElementById("heroEbCard");
+          const hProg = document.getElementById("heroEbProgress");
+          const hBadge = document.getElementById("heroBadge");
+          if (isFull) {
+            if (hCard) hCard.style.display = "none";
+            if (hProg) hProg.style.display = "none";
+            if (hBadge) hBadge.style.display = "none";
+          } else {
+            const hNum = document.getElementById("heroSpotsNum");
+            if (hNum) hNum.textContent = left;
+            const hFill = document.getElementById("heroBarFill");
+            if (hFill) hFill.style.width = pct + "%";
+            const hLabel = document.getElementById("heroClaimedLabel");
+            if (hLabel) hLabel.textContent = count + " claimed";
+          }
+        }
+
+        // Fetch live count from your existing /api/user-count endpoint
+        fetch("/api/user-count")
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (data) {
+            applyCount(data.count || 0);
+          })
+          .catch(function () {
+            // On error, hide early bird UI gracefully rather than showing stale data
+            var banner = document.getElementById("earlyBirdBanner");
+            if (banner) banner.style.display = "none";
+            var hCard = document.getElementById("heroEbCard");
+            if (hCard) hCard.style.display = "none";
+            var hProg = document.getElementById("heroEbProgress");
+            if (hProg) hProg.style.display = "none";
+            var hBadge = document.getElementById("heroBadge");
+            if (hBadge) hBadge.style.display = "none";
+          });
+      })();
     </script>
   </body>
 </html>

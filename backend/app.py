@@ -191,32 +191,29 @@ DEFAULT_PRICING = {
     },
     "lifetime": {
         "base_usd": 40, "base_inr_paise": 350000, 
-        "discount_usd": 25, "discount_inr_paise": 210000, "promo_badge": "🔥 Launch Sale!"
+        "discount_usd": None, "discount_inr_paise": None, "promo_badge": "🔥 Launch Sale!"
     }
 }
 
 def get_pricing_config():
-    """Fetches pricing from the DB, falls back to DEFAULT_PRICING if DB is empty."""
+    """Fetches pricing from the DB, falls back to DEFAULT_PRICING per plan if missing."""
     try:
         plans = PricingConfig.query.all()
-        if not plans:
-            return DEFAULT_PRICING
-            
-        config = {}
+        config = {k: v.copy() for k, v in DEFAULT_PRICING.items()} # Start with defaults
+        
         for p in plans:
-            config[p.plan_type] = {
-                "base_usd": p.base_usd,
-                "base_inr_paise": p.base_inr_paise,
-                "discount_usd": p.discount_usd,
-                "discount_inr_paise": p.discount_inr_paise,
-                "promo_badge": p.promo_badge
-            }
+            if p.plan_type in config:
+                config[p.plan_type] = {
+                    "base_usd": p.base_usd,
+                    "base_inr_paise": p.base_inr_paise,
+                    "discount_usd": p.discount_usd,
+                    "discount_inr_paise": p.discount_inr_paise,
+                    "promo_badge": p.promo_badge
+                }
         return config
     except Exception as e:
         app.logger.error(f"Error fetching pricing: {e}")
         return DEFAULT_PRICING
-
-
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -269,6 +266,85 @@ def user_count():
 # ping_thread = threading.Thread(target=self_ping, daemon=True)
 # ping_thread.start()
 
+# ─── Admin Dashboard ───────────────────────────────────────────────────────────────
+
+@app.route('/hq-admin-panel')
+def admin_dashboard():
+    # SECURE URL: Change 'hq-admin-panel' to whatever you want
+    return render_template("admin.html")
+
+@app.route('/api/admin/stats')
+def admin_stats():
+    if not _admin_token_required(): return jsonify({"error": "Forbidden"}), 403
+    try:
+        s = {
+            "total_users": User.query.count(),
+            "pro_users": User.query.filter_by(is_pro=True).count(),
+            "lifetime_users": User.query.filter_by(plan_type='lifetime').count(),
+            "monthly_users": User.query.filter_by(plan_type='monthly').count(),
+            "free_users": User.query.filter_by(plan_type='free').count(),
+            "total_notes": Note.query.count(),
+            "total_websites": Website.query.count(),
+            "expired_users": User.query.filter(User.plan_type == 'monthly', User.pro_expires_at < datetime.utcnow()).count()
+        }
+        # DB Size check
+        try:
+            res = db.session.execute(sa_text("SELECT pg_database_size(current_database())")).fetchone()
+            s["db_size_mb"] = round(res[0] / (1024 * 1024), 2) if res else 0
+        except: s["db_size_mb"] = 0
+        s["db_limit_mb"] = 512
+        return jsonify(s)
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+@app.route('/api/admin/users')
+def admin_users():
+    if not _admin_token_required(): return jsonify({"error": "Forbidden"}), 403
+    users = User.query.order_by(User.id.desc()).all()
+    return jsonify([{
+        "id": u.id, "email": u.email, "is_pro": u.is_pro, "plan_type": u.plan_type,
+        "pro_expires_at": u.pro_expires_at.isoformat() if u.pro_expires_at else None,
+        "created_at": u.created_at.isoformat() if u.created_at else None, # Needed for charts
+    } for u in users])
+
+@app.route('/api/admin/pricing', methods=['POST'])
+def admin_update_pricing():
+    if not _admin_token_required():
+        return jsonify({"error": "Forbidden"}), 403
+
+    data = request.get_json(silent=True)
+    plan_type = data.get("plan_type")
+    
+    try:
+        plan = PricingConfig.query.filter_by(plan_type=plan_type).first()
+        if not plan:
+            plan = PricingConfig(plan_type=plan_type, base_usd=0, base_inr_paise=0)
+            db.session.add(plan)
+
+        # Update base prices
+        if 'base_usd' in data: plan.base_usd = data['base_usd']
+        if 'base_inr_paise' in data: plan.base_inr_paise = data['base_inr_paise']
+        
+        # Update discounts (can be null)
+        plan.discount_usd = data.get('discount_usd')
+        plan.discount_inr_paise = data.get('discount_inr_paise')
+        plan.promo_badge = data.get('promo_badge')
+
+        db.session.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/admin/feedback-digest')
+def admin_feedback():
+    if not _admin_token_required(): return jsonify({"error": "Forbidden"}), 403
+    week_ago = datetime.utcnow() - timedelta(days=7)
+    rows = Feedback.query.filter(Feedback.created_at >= week_ago).all()
+    return jsonify([{
+        "id": f.id, "email": f.email, "type": f.fb_type, "message": f.message, "created_at": f.created_at.isoformat()
+    } for f in rows])
+
+
 
 # ─── Mobile PWA ───────────────────────────────────────────────────────────────
 
@@ -283,198 +359,6 @@ def mobile_app():
 @app.route("/mobile/<path:filename>")
 def mobile_static(filename):
     return send_from_directory(MOBILE_DIR, filename)
-
-
-# ─── Admin Dashboard ─────────────────────────────────────────────────────────────────
-# 1. Change this string to whatever secret URL you want
-@app.route('/CSGO_>_CS2') 
-def admin_dashboard():
-    # 2. Force the user to log in via Google first
-    if 'user_email' not in session:
-        return redirect(url_for('login'))
-        
-    # 3. REPLACE WITH YOUR ACTUAL EMAIL(S)
-    ALLOWED_ADMIN_EMAILS = [
-        "your_actual_email@gmail.com", 
-        "another_admin@gmail.com"
-    ]
-    
-    # 4. Block anyone who isn't you
-    if session['user_email'] not in ALLOWED_ADMIN_EMAILS:
-        return """
-        <h1 style='color:red; text-align:center; margin-top:50px;'>
-            Unauthorized Account
-        </h1>
-        <p style='text-align:center;'>Your email is not authorized to view this page.</p>
-        """, 403
-
-    # 5. Only if it is YOU, render the dashboard
-    return render_template('admin.html')
-@app.route('/api/admin/stats')
-def admin_stats():
-    if not _admin_token_required():
-        return jsonify({"error": "Forbidden"}), 403
- 
-    try:
-        total_users    = User.query.count()
-        pro_users      = User.query.filter_by(is_pro=True).count()
-        lifetime_users = User.query.filter_by(plan_type='lifetime').count()
-        monthly_users  = User.query.filter_by(plan_type='monthly').count()
-        free_users     = User.query.filter_by(plan_type='free').count()
-        total_notes    = Note.query.count()
-        total_websites = Website.query.count()
- 
-        expired_users = User.query.filter(
-            User.plan_type == 'monthly',
-            User.pro_expires_at != None,
-            User.pro_expires_at < datetime.utcnow()
-        ).count()
-
-        db_size_mb  = None
-        db_limit_mb = 512  # Neon/Supabase free tier is 512 MB — adjust if you upgrade
- 
-        try:
-            result = db.session.execute(
-                sa_text("SELECT pg_database_size(current_database()) AS size")
-            ).fetchone()
-            if result:
-                db_size_mb = round(result.size / (1024 * 1024), 2)
-        except Exception as db_err:
-            app.logger.warning(f"Could not fetch DB size: {db_err}")
- 
-        db_days_left = None
-        renewal_date_str = os.getenv("DB_RENEWAL_DATE")
-        if renewal_date_str:
-            try:
-                renewal_date = datetime.strptime(renewal_date_str, "%Y-%m-%d")
-                delta = renewal_date - datetime.utcnow()
-                db_days_left = max(0, delta.days)
-            except ValueError:
-                pass  # Bad date format in env — ignore
- 
-        return jsonify({
-            "total_users":    total_users,
-            "pro_users":      pro_users,
-            "lifetime_users": lifetime_users,
-            "monthly_users":  monthly_users,
-            "free_users":     free_users,
-            "expired_users":  expired_users,
-            "total_notes":    total_notes,
-            "total_websites": total_websites,
-            "db_size_mb":     db_size_mb,
-            "db_limit_mb":    db_limit_mb,
-            "db_days_left":   db_days_left,
-        })
- 
-    except Exception as e:
-        app.logger.error(f"admin_stats error: {e}")
-        return jsonify({"error": "Internal server error"}), 500
- 
- 
-@app.route('/api/admin/users')
-def admin_users():
-    if not _admin_token_required():
-        return jsonify({"error": "Forbidden"}), 403
- 
-    try:
-        users = User.query.order_by(User.id.desc()).all()
-        return jsonify([{
-            "id":            u.id,
-            "email":         u.email,
-            "is_pro":        u.is_pro,
-            "plan_type":     u.plan_type,
-            "pro_expires_at": u.pro_expires_at.isoformat() if u.pro_expires_at else None,
-            "created_at":    u.created_at.isoformat() if u.created_at else None,
-        } for u in users])
- 
-    except Exception as e:
-        app.logger.error(f"admin_users error: {e}")
-        return jsonify({"error": "Internal server error"}), 500
- 
-@app.route('/api/admin/pricing', methods=['POST'])
-def admin_update_pricing():
-    """Updates the pricing in the database."""
-    if not _admin_token_required():
-        return jsonify({"error": "Forbidden"}), 403
-
-    data = request.get_json(silent=True)
-    if not data or not data.get("plan_type"):
-        return jsonify({"error": "Invalid request body. 'plan_type' is required."}), 400
-
-    plan_type = data["plan_type"]
-    
-    try:
-        plan = PricingConfig.query.filter_by(plan_type=plan_type).first()
-        
-        # FIX: If the row doesn't exist, create it using the correct DEFAULT base prices
-        if not plan:
-            def_usd = DEFAULT_PRICING.get(plan_type, {}).get("base_usd", 0)
-            def_inr = DEFAULT_PRICING.get(plan_type, {}).get("base_inr_paise", 0)
-            plan = PricingConfig(plan_type=plan_type, base_usd=def_usd, base_inr_paise=def_inr)
-            db.session.add(plan)
-
-        # Apply updates
-        if 'base_usd' in data: plan.base_usd = data['base_usd']
-        if 'base_inr_paise' in data: plan.base_inr_paise = data['base_inr_paise']
-        
-        # Null values (for 0% discounts) are allowed
-        if 'discount_usd' in data: plan.discount_usd = data['discount_usd']
-        if 'discount_inr_paise' in data: plan.discount_inr_paise = data['discount_inr_paise']
-        if 'promo_badge' in data: plan.promo_badge = data['promo_badge']
-
-        db.session.commit()
-        return jsonify({"ok": True, "message": f"{plan_type} pricing updated successfully!"})
-
-    except Exception as e:
-        db.session.rollback()
-        app.logger.error(f"admin_update_pricing error: {e}")
-        return jsonify({"error": "Internal server error"}), 500
-    
- 
-@app.route('/api/admin/users/<int:user_id>/access', methods=['PATCH'])
-def admin_set_access(user_id):
-    if not _admin_token_required():
-        return jsonify({"error": "Forbidden"}), 403
- 
-    data = request.get_json(silent=True)
-    if not data:
-        return jsonify({"error": "Invalid request body"}), 400
- 
-    user = db.session.get(User, user_id)
-    if not user:
-        return jsonify({"error": "User not found"}), 404
- 
-    try:
-        is_pro    = bool(data.get("is_pro", user.is_pro))
-        plan_type = str(data.get("plan_type", user.plan_type))
- 
-        if plan_type not in ("free", "monthly", "lifetime"):
-            return jsonify({"error": "Invalid plan_type"}), 400
- 
-        user.is_pro    = is_pro
-        user.plan_type = plan_type
- 
-        if plan_type == "monthly" and is_pro:
-            # Grant 30 days from now
-            user.pro_expires_at = datetime.utcnow() + timedelta(days=30)
-        elif plan_type in ("lifetime", "free"):
-            user.pro_expires_at = None
- 
-        db.session.commit()
-        app.logger.info(f"Admin updated user {user_id}: is_pro={is_pro}, plan={plan_type}")
- 
-        return jsonify({
-            "ok": True,
-            "user_id":    user.id,
-            "is_pro":     user.is_pro,
-            "plan_type":  user.plan_type,
-        })
- 
-    except Exception as e:
-        db.session.rollback()
-        app.logger.error(f"admin_set_access error: {e}")
-        return jsonify({"error": "Internal server error"}), 500
-
 
 
 # ─── Login / OAuth ────────────────────────────────────────────────────────────

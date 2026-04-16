@@ -1969,7 +1969,7 @@
       // ════════════════════════════════════════════════════════════
       // Prices mirror your PRICING_CONFIG in app.py
       const PLANS = {
-        monthly: { label: "Pro Monthly", inr: 18000, usd: 2 }, 
+        monthly: { label: "Pro Monthly", inr: 18000, usd: 2 },
         lifetime: { label: "Lifetime", inr: 350000, usd: 40 },
       };
 
@@ -1977,33 +1977,42 @@
         const opts = Object.entries(PLANS)
           .map(
             ([k, v]) =>
-              `<option value="${k}" data-inr="${v.inr}">${v.label}</option>`,
+              `<option value="${k}" data-inr="${v.inr}" data-usd="${v.usd}">${v.label}</option>`,
           )
           .join("");
+
         return `<div class="card">
-    <div class="card-header"><span class="card-title">Apply Offer</span></div>
+    <div class="card-header"><span class="card-title">Pricing & Offers</span></div>
     <div class="card-body">
       <div class="f-row">
-        <label class="f-label">Plan</label>
+        <label class="f-label">Select Plan</label>
         <select class="f-ctrl" id="offerPlan" onchange="calcOffer()">${opts}</select>
       </div>
-      <div class="f-row">
-        <label class="f-label">Discount (%)</label>
-        <input class="f-ctrl" type="number" id="offerPct" value="20" min="1" max="99" oninput="calcOffer()"/>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom:10px;">
+        <div class="f-row">
+          <label class="f-label">Base Price (USD)</label>
+          <input class="f-ctrl" type="number" id="baseUsdInput" placeholder="e.g. 40" />
+        </div>
+        <div class="f-row">
+          <label class="f-label">Base Price (INR)</label>
+          <input class="f-ctrl" type="number" id="baseInrInput" placeholder="e.g. 3500" />
+        </div>
       </div>
+
       <div class="f-row">
-        <label class="f-label">Apply to</label>
-        <select class="f-ctrl" id="offerScope">
-          <option value="all">All users on this plan</option>
-          <option value="new">New signups only</option>
-        </select>
+        <label class="f-label">Active Sale Discount (%)</label>
+        <input class="f-ctrl" type="number" id="offerPct" value="0" min="0" max="99" oninput="calcOffer()"/>
+        <small style="color:var(--text3); font-size:10px;">Set to 0 to disable sale</small>
       </div>
+
       <div class="price-block">
-        <span class="p-orig" id="pOrig">₹180</span>
-        <span class="p-new"  id="pNew">₹144</span>
-        <span class="p-off"  id="pOff">−20%</span>
+        <span class="p-orig" id="pOrig">₹0</span>
+        <span class="p-new"  id="pNew">₹0</span>
+        <span class="p-off"  id="pOff">0% OFF</span>
       </div>
-      <button class="btn-primary" onclick="confirmOffer()">Apply offer</button>
+      
+      <button class="btn-primary" onclick="confirmOffer()">Update Pricing live</button>
     </div>
   </div>`;
       }
@@ -2202,62 +2211,57 @@
         );
       }
 
-      function confirmOffer() {
-        const planEl = document.getElementById("offerPlan");
-        const planLbl = planEl?.options[planEl.selectedIndex]?.text || "";
-        const planKey = planEl?.value || "lifetime";
-        
-        const pct = document.getElementById("offerPct")?.value || 0;
-        const discountPct = parseInt(pct);
-        
-        const scopeEl = document.getElementById("offerScope");
-        const scope = scopeEl?.options[scopeEl.selectedIndex]?.text || "";
+      async function confirmOffer() {
+        const planKey = document.getElementById("offerPlan").value;
+        const baseUsd = parseInt(document.getElementById("baseUsdInput").value);
+        const baseInr = parseInt(document.getElementById("baseInrInput").value);
+        const discountPct =
+          parseInt(document.getElementById("offerPct").value) || 0;
+
+        if (!baseUsd || !baseInr) {
+          toast("Please enter base prices", "error");
+          return;
+        }
+
+        // Calculate values
+        const baseInrPaise = baseInr * 100; // Convert to paise for Razorpay
+        let discountInrPaise = null;
+        let discountUsd = null;
+        let promoBadge = "";
+
+        if (discountPct > 0) {
+          discountInrPaise = Math.round(baseInrPaise * (1 - discountPct / 100));
+          discountUsd = Math.max(
+            1,
+            Math.round(baseUsd * (1 - discountPct / 100)),
+          );
+          promoBadge = "🔥 " + discountPct + "% SALE";
+        } else {
+          promoBadge = planKey === "monthly" ? "Most Popular" : "";
+        }
 
         openModal(
-          "Apply offer",
-          `Apply <strong>${discountPct}%</strong> discount to <strong>${planLbl}</strong> for <strong>${scope.toLowerCase()}</strong>?<br/><br/>
-    <span style="font-size:11px;color:var(--text3)">This will update the prices live on your website and checkout instantly. Set to 0% to turn the sale off.</span>`,
-          "Apply",
+          "Confirm Changes",
+          `Update <strong>${planKey}</strong> standard price to $${baseUsd} / ₹${baseInr}? ${discountPct > 0 ? `<br>Active sale: ${discountPct}% off.` : ""}`,
+          "Update Live",
           "ok",
           async () => {
             try {
-              // 1. Calculate actual discounted prices based on percentage
-              const baseInr = PLANS[planKey].inr;
-              const baseUsd = PLANS[planKey].usd;
-
-              let discount_inr_paise = null;
-              let discount_usd = null;
-              let promo_badge = null;
-
-              if (discountPct > 0) {
-                  // Calculate new prices (Math.round ensures we don't send decimals to Stripe/Razorpay)
-                  discount_inr_paise = Math.round(baseInr * (1 - discountPct / 100));
-                  discount_usd = Math.max(1, Math.round(baseUsd * (1 - discountPct / 100))); 
-                  promo_badge = "🔥 Limited Time Offer!";
-              } else {
-                  // If 0%, revert to default badges and remove discounts
-                  promo_badge = planKey === 'monthly' ? 'Most Popular' : '';
-              }
-
-              // 2. Send the exact payload the backend expects
               await api("/api/admin/pricing", {
                 method: "POST",
                 body: JSON.stringify({
                   plan_type: planKey,
-                  discount_usd: discount_usd,
-                  discount_inr_paise: discount_inr_paise,
-                  promo_badge: promo_badge
+                  base_usd: baseUsd,
+                  base_inr_paise: baseInrPaise,
+                  discount_usd: discountUsd,
+                  discount_inr_paise: discountInrPaise,
+                  promo_badge: promoBadge,
                 }),
               });
-              
-              if (discountPct > 0) {
-                  toast(`${discountPct}% offer applied! Prices updated live.`, "success");
-              } else {
-                  toast(`Sale ended. Prices reverted to normal.`, "info");
-              }
-              
+              toast("Pricing updated successfully!", "success");
+              loadAll(); // Refresh data
             } catch (e) {
-              toast("Failed to update pricing. Check server logs.", "error");
+              toast("Error updating pricing", "error");
             }
           },
         );
