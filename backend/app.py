@@ -15,7 +15,7 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 from markupsafe import escape
 from sqlalchemy import func, text as sa_text
-
+from flask_mail import Mail, Message
 
 
 
@@ -63,6 +63,16 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     }
 }
 db = SQLAlchemy(app)
+
+
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 465
+app.config['MAIL_USE_SSL'] = True
+app.config['MAIL_USERNAME'] = os.getenv("MAIL_USERNAME")
+app.config['MAIL_PASSWORD'] = os.getenv("MAIL_PASSWORD")
+app.config['MAIL_DEFAULT_SENDER'] = os.getenv("MAIL_USERNAME")
+
+mail = Mail(app)
 
 # ─── Razorpay ─────────────────────────────────────────────────────────────────
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
@@ -665,18 +675,11 @@ def support():
  
 @app.route('/api/support', methods=['POST'])
 def support_contact():
-    """
-    Handles the support contact form.
-    Accepts JSON: { email, type, subject, message }
-    No session required — works for logged-out users too.
-    Stores the submission in your existing Feedback table.
-    """
     try:
         data = request.get_json(silent=True) or {}
  
-        # ── Validate ─────────────────────────────────────────────────────────
-        email   = str(data.get('email',   '')).strip()[:255]
-        fb_type = str(data.get('type',    'general')).strip()[:50]
+        email   = str(data.get('email', '')).strip()[:255]
+        fb_type = str(data.get('type', 'general')).strip()[:50]
         subject = str(data.get('subject', '')).strip()[:255]
         message = str(data.get('message', '')).strip()[:2000]
  
@@ -686,42 +689,37 @@ def support_contact():
         if not message:
             return jsonify({'error': 'Message is required.'}), 400
  
-        allowed_types = {'bug', 'feature', 'billing', 'general', 'complaint'}
-        if fb_type not in allowed_types:
-            fb_type = 'general'
- 
-        # ── Escape user input ─────────────────────────────────────────────────
-        fb_type = str(escape(fb_type))
-        subject = str(escape(subject))
-        message = str(escape(message))
-        # Note: email is validated by regex above, not escaped (escape would
-        # mangle @ and . characters).
- 
-        # ── Try to associate with an existing user ────────────────────────────
-        user_id = None
-        existing_user = User.query.filter_by(email=email).first()
-        if existing_user:
-            user_id = existing_user.id
- 
-        # ── Persist ───────────────────────────────────────────────────────────
+        # Persistence
         feedback = Feedback(
-            user_id = user_id,
+            user_id = User.query.filter_by(email=email).first().id if User.query.filter_by(email=email).first() else None,
             email   = email,
-            fb_type = fb_type,
-            subject = subject,
-            message = message,
+            fb_type = str(escape(fb_type)),
+            subject = str(escape(subject)),
+            message = str(escape(message)),
         )
         db.session.add(feedback)
         db.session.commit()
+
+        # Email Notification
+        try:
+            msg = Message(
+                subject=f"Kontexa Support: {fb_type} - {subject}",
+                recipients=[os.getenv("MAIL_USERNAME")], # Sends to your email
+                body=f"New message from: {email}\n\nTopic: {fb_type}\n\nMessage:\n{message}"
+            )
+            mail.send(msg)
+        except Exception as mail_err:
+            app.logger.error(f"Email delivery failed: {mail_err}")
+            # We don't return error to user here because the DB save was successful
  
-        app.logger.info(f"Support message from {email} [{fb_type}]: {subject}")
         return jsonify({'ok': True}), 201
  
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"support_contact error: {e}")
-        return jsonify({'error': 'Internal server error. Please try again.'}), 500
-
+        return jsonify({'error': 'Internal server error.'}), 500
+    
+    
 # ─── Notes API ────────────────────────────────────────────────────────────────
 
 @app.route('/api/sync', methods=['POST'])
