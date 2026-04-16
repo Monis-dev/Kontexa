@@ -611,7 +611,155 @@
       </div>
     </div>
 
-    <!-- Data Guide Modal -->
+    <!-- Login Modal -->
+    <div class="mbg" id="loginModal">
+      <div class="modal" style="max-width: 420px; text-align: left">
+        <h3 style="margin-bottom: 6px; font-size: 18px; color: var(--ink)">
+          Sign in to Kontexa
+        </h3>
+        <p
+          style="
+            font-size: 13px;
+            color: var(--mut);
+            margin: 0 0 20px;
+            line-height: 1.5;
+          "
+        >
+          Your notes are already saved locally. Signing in unlocks sync and Pro
+          features.
+        </p>
+
+        <!-- Row: Free account -->
+        <div
+          style="
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 13px 0;
+            border-bottom: 1px solid var(--bdr);
+          "
+        >
+          <div
+            style="
+              width: 32px;
+              height: 32px;
+              border-radius: 8px;
+              background: #eaf3de;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              flex-shrink: 0;
+            "
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#3B6D11"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+          </div>
+          <div>
+            <p
+              style="
+                font-size: 13.5px;
+                font-weight: 600;
+                color: var(--ink);
+                margin: 0 0 3px;
+              "
+            >
+              Local Storage (Free)
+            </p>
+            <p
+              style="
+                font-size: 12.5px;
+                color: var(--mut);
+                margin: 0;
+                line-height: 1.5;
+              "
+            >
+              Your notes are saved to this browser only. No account needed.
+            </p>
+          </div>
+        </div>
+
+        <!-- Row: Pro account -->
+        <div
+          style="
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 13px 0;
+            margin-bottom: 10px;
+          "
+        >
+          <div
+            style="
+              width: 32px;
+              height: 32px;
+              border-radius: 8px;
+              background: #eeedfe;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              flex-shrink: 0;
+            "
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#534AB7"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+              ></path>
+            </svg>
+          </div>
+          <div>
+            <p
+              style="
+                font-size: 13.5px;
+                font-weight: 600;
+                color: var(--ink);
+                margin: 0 0 3px;
+              "
+            >
+              Kontexa Pro (Cloud)
+            </p>
+            <p
+              style="
+                font-size: 12.5px;
+                color: var(--mut);
+                margin: 0;
+                line-height: 1.5;
+              "
+            >
+              Cloud sync, AI features, YouTube timestamps, and custom folders.
+            </p>
+          </div>
+        </div>
+
+        <div class="macts" style="margin-top: 14px">
+          <button class="btn" id="closeLoginModalBtn">Cancel</button>
+          <button class="btn pri" id="confirmLoginBtn">
+            Continue with Google
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Guide Modal -->
     <div class="mbg" id="guideModal">
       <div
         class="modal"
@@ -700,7 +848,8 @@
                     line-height: 1.5;
                   "
                 >
-                  Select any text on a webpage, right-click or press <strong>ALT + SHIFT + S</strong>, and choose
+                  Select any text on a webpage, right-click or press
+                  <strong>ALT + SHIFT + S</strong>, and choose
                   <strong>Save to Kontexa</strong>. Add a title and note, then
                   hit save.
                 </p>
@@ -774,6 +923,77 @@
                 >
                   Click the Kontexa icon in your toolbar to open your dashboard,
                   browse notes by source, search, and export.
+                </p>
+              </div>
+            </div>
+
+            <!-- Slide 3-->
+            <div
+              class="guide-slide"
+              style="min-width: 100%; display: flex; flex-direction: column"
+            >
+              <div
+                style="
+                  position: relative;
+                  background: #000;
+                  aspect-ratio: 16/9;
+                  overflow: hidden;
+                "
+              >
+                <div
+                  class="guide-video-placeholder"
+                  data-index="1"
+                  style="
+                    width: 100%;
+                    height: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                  "
+                >
+                  <div
+                    style="
+                      width: 48px;
+                      height: 48px;
+                      border-radius: 50%;
+                      background: rgba(255, 255, 255, 0.12);
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="white"
+                    >
+                      <polygon points="5 3 19 12 5 21 5 3" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              <div style="padding: 6px 12px 2px">
+                <p
+                  style="
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: var(--ink);
+                    margin: 0 0 2px;
+                  "
+                >
+                  2 — Video Stamp <strong><i>(Pro Tier Feature)</i></strong>
+                </p>
+                <p
+                  style="
+                    font-size: 12px;
+                    color: var(--mut);
+                    margin: 0;
+                    line-height: 1.5;
+                  "
+                >
+                  Press <strong>Alt + Shift + S</strong> and create a timestamp
+                  on any <strong>YouTube</strong> video
                 </p>
               </div>
             </div>
@@ -1376,7 +1596,7 @@
               color: var(--acc);
             "
           >
-            🧠 Talk
+            Talk
           </button>
           <button
             id="modeResearch"
@@ -1391,7 +1611,7 @@
               color: var(--mut);
             "
           >
-            🔬 Research
+            Research
           </button>
         </div>
         <div id="aiChatBox">

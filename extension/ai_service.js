@@ -26,6 +26,11 @@ const AIService = {
         if (n.title) parts.push(`Page Title: ${n.title}`);
         if (n.selection) parts.push(`Highlighted Text: ${n.selection}`);
         if (n.content) parts.push(`User's Written Note: ${n.content}`);
+        const hasTags = Array.isArray(n.tags) && n.tags.length > 0;
+        if (hasTags)
+          parts.push(
+            `ALREADY TAGGED: ${n.tags.join(", ")} — skip this note in the tags object`,
+          );
         return parts.join("\n");
       })
       .join("\n\n");
@@ -44,6 +49,7 @@ RULES:
 - lowercase
 - no duplicates
 - based ONLY on note content
+- If a note says "ALREADY TAGGED", do NOT include it in the tags object at all
 
 FORMAT (use the real IDs from the notes below):
 {
@@ -78,7 +84,15 @@ ${notesText || "No notes provided."}
       });
 
       if (response.status === 429) {
-        return "⚠️ Rate limit exceeded. Please wait a moment or check your API key usage.";
+        return "Rate limit exceeded. Please wait a moment or check your API key usage.";
+      }
+
+      if (response.status === 503) {
+        return {
+          answer:
+            "Gemini is temporarily unavailable (server overload). Please wait 10–15 seconds and try again.",
+          tags: {},
+        };
       }
 
       if (!response.ok) {
@@ -90,7 +104,7 @@ ${notesText || "No notes provided."}
       let raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
       if (!raw) {
-        return { answer: "⚠️ Empty AI response", tags: {} };
+        return { answer: "Empty AI response", tags: {} };
       }
 
       // clean markdown
@@ -180,7 +194,7 @@ ${notesText || "No notes provided."}
   async generateNotesFromQuestion(question) {
     const res = await chrome.storage.local.get(["gemini_key"]);
     const apiKey = res.gemini_key;
-    if (!apiKey) return null;
+    if (!apiKey) throw new Error("API_KEY_MISSING");
 
     const prompt = `
 You are a note generator. The user asked about a topic they have no saved notes on.
@@ -220,6 +234,7 @@ User Question: ${question}
         }),
       });
 
+      if (response.status === 503) throw new Error("GEMINI_UNAVAILABLE");
       if (!response.ok) return null;
 
       const data = await response.json();

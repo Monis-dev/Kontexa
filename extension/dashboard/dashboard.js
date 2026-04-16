@@ -206,6 +206,17 @@ E($("proceedLoginBtn"), "click", () => {
   window.open(`${API_BASE}/login`, "_blank");
 });
 
+E($("closeLoginModalBtn"), "click", () =>
+  $("loginModal").classList.remove("on"),
+);
+E($("loginModal"), "click", (e) => {
+  if (e.target === $("loginModal")) $("loginModal").classList.remove("on");
+});
+E($("confirmLoginBtn"), "click", () => {
+  $("loginModal").classList.remove("on");
+  window.open(`${API_BASE}/login`, "_blank");
+});
+
 E($("cancelLogout"), "click", () => $("logoutModal").classList.remove("on"));
 E($("logoutKeepBtn"), "click", async () => {
   try {
@@ -1090,11 +1101,13 @@ function loadLocalUI() {
     const persistedFolders = res[FOLDERS_KEY] || [];
     const foldersFromNotes = allNotesFlat.map((n) => n.folder).filter(Boolean);
     userFolders = [...new Set([...persistedFolders, ...foldersFromNotes])];
+    userFolders = userFolders.filter(
+      (f) => f !== "General Notes" && f.trim() !== "",
+    );
+
     if (JSON.stringify(persistedFolders) !== JSON.stringify(userFolders)) {
       chrome.storage.local.set({ [FOLDERS_KEY]: userFolders });
     }
-    userFolders = userFolders.filter((f) => (folderCounts[f] || 0) > 0);
-    chrome.storage.local.set({ [FOLDERS_KEY]: userFolders });
     userFolders.forEach((f) => {
       if (!groupedFolders[f]) {
         groupedFolders[f] = {
@@ -1142,7 +1155,7 @@ function renderNoNotesSuggestion(question, notes) {
   if (!notes || !Array.isArray(notes) || notes.length === 0) {
     chatBox.insertAdjacentHTML(
       "beforeend",
-      `<div class="chat-msg chat-ai">⚠️ No notes found and couldn't generate suggestions. Try rephrasing your question.</div>`,
+      `<div class="chat-msg chat-ai">No notes found and couldn't generate suggestions. Try rephrasing your question.</div>`,
     );
     chatBox.scrollTop = chatBox.scrollHeight;
     return;
@@ -1446,10 +1459,8 @@ async function checkAuthAndSync() {
 
 E($("loginBtn"), "click", () => {
   $("synmenu").classList.remove("on");
-  $("proceedLoginBtn").style.display = "block";
-  $("guideModal").classList.add("on");
+  $("loginModal").classList.add("on");
 });
-
 // FIX: Only ONE focus listener — the duplicate at the bottom of the original
 // file has been removed. Both shared the same lastAuthCheck guard anyway,
 // making the second one a no-op while risking a future double-registration.
@@ -1908,9 +1919,40 @@ async function handleAiSubmit() {
         `<div class="chat-msg chat-ai">Generating research notes…</div>`,
       );
       chatBox.scrollTop = chatBox.scrollHeight;
-      const suggestions = await AIService.generateNotesFromQuestion(q);
-      chatBox.lastElementChild.remove();
-      renderNoNotesSuggestion(q, suggestions);
+      try {
+        const suggestions = await AIService.generateNotesFromQuestion(q);
+        chatBox.lastElementChild.remove(); // remove "Generating suggestions…" bubble
+        renderNoNotesSuggestion(q, suggestions);
+      } catch (e) {
+        chatBox.lastElementChild.remove();
+        const isKeyMissing = e?.message === "API_KEY_MISSING";
+        const isUnavailable = e?.message === "GEMINI_UNAVAILABLE";
+        chatBox.insertAdjacentHTML(
+          "beforeend",
+          isKeyMissing
+            ? `...api key message...`
+            : isUnavailable
+              ? `<div class="chat-msg chat-ai">Gemini is temporarily overloaded. Wait a few seconds and try again.</div>`
+              : `<div class="chat-msg chat-ai">Error: Could not connect to AI.</div>`
+                ? `<div class="chat-msg chat-ai" style="display:flex;flex-direction:column;gap:10px;">
+          <div<strong>No Gemini API key found.</strong></div>
+          <div style="font-size:12px;color:var(--mut,#64748b);line-height:1.6;">
+            Get a free key at 
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener"
+               style="color:var(--acc,#3b82f6);">aistudio.google.com</a>, 
+            then add it via <strong>Settings → API Key</strong>.
+          </div>
+          <button
+            onclick="document.getElementById('apiSettingsBtn')?.click()"
+            style="align-self:flex-start;font-size:12px;font-weight:500;padding:6px 14px;
+                   border-radius:8px;border:1px solid var(--acc,#3b82f6);
+                   background:var(--acc,#3b82f6);color:#fff;cursor:pointer;">
+            Open API Key Settings
+          </button>
+        </div>`
+                : `<div class="chat-msg chat-ai">Could not generate suggestions. Try again.</div>`,
+        );
+      }
       input.value = "";
       input.disabled = false;
       sendBtn.disabled = false;
@@ -1946,7 +1988,7 @@ async function handleAiSubmit() {
     }
 
     const result = await AIService.chat(q, filteredNotes);
-    const aiAnswer = result?.answer || "⚠️ No answer received.";
+    const aiAnswer = result?.answer || "No answer received.";
     const aiTags = result?.tags || {};
 
     const res = await new Promise((resolve) =>
@@ -1954,10 +1996,12 @@ async function handleAiSubmit() {
     );
     let allNotes = res.context_notes_data || [];
     const updated = allNotes.map((note) => {
+      const alreadyHasTags = Array.isArray(note.tags) && note.tags.length > 0;
+      if (alreadyHasTags) return note; // ← never touch notes that already have tags
+
       const newTags = aiTags[note.id];
       if (newTags && newTags.length > 0) {
-        const merged = [...new Set([...(note.tags || []), ...newTags])];
-        return { ...note, tags: merged };
+        return { ...note, tags: newTags };
       }
       return note;
     });
@@ -1971,7 +2015,7 @@ async function handleAiSubmit() {
     if (tagUpdates.length > 0 && isLoggedIn && isProUserUI) {
       try {
         // FIX: updated endpoint from /api/notes/tags → /api/notes/batch-tags
-        await fetch(`${API_BASE}/api/notes/batch-tags`, {
+        await fetch(`${API_BASE}/api/notes/tags`, {
           method: "PUT",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -1987,9 +2031,28 @@ async function handleAiSubmit() {
       `<div class="chat-msg chat-ai" style="line-height:1.6">${renderMarkdown(aiAnswer)}</div>`,
     );
   } catch (e) {
+    const isKeyMissing = e?.message === "API_KEY_MISSING";
     chatBox.insertAdjacentHTML(
       "beforeend",
-      `<div class="chat-msg chat-ai">Error: Could not connect to AI.</div>`,
+      isKeyMissing
+        ? `<div class="chat-msg chat-ai" style="display:flex;flex-direction:column;gap:10px;">
+          <div>⚠️ <strong>No Gemini API key found.</strong> The AI features require your own Gemini key.</div>
+          <div style="font-size:12px;color:var(--mut,#64748b);line-height:1.6;">
+            1. Get a free key at 
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener"
+               style="color:var(--acc,#3b82f6);">aistudio.google.com</a><br>
+            2. Open <strong>Settings → API Key</strong> in the extension<br>
+            3. Paste your key and save
+          </div>
+          <button
+            onclick="document.getElementById('apiSettingsBtn')?.click()"
+            style="align-self:flex-start;font-size:12px;font-weight:500;padding:6px 14px;
+                   border-radius:8px;border:1px solid var(--acc,#3b82f6);
+                   background:var(--acc,#3b82f6);color:#fff;cursor:pointer;">
+            Open API Key Settings
+          </button>
+        </div>`
+        : `<div class="chat-msg chat-ai">⚠️ Error: Could not connect to AI. Check your internet connection and API key.</div>`,
     );
   }
 
@@ -2348,6 +2411,10 @@ E($("manageSubBtn"), "click", () => {
       src: chrome.runtime.getURL("dashboard/guide/dashboard-open.mp4"),
       poster: "",
     },
+    {
+      src: chrome.runtime.getURL("dashboard/guide/Video-Stamp.mp4"),
+      poster: "",
+    },
   ];
   let currentSlide = 0;
   const totalSlides = GUIDE_VIDEOS.length;
@@ -2469,3 +2536,16 @@ E($("manageSubBtn"), "click", () => {
     }, { passive: true });
   }
 })();
+
+E($("manageSubBtn"), "click", () => {
+  if (!isLoggedIn) {
+    // If they aren't logged in, show the login prompt
+    $("loginModal").classList.add("on");
+    closeSettingsPanel();
+    return;
+  }
+
+  // Open the pricing page
+  window.open(`${API_BASE}/pricing`, "_blank");
+  closeSettingsPanel();
+});

@@ -50,7 +50,8 @@
         "pro.js",
         "ai_service.js",
         "dashboard/guide/Highlight-save.mp4",
-        "dashboard/guide/dashboard-open.mp4"
+        "dashboard/guide/dashboard-open.mp4",
+        "dashboard/guide/Video-Stamp.mp4"
       ],
       "matches": ["<all_urls>"]
     }
