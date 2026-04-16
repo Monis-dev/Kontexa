@@ -286,6 +286,9 @@ def mobile_static(filename):
 
 
 # ─── Admin Dashboard ─────────────────────────────────────────────────────────────────
+@app.route('/admin')
+def admin_dashboard():
+    return render_template('Admin_dashboard.html')
 
 @app.route('/api/admin/stats')
 def admin_stats():
