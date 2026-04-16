@@ -1549,116 +1549,125 @@
       id="earlyBirdBanner"
       style="
         background: #0d0f12;
-        padding: 12px 24px;
-        display: flex;
+        padding: 8px 24px;
+        display: flex; /* THIS WAS MISSING */
         align-items: center;
         justify-content: center;
-        gap: 16px;
+        gap: 20px;
         flex-wrap: wrap;
         border-bottom: 1px solid #1e2028;
         position: relative;
-        z-index: 101;
+        z-index: 1000;
+        min-height: 50px;
       "
     >
-      <span
-        id="ebPulse"
-        style="
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          background: #22c55e;
-          flex-shrink: 0;
-          animation: ebPulse 2s infinite;
-        "
-      ></span>
-      <span
-        style="
-          font-size: 14px;
-          color: rgba(255, 255, 255, 0.75);
-          font-family: &quot;DM Sans&quot;, sans-serif;
-        "
-      >
-        <strong style="color: #fff">Early Bird:</strong> First 100 users get
-        Lifetime Pro <strong style="color: #fff">free — forever.</strong>
-      </span>
-      <span
+      <!-- Pulse + Text -->
+      <div style="display: flex; align-items: center; gap: 12px">
+        <span
+          id="ebPulse"
+          style="
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+            flex-shrink: 0;
+            animation: ebPulse 2s infinite;
+          "
+        ></span>
+        <span
+          style="
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.8);
+            font-family: &quot;DM Sans&quot;, sans-serif;
+          "
+        >
+          <strong style="color: #fff">Early Bird:</strong> First 100 users get
+          Lifetime Pro <strong style="color: #fff">free — forever.</strong>
+        </span>
+      </div>
+
+      <!-- Spots Left Badge -->
+      <div
         style="
           display: flex;
           align-items: center;
           gap: 8px;
           background: rgba(234, 179, 8, 0.1);
-          border: 1px solid rgba(234, 179, 8, 0.3);
+          border: 1px solid rgba(234, 179, 8, 0.2);
           border-radius: 99px;
-          padding: 4px 14px;
+          padding: 4px 12px;
         "
       >
         <span
           id="ebSpotsNum"
           style="
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 700;
             color: #fbbf24;
             font-variant-numeric: tabular-nums;
           "
-          >—</span
+          >97</span
         >
         <span
           style="
-            font-size: 12px;
-            color: rgba(234, 179, 8, 0.8);
-            font-weight: 500;
+            font-size: 11px;
+            color: #fbbf24;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
           "
           >spots left</span
         >
-      </span>
-      <span style="display: flex; flex-direction: column; gap: 4px">
-        <span
+      </div>
+
+      <!-- Progress Bar Section -->
+      <div style="display: flex; align-items: center; gap: 12px">
+        <div
           style="
-            width: 140px;
+            width: 100px;
             height: 6px;
             background: rgba(255, 255, 255, 0.1);
-            border-radius: 3px;
+            border-radius: 10px;
             overflow: hidden;
-            display: block;
           "
         >
-          <span
+          <div
             id="ebBarFill"
             style="
-              display: block;
               height: 100%;
-              width: 0%;
+              width: 3%;
               background: #4f46e5;
-              border-radius: 3px;
-              transition: width 0.6s ease;
+              transition: width 0.8s ease;
             "
-          ></span>
-        </span>
+          ></div>
+        </div>
         <span
           id="ebBarMeta"
           style="
             font-size: 11px;
-            color: rgba(255, 255, 255, 0.35);
+            color: rgba(255, 255, 255, 0.4);
             font-family: &quot;DM Sans&quot;, sans-serif;
+            font-variant-numeric: tabular-nums;
           "
-          >Loading…</span
+          >3/100 claimed</span
         >
-      </span>
+      </div>
+
+      <!-- Action Button -->
       <a
         href="/login"
         style="
           background: #4f46e5;
           color: #fff;
-          font-size: 13px;
+          font-size: 12px;
           font-weight: 600;
-          padding: 7px 18px;
-          border-radius: 8px;
+          padding: 6px 16px;
+          border-radius: 6px;
           text-decoration: none;
           font-family: &quot;DM Sans&quot;, sans-serif;
-          white-space: nowrap;
-          transition: background 0.15s;
+          transition: all 0.2s;
         "
-        onmouseover="this.style.background = '#4338ca'"
+        onmouseover="this.style.background = '#6366f1'"
         onmouseout="this.style.background = '#4f46e5'"
       >
         Claim yours →
