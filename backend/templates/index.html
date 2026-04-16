@@ -154,7 +154,7 @@
 
       /* ── NAV ── */
       nav {
-        position: fixed;
+        position: sticky;
         top: 0;
         left: 0;
         right: 0;
@@ -1530,6 +1530,17 @@
           grid-template-columns: 1fr;
         }
       }
+      @keyframes ebPulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.6;
+          transform: scale(1.4);
+        }
+      }
     </style>
   </head>
   <body>
@@ -1653,19 +1664,7 @@
         Claim yours →
       </a>
     </div>
-    <style>
-      @keyframes ebPulse {
-        0%,
-        100% {
-          opacity: 1;
-          transform: scale(1);
-        }
-        50% {
-          opacity: 0.6;
-          transform: scale(1.4);
-        }
-      }
-    </style>
+
     <!-- ── NAVIGATION ── -->
     <nav>
       <a href="#" class="nav-logo">
@@ -2437,6 +2436,7 @@
 
           <!-- PRO MONTHLY PLAN -->
           <div class="pricing-card featured">
+            {% if pricing.monthly.promo_badge %}
             <div
               class="pricing-badge"
               {%
@@ -2447,8 +2447,10 @@
               endif
               %}
             >
-              {{ pricing.monthly.badge }}
+              {{ pricing.monthly.promo_badge }}
             </div>
+            {% endif %}
+
             <div class="pricing-plan">Pro — Monthly</div>
 
             <div class="pricing-price">
@@ -2457,11 +2459,12 @@
                 style="
                   text-decoration: line-through;
                   font-size: 24px;
-                  color: var(--mut);
+                  color: var(--muted);
                   margin-right: 8px;
                 "
-                ><sup>$</sup>{{ pricing.monthly.base_usd }}</span
               >
+                <sup>$</sup>{{ pricing.monthly.base_usd }}
+              </span>
               <sup>$</sup>{{ pricing.monthly.discount_usd }}<span>/mo</span>
               {% else %}
               <sup>$</sup>{{ pricing.monthly.base_usd }}<span>/mo</span>
@@ -2480,7 +2483,7 @@
               <li>Mobile PWA with note sync</li>
               <li>Priority support</li>
             </ul>
-            <a href="/pricing">
+            <a href="/pricing" style="text-decoration: none">
               <button class="pricing-btn pri">
                 Upgrade to Pro — ${% if pricing.monthly.discount_usd %}{{
                 pricing.monthly.discount_usd }}{% else %}{{
@@ -2491,6 +2494,7 @@
 
           <!-- PRO LIFETIME PLAN -->
           <div class="pricing-card featured">
+            {% if pricing.lifetime.promo_badge %}
             <div
               class="pricing-badge"
               {%
@@ -2501,8 +2505,10 @@
               endif
               %}
             >
-              {{ pricing.lifetime.badge }}
+              {{ pricing.lifetime.promo_badge }}
             </div>
+            {% endif %}
+
             <div class="pricing-plan">Pro — Lifetime</div>
 
             <div class="pricing-price">
@@ -2511,11 +2517,12 @@
                 style="
                   text-decoration: line-through;
                   font-size: 24px;
-                  color: var(--mut);
+                  color: var(--muted);
                   margin-right: 8px;
                 "
-                ><sup>$</sup>{{ pricing.lifetime.base_usd }}</span
               >
+                <sup>$</sup>{{ pricing.lifetime.base_usd }}
+              </span>
               <sup>$</sup>{{ pricing.lifetime.discount_usd }}<span> once</span>
               {% else %}
               <sup>$</sup>{{ pricing.lifetime.base_usd }}<span> once</span>
@@ -2531,9 +2538,9 @@
               <li>No recurring payments</li>
               <li>Priority feature access</li>
             </ul>
-            <a href="/pricing">
+            <a href="/pricing" style="text-decoration: none">
               <button class="pricing-btn pri">
-                Get Lifetime Access — ${% if pricing.lifetime.discount_usd %}{{
+                Get Lifetime — ${% if pricing.lifetime.discount_usd %}{{
                 pricing.lifetime.discount_usd }}{% else %}{{
                 pricing.lifetime.base_usd }}{% endif %}
               </button>
