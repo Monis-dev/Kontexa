@@ -286,10 +286,30 @@ def mobile_static(filename):
 
 
 # ─── Admin Dashboard ─────────────────────────────────────────────────────────────────
-@app.route('/admin')
+# 1. Change this string to whatever secret URL you want
+@app.route('/CSGO_>_CS2') 
 def admin_dashboard():
-    return render_template('Admin_dashboard.html')
+    # 2. Force the user to log in via Google first
+    if 'user_email' not in session:
+        return redirect(url_for('login'))
+        
+    # 3. REPLACE WITH YOUR ACTUAL EMAIL(S)
+    ALLOWED_ADMIN_EMAILS = [
+        "your_actual_email@gmail.com", 
+        "another_admin@gmail.com"
+    ]
+    
+    # 4. Block anyone who isn't you
+    if session['user_email'] not in ALLOWED_ADMIN_EMAILS:
+        return """
+        <h1 style='color:red; text-align:center; margin-top:50px;'>
+            Unauthorized Account
+        </h1>
+        <p style='text-align:center;'>Your email is not authorized to view this page.</p>
+        """, 403
 
+    # 5. Only if it is YOU, render the dashboard
+    return render_template('admin.html')
 @app.route('/api/admin/stats')
 def admin_stats():
     if not _admin_token_required():
@@ -373,11 +393,7 @@ def admin_users():
  
 @app.route('/api/admin/pricing', methods=['POST'])
 def admin_update_pricing():
-    """
-    Updates the pricing in the database.
-    Protected by X-Admin-Token header.
-    Expects body: { "plan_type": "lifetime", "discount_usd": 20, "discount_inr_paise": 180000, ... }
-    """
+    """Updates the pricing in the database."""
     if not _admin_token_required():
         return jsonify({"error": "Forbidden"}), 403
 
@@ -389,16 +405,21 @@ def admin_update_pricing():
     
     try:
         plan = PricingConfig.query.filter_by(plan_type=plan_type).first()
+        
+        # FIX: If the row doesn't exist, create it using the correct DEFAULT base prices
         if not plan:
-            plan = PricingConfig(plan_type=plan_type, base_usd=0, base_inr_paise=0)
+            def_usd = DEFAULT_PRICING.get(plan_type, {}).get("base_usd", 0)
+            def_inr = DEFAULT_PRICING.get(plan_type, {}).get("base_inr_paise", 0)
+            plan = PricingConfig(plan_type=plan_type, base_usd=def_usd, base_inr_paise=def_inr)
             db.session.add(plan)
 
+        # Apply updates
         if 'base_usd' in data: plan.base_usd = data['base_usd']
         if 'base_inr_paise' in data: plan.base_inr_paise = data['base_inr_paise']
         
+        # Null values (for 0% discounts) are allowed
         if 'discount_usd' in data: plan.discount_usd = data['discount_usd']
         if 'discount_inr_paise' in data: plan.discount_inr_paise = data['discount_inr_paise']
-        
         if 'promo_badge' in data: plan.promo_badge = data['promo_badge']
 
         db.session.commit()
@@ -408,7 +429,7 @@ def admin_update_pricing():
         db.session.rollback()
         app.logger.error(f"admin_update_pricing error: {e}")
         return jsonify({"error": "Internal server error"}), 500
-
+    
  
 @app.route('/api/admin/users/<int:user_id>/access', methods=['PATCH'])
 def admin_set_access(user_id):
