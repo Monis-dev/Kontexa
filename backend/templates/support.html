@@ -1,0 +1,944 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Get help with Kontexa — the web annotation and notes extension. Browse FAQs or contact our support team directly."
+    />
+    <title>Support — Kontexa</title>
+
+    <!-- Fonts from Target Theme -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      @import url("https://fonts.cdnfonts.com/css/neoneon");
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --ink: #0d0f12;
+        --ink2: #3a3d45;
+        --muted: #767b87;
+        --surface: #ffffff;
+        --bg: #f7f7f5;
+        --bdr: #e8e8e4;
+        --acc: #4f46e5;
+        --acc-light: #eef2ff;
+        --green: #059669;
+        --red: #dc2626;
+        --sans: "DM Sans", sans-serif;
+        --serif: "Instrument Serif", serif;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--sans);
+        line-height: 1.7;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+      }
+
+      /* ── LOGO ── */
+      .logo {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        background: linear-gradient(135deg, #6366f1, #4f46e5);
+        background-size: 200% 200%;
+        clip-path: polygon(0 0, 68% 0, 100% 32%, 100% 100%, 0 100%);
+        border-radius: 6px;
+        overflow: hidden;
+        flex-shrink: 0;
+        animation: logoBg 4s ease-in-out infinite;
+      }
+      .logo::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 32%;
+        height: 32%;
+        background: #312e81;
+        opacity: 0.55;
+        z-index: 2;
+      }
+
+      @keyframes logoBg {
+        0% {
+          background-position: 0% 50%;
+        }
+        50% {
+          background-position: 100% 50%;
+        }
+        100% {
+          background-position: 0% 50%;
+        }
+      }
+
+      /* ── NAV ── */
+      nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 40px;
+        height: 64px;
+        background: rgba(247, 247, 245, 0.92);
+        backdrop-filter: blur(18px);
+        border-bottom: 1px solid var(--bdr);
+      }
+      .nav-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        text-decoration: none;
+      }
+      .nav-logo-name {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--ink);
+        letter-spacing: -0.3px;
+      }
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+      }
+      .nav-links a {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--muted);
+        text-decoration: none;
+        transition: color 0.15s;
+      }
+      .nav-links a:hover {
+        color: var(--acc);
+      }
+      .nav-links a.active {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      /* ── LAYOUT ── */
+      .page {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 110px 24px 100px;
+      }
+
+      /* ── HERO ── */
+      .page-label {
+        font-size: 11.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--acc);
+        margin-bottom: 14px;
+      }
+      .page-title {
+        font-family: var(--serif);
+        font-size: clamp(36px, 5vw, 54px);
+        line-height: 1.08;
+        letter-spacing: -1px;
+        color: var(--ink);
+        margin-bottom: 12px;
+      }
+      .page-meta {
+        font-size: 15px;
+        color: var(--ink2);
+        margin-bottom: 48px;
+        padding-bottom: 32px;
+        border-bottom: 1px solid var(--bdr);
+        max-width: 600px;
+      }
+
+      /* ── SECTION HEADER ── */
+      .section-header {
+        margin-bottom: 24px;
+      }
+      .section-header h2 {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--ink);
+        letter-spacing: -0.3px;
+      }
+      .section-header p {
+        font-size: 14px;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+
+      /* ── QUICK LINKS ── */
+      .quick-links {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 16px;
+        margin-bottom: 56px;
+      }
+      .quick-card {
+        background: var(--surface);
+        border: 1.5px solid var(--bdr);
+        border-radius: 16px;
+        padding: 20px 24px;
+        text-decoration: none;
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        transition: all 0.2s ease;
+      }
+      .quick-card:hover {
+        border-color: rgba(79, 70, 229, 0.4);
+        box-shadow: 0 4px 20px rgba(79, 70, 229, 0.06);
+      }
+      .quick-card-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: var(--acc-light);
+        border: 1px solid rgba(79, 70, 229, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 20px;
+        color: var(--acc);
+      }
+      .quick-card-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--ink);
+        margin-bottom: 2px;
+      }
+      .quick-card-desc {
+        font-size: 13.5px;
+        color: var(--muted);
+      }
+
+      /* ── TWO-COL ── */
+      .two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 56px;
+        align-items: start;
+      }
+
+      /* ── FAQ ── */
+      .faq-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .faq-item {
+        border: 1.5px solid var(--bdr);
+        border-radius: 12px;
+        background: var(--surface);
+        overflow: hidden;
+        transition: all 0.2s ease;
+      }
+      .faq-item:hover {
+        border-color: rgba(79, 70, 229, 0.3);
+      }
+      .faq-item.open {
+        border-color: rgba(79, 70, 229, 0.4);
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.04);
+      }
+
+      .faq-q {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 18px 20px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        text-align: left;
+        font-family: var(--sans);
+        font-size: 14.5px;
+        font-weight: 600;
+        color: var(--ink);
+      }
+      .faq-chevron {
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
+        color: var(--muted);
+        transition: transform 0.25s ease;
+      }
+      .faq-item.open .faq-chevron {
+        transform: rotate(180deg);
+        color: var(--acc);
+      }
+
+      .faq-a {
+        max-height: 0;
+        overflow: hidden;
+        transition:
+          max-height 0.3s ease,
+          padding 0.3s ease;
+        font-size: 14.5px;
+        color: var(--ink2);
+        line-height: 1.7;
+        padding: 0 20px;
+      }
+      .faq-item.open .faq-a {
+        max-height: 400px;
+        padding: 0 20px 20px;
+      }
+      .faq-a a {
+        color: var(--acc);
+        font-weight: 500;
+      }
+
+      /* ── CONTACT FORM ── */
+      .form-card {
+        background: var(--surface);
+        border: 1.5px solid var(--bdr);
+        border-radius: 16px;
+        padding: 32px;
+      }
+
+      .form-row {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 20px;
+      }
+
+      .form-label {
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--ink);
+      }
+
+      .form-control {
+        padding: 12px 16px;
+        background: var(--bg);
+        border: 1.5px solid var(--bdr);
+        border-radius: 10px;
+        font-family: var(--sans);
+        font-size: 14.5px;
+        color: var(--ink);
+        outline: none;
+        width: 100%;
+        transition: all 0.2s ease;
+        -webkit-appearance: none;
+        resize: none;
+      }
+      .form-control:focus {
+        border-color: var(--acc);
+        background: var(--surface);
+        box-shadow: 0 0 0 4px var(--acc-light);
+      }
+      .form-control::placeholder {
+        color: var(--muted);
+      }
+      .form-control option {
+        background: #fff;
+      }
+
+      .form-row-split {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+
+      .submit-btn {
+        width: 100%;
+        padding: 14px;
+        background: var(--acc);
+        color: #fff;
+        font-family: var(--sans);
+        font-size: 15px;
+        font-weight: 600;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin-top: 4px;
+      }
+      .submit-btn:hover:not(:disabled) {
+        background: #4338ca;
+      }
+      .submit-btn:active:not(:disabled) {
+        transform: scale(0.98);
+      }
+      .submit-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .form-status {
+        display: none;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 16px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 500;
+        margin-top: 16px;
+      }
+      .form-status.success {
+        display: flex;
+        background: #ecfdf5;
+        border: 1px solid #a7f3d0;
+        color: var(--green);
+      }
+      .form-status.error {
+        display: flex;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: var(--red);
+      }
+
+      .char-count {
+        font-size: 12px;
+        color: var(--muted);
+        text-align: right;
+        margin-top: 4px;
+        font-weight: 500;
+      }
+      .char-count.near {
+        color: var(--red);
+      }
+
+      /* ── FOOTER ── */
+      footer {
+        background: var(--ink);
+        padding: 32px 40px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+      .footer-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .footer-logo-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.7);
+      }
+      .footer-copy {
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.3);
+      }
+      .footer-links {
+        display: flex;
+        gap: 24px;
+      }
+      .footer-links a {
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.4);
+        text-decoration: none;
+        transition: color 0.15s;
+      }
+      .footer-links a:hover {
+        color: rgba(255, 255, 255, 0.8);
+      }
+
+      /* ── RESPONSIVE ── */
+      @media (max-width: 800px) {
+        .two-col {
+          grid-template-columns: 1fr;
+          gap: 48px;
+        }
+      }
+      @media (max-width: 600px) {
+        nav {
+          padding: 0 20px;
+        }
+        .form-row-split {
+          grid-template-columns: 1fr;
+          gap: 0;
+        }
+        .form-row-split .form-row {
+          margin-bottom: 20px;
+        }
+        footer {
+          flex-direction: column;
+          text-align: center;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- NAV -->
+    <nav>
+      <a href="/" class="nav-logo">
+        <div class="logo">
+          <span
+            style="
+              font-family: &quot;Neoneon&quot;, sans-serif;
+              color: #fff;
+              font-size: 16px;
+              line-height: 1;
+              position: relative;
+              z-index: 1;
+              margin-top: 4px;
+              margin-left: -2px;
+            "
+            >K</span
+          >
+        </div>
+        <span class="nav-logo-name">Kontexa</span>
+      </a>
+      <div class="nav-links">
+        <a href="/">Home</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/support" class="active">Support</a>
+      </div>
+    </nav>
+
+    <!-- PAGE -->
+    <div class="page">
+      <!-- HERO -->
+      <div class="page-label">Support Center</div>
+      <h1 class="page-title">How can we help?</h1>
+      <p class="page-meta">
+        Find answers to common questions or send us a message. We typically
+        respond within 24 hours.
+      </p>
+
+      <!-- QUICK LINKS -->
+      <div class="quick-links">
+        <a class="quick-card" href="#faq">
+          <div class="quick-card-icon">?</div>
+          <div>
+            <div class="quick-card-title">FAQ</div>
+            <div class="quick-card-desc">Common questions answered</div>
+          </div>
+        </a>
+        <a class="quick-card" href="#contact">
+          <div class="quick-card-icon">✉</div>
+          <div>
+            <div class="quick-card-title">Contact us</div>
+            <div class="quick-card-desc">Send us a message directly</div>
+          </div>
+        </a>
+        <a class="quick-card" href="/privacy">
+          <div class="quick-card-icon">🔒</div>
+          <div>
+            <div class="quick-card-title">Privacy Policy</div>
+            <div class="quick-card-desc">How we handle your data</div>
+          </div>
+        </a>
+      </div>
+
+      <!-- TWO COLUMN: FAQ + FORM -->
+      <div class="two-col">
+        <!-- FAQ -->
+        <div id="faq">
+          <div class="section-header">
+            <h2>Frequently asked questions</h2>
+            <p>Tap a question to expand the answer</p>
+          </div>
+          <div class="faq-list">
+            <div class="faq-item">
+              <button class="faq-q" onclick="toggleFaq(this)">
+                What is Kontexa?
+                <svg
+                  class="faq-chevron"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polyline points="4,6 8,10 12,6" />
+                </svg>
+              </button>
+              <div class="faq-a">
+                Kontexa is a Chrome extension that lets you save notes and
+                annotations directly on any webpage. Your notes are attached to
+                the exact URL you saved them on, so they reappear every time you
+                revisit that page.
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-q" onclick="toggleFaq(this)">
+                How do I sync my notes across devices?
+                <svg
+                  class="faq-chevron"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polyline points="4,6 8,10 12,6" />
+                </svg>
+              </button>
+              <div class="faq-a">
+                Sign in with your Google account inside the extension, then
+                click <strong>Account → Sync</strong>. Your notes will be backed
+                up to our server and restored on any device where you sign in
+                with the same account. Sync requires a Pro subscription.
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-q" onclick="toggleFaq(this)">
+                What is included in the free plan?
+                <svg
+                  class="faq-chevron"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polyline points="4,6 8,10 12,6" />
+                </svg>
+              </button>
+              <div class="faq-a">
+                The free plan lets you create and manage notes locally on your
+                current device. Notes are stored in your browser and are
+                available offline. Cloud sync, cross-device access, and advanced
+                features require a Pro upgrade.
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-q" onclick="toggleFaq(this)">
+                My notes disappeared after reinstalling the extension
+                <svg
+                  class="faq-chevron"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polyline points="4,6 8,10 12,6" />
+                </svg>
+              </button>
+              <div class="faq-a">
+                Local notes are stored in your browser's storage — reinstalling
+                the extension clears this. If you had a Pro account with sync
+                enabled, sign back in and tap <strong>Sync</strong> to restore
+                your notes from the cloud. We strongly recommend enabling sync
+                to avoid data loss.
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-q" onclick="toggleFaq(this)">
+                How do I cancel my monthly subscription?
+                <svg
+                  class="faq-chevron"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polyline points="4,6 8,10 12,6" />
+                </svg>
+              </button>
+              <div class="faq-a">
+                Subscriptions are processed via Razorpay. To cancel, contact us
+                using the form on this page with your email address and the
+                subject "Cancel Subscription" — we will cancel it and confirm
+                within 24 hours. You will retain Pro access until the end of
+                your current billing period.
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-q" onclick="toggleFaq(this)">
+                I was charged but my account is still on the free plan
+                <svg
+                  class="faq-chevron"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polyline points="4,6 8,10 12,6" />
+                </svg>
+              </button>
+              <div class="faq-a">
+                This can happen if the payment confirmation was interrupted.
+                First, close and reopen the extension, then click
+                <strong>Account → Sync</strong>. If your plan still shows as
+                free after a few minutes, contact us with your email address and
+                we will resolve it immediately.
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-q" onclick="toggleFaq(this)">
+                Is my data private?
+                <svg
+                  class="faq-chevron"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polyline points="4,6 8,10 12,6" />
+                </svg>
+              </button>
+              <div class="faq-a">
+                Yes. Your notes are stored securely in our database and are only
+                accessible by your account. We do not sell your data to third
+                parties. Read our full <a href="/privacy">Privacy Policy</a> for
+                complete details.
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-q" onclick="toggleFaq(this)">
+                The extension is not working on a specific website
+                <svg
+                  class="faq-chevron"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polyline points="4,6 8,10 12,6" />
+                </svg>
+              </button>
+              <div class="faq-a">
+                Some websites with strict Content Security Policies can restrict
+                extensions. Try refreshing the page after pinning the extension.
+                If the issue persists, contact us with the website URL and we
+                will investigate.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CONTACT FORM -->
+        <div id="contact">
+          <div class="section-header">
+            <h2>Send a message</h2>
+            <p>We respond within 24 hours on business days</p>
+          </div>
+
+          <div class="form-card">
+            <div class="form-row">
+              <label class="form-label" for="email">Email address</label>
+              <input
+                class="form-control"
+                type="email"
+                id="email"
+                name="email"
+                placeholder="you@example.com"
+                autocomplete="email"
+                required
+              />
+            </div>
+
+            <div class="form-row-split">
+              <div class="form-row" style="margin-bottom: 0">
+                <label class="form-label" for="type">Topic</label>
+                <select class="form-control" id="type" name="type">
+                  <option value="bug">Bug report</option>
+                  <option value="feature">Feature request</option>
+                  <option value="billing">Billing</option>
+                  <option value="general" selected>General question</option>
+                </select>
+              </div>
+              <div class="form-row" style="margin-bottom: 0">
+                <label class="form-label" for="subject">Subject</label>
+                <input
+                  class="form-control"
+                  type="text"
+                  id="subject"
+                  name="subject"
+                  placeholder="Brief summary"
+                  maxlength="200"
+                />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <label class="form-label" for="message">Message</label>
+              <textarea
+                class="form-control"
+                id="message"
+                name="message"
+                rows="6"
+                placeholder="Describe your issue or question in detail…"
+                maxlength="2000"
+                oninput="countChars(this)"
+                required
+              ></textarea>
+              <div class="char-count" id="charCount">0 / 2000</div>
+            </div>
+
+            <button class="submit-btn" id="submitBtn" onclick="submitForm()">
+              Send message
+            </button>
+
+            <div class="form-status success" id="statusSuccess">
+              Message sent — we will get back to you within 24 hours.
+            </div>
+            <div class="form-status error" id="statusError">
+              <span id="errorText"
+                >Something went wrong. Please try again.</span
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- /page -->
+
+    <!-- FOOTER -->
+    <footer>
+      <div class="footer-logo">
+        <div class="logo" style="width: 28px; height: 28px">
+          <span
+            style="
+              font-family: &quot;Neoneon&quot;, sans-serif;
+              color: #fff;
+              font-size: 14px;
+              line-height: 1;
+              position: relative;
+              z-index: 1;
+              margin-top: 3px;
+              margin-left: -2px;
+            "
+            >K</span
+          >
+        </div>
+        <span class="footer-logo-name">Kontexa</span>
+      </div>
+      <div class="footer-copy">© 2025 Kontexa. All rights reserved.</div>
+      <div class="footer-links">
+        <a href="/privacy">Privacy Policy</a>
+        <a href="#">Terms</a>
+        <a href="/support">Support</a>
+      </div>
+    </footer>
+
+    <script>
+      // ── FAQ TOGGLE ──────────────────────────────────────────────
+      function toggleFaq(btn) {
+        const item = btn.closest(".faq-item");
+        const isOpen = item.classList.contains("open");
+        // Close all
+        document
+          .querySelectorAll(".faq-item.open")
+          .forEach((el) => el.classList.remove("open"));
+        // Open this one if it was closed
+        if (!isOpen) item.classList.add("open");
+      }
+
+      // ── CHAR COUNTER ────────────────────────────────────────────
+      function countChars(el) {
+        const len = el.value.length;
+        const counter = document.getElementById("charCount");
+        counter.textContent = `${len} / 2000`;
+        counter.classList.toggle("near", len > 1800);
+      }
+
+      // ── FORM SUBMIT ─────────────────────────────────────────────
+      async function submitForm() {
+        const email = document.getElementById("email").value.trim();
+        const type = document.getElementById("type").value;
+        const subject = document.getElementById("subject").value.trim();
+        const message = document.getElementById("message").value.trim();
+        const btn = document.getElementById("submitBtn");
+        const ok = document.getElementById("statusSuccess");
+        const err = document.getElementById("statusError");
+        const errText = document.getElementById("errorText");
+
+        // Reset
+        ok.style.display = "none";
+        err.style.display = "none";
+
+        // Basic validation
+        if (!email || !email.includes("@")) {
+          errText.textContent = "Please enter a valid email address.";
+          err.style.display = "flex";
+          document.getElementById("email").focus();
+          return;
+        }
+        if (!message) {
+          errText.textContent = "Please enter a message before submitting.";
+          err.style.display = "flex";
+          document.getElementById("message").focus();
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = "Sending…";
+
+        try {
+          const res = await fetch("/api/support", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, type, subject, message }),
+          });
+
+          if (res.ok) {
+            ok.style.display = "flex";
+            // Reset form
+            document.getElementById("email").value = "";
+            document.getElementById("subject").value = "";
+            document.getElementById("message").value = "";
+            document.getElementById("charCount").textContent = "0 / 2000";
+            btn.textContent = "Message sent";
+            setTimeout(() => {
+              btn.disabled = false;
+              btn.textContent = "Send message";
+            }, 4000);
+          } else {
+            const data = await res.json().catch(() => ({}));
+            errText.textContent =
+              data.error || "Server error. Please try again.";
+            err.style.display = "flex";
+            btn.disabled = false;
+            btn.textContent = "Send message";
+          }
+        } catch (e) {
+          errText.textContent =
+            "Could not connect to the server. Please check your connection.";
+          err.style.display = "flex";
+          btn.disabled = false;
+          btn.textContent = "Send message";
+        }
+      }
+
+      // Allow Enter in subject to jump to message
+      document.getElementById("subject").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          document.getElementById("message").focus();
+        }
+      });
+    </script>
+  </body>
+</html>

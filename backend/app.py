@@ -2,6 +2,7 @@ import os
 import razorpay
 import hmac
 import hashlib
+import re
 from datetime import datetime, timedelta
 
 from urllib.parse import unquote
@@ -37,6 +38,8 @@ app.config.update(
 
 # No fallback — raises KeyError at startup if SECRET_KEY is not set
 app.secret_key = os.environ["SECRET_KEY"]
+
+_EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 
 # ─── Database ─────────────────────────────────────────────────────────────────
 uri = os.getenv("DATABASE_URL")
@@ -652,6 +655,72 @@ def feedback_digest():
         'created_at': f.created_at.isoformat(),
     } for f in rows])
 
+# ─── Support ────────────────────────────────────────────────────────────────
+
+@app.route('/support')
+def support():
+    """Renders the public support page. No login required."""
+    return render_template('support.html')
+ 
+ 
+@app.route('/api/support', methods=['POST'])
+def support_contact():
+    """
+    Handles the support contact form.
+    Accepts JSON: { email, type, subject, message }
+    No session required — works for logged-out users too.
+    Stores the submission in your existing Feedback table.
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+ 
+        # ── Validate ─────────────────────────────────────────────────────────
+        email   = str(data.get('email',   '')).strip()[:255]
+        fb_type = str(data.get('type',    'general')).strip()[:50]
+        subject = str(data.get('subject', '')).strip()[:255]
+        message = str(data.get('message', '')).strip()[:2000]
+ 
+        if not email or not _EMAIL_RE.match(email):
+            return jsonify({'error': 'A valid email address is required.'}), 400
+ 
+        if not message:
+            return jsonify({'error': 'Message is required.'}), 400
+ 
+        allowed_types = {'bug', 'feature', 'billing', 'general', 'complaint'}
+        if fb_type not in allowed_types:
+            fb_type = 'general'
+ 
+        # ── Escape user input ─────────────────────────────────────────────────
+        fb_type = str(escape(fb_type))
+        subject = str(escape(subject))
+        message = str(escape(message))
+        # Note: email is validated by regex above, not escaped (escape would
+        # mangle @ and . characters).
+ 
+        # ── Try to associate with an existing user ────────────────────────────
+        user_id = None
+        existing_user = User.query.filter_by(email=email).first()
+        if existing_user:
+            user_id = existing_user.id
+ 
+        # ── Persist ───────────────────────────────────────────────────────────
+        feedback = Feedback(
+            user_id = user_id,
+            email   = email,
+            fb_type = fb_type,
+            subject = subject,
+            message = message,
+        )
+        db.session.add(feedback)
+        db.session.commit()
+ 
+        app.logger.info(f"Support message from {email} [{fb_type}]: {subject}")
+        return jsonify({'ok': True}), 201
+ 
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"support_contact error: {e}")
+        return jsonify({'error': 'Internal server error. Please try again.'}), 500
 
 # ─── Notes API ────────────────────────────────────────────────────────────────
 
