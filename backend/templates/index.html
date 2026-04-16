@@ -1585,18 +1585,18 @@
           />
         </div>
         <div class="hero-text">
-          <!-- Early bird badge — shown only while spots remain -->
+          <!-- 1. Small Subtle Badge -->
           <div
             id="heroBadge"
             style="
               display: inline-flex;
               align-items: center;
-              gap: 6px;
+              gap: 8px;
               background: rgba(234, 179, 8, 0.1);
-              border: 1px solid rgba(234, 179, 8, 0.3);
+              border: 1px solid rgba(234, 179, 8, 0.2);
               border-radius: 99px;
-              padding: 5px 14px;
-              margin-bottom: 20px;
+              padding: 6px 14px;
+              margin-bottom: 24px;
               animation: fadeUp 0.7s ease both;
             "
           >
@@ -1607,75 +1607,58 @@
                 border-radius: 50%;
                 background: #fbbf24;
                 animation: ebPulse 2s infinite;
-                flex-shrink: 0;
               "
             ></span>
-            <span
-              style="
-                font-size: 13px;
-                color: #fbbf24;
-                font-weight: 600;
-                font-family: &quot;DM Sans&quot;, sans-serif;
-              "
-              >Early Bird — Lifetime Pro Free</span
+            <span style="font-size: 13px; color: #fbbf24; font-weight: 600"
+              >Early Bird Open</span
             >
           </div>
+
           <h1 class="hero-headline">
             Capture ideas, <em>remember everything.</em>
           </h1>
+
           <p class="hero-sub">
             Highlight text, save notes, and organize what you find online — all
             in one place.
           </p>
-          <!-- Early Bird counter card — hidden once 100 is reached -->
+
+          <!-- 2. Clean Urgency Text (Replaces the big card and bar) -->
           <div
-            id="heroEbCard"
-            style="
-              display: inline-flex;
-              align-items: center;
-              gap: 20px;
-              background: #fff;
-              border: 1.5px solid #e8e8e4;
-              border-radius: 16px;
-              padding: 16px 28px;
-              margin-bottom: 28px;
-              box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
-              animation: fadeUp 0.7s 0.25s ease both;
-            "
+            id="heroEbText"
+            style="margin-bottom: 32px; animation: fadeUp 0.7s 0.2s ease both"
           >
-            <span
-              id="heroSpotsNum"
-              style="
-                font-size: 44px;
-                font-weight: 700;
-                color: #0d0f12;
-                font-variant-numeric: tabular-nums;
-                line-height: 1;
-                font-family: &quot;DM Sans&quot;, sans-serif;
-              "
-              >—</span
-            >
-            <span
-              style="
-                text-align: left;
-                line-height: 1.4;
-                font-family: &quot;DM Sans&quot;, sans-serif;
-              "
-            >
-              <strong
+            <p style="font-size: 15px; color: var(--ink); font-weight: 500">
+              🎁 First 100 users get
+              <span style="color: var(--acc); font-weight: 700"
+                >Lifetime Pro Free</span
+              >
+            </p>
+            <p style="font-size: 13px; color: var(--muted); margin-top: 4px">
+              Only
+              <span
+                id="heroSpotsNum"
                 style="
-                  display: block;
-                  font-size: 15px;
-                  color: #0d0f12;
-                  font-weight: 600;
-                  margin-bottom: 2px;
+                  color: var(--gold);
+                  font-weight: 700;
+                  font-family: monospace;
                 "
-                >spots remaining</strong
+                >97</span
               >
-              <span style="font-size: 13px; color: #767b87"
-                >out of 100 early bird seats</span
-              >
-            </span>
+              spots remaining.
+            </p>
+          </div>
+
+          <div class="hero-actions">
+            <a href="/login" class="btn-primary">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"
+                ></path>
+              </svg>
+              Add to Chrome — Free
+            </a>
+            <a href="#how" class="btn-secondary">How it works →</a>
           </div>
 
           <!-- Progress bar -->
@@ -2682,13 +2665,18 @@
           const hBadge = document.getElementById("heroBadge");
           if (isFull) {
             if (hCard) hCard.style.display = "none";
-            if (hProg) hProg.style.display = "none";
+            if (hProg) {
+              // Add this check
+              hProg.style.display = isFull ? "none" : "";
+            }
             if (hBadge) hBadge.style.display = "none";
           } else {
             const hNum = document.getElementById("heroSpotsNum");
             if (hNum) hNum.textContent = left;
             const hFill = document.getElementById("heroBarFill");
-            if (hFill) hFill.style.width = pct + "%";
+            if (hFill) {
+              hFill.style.width = pct + "%";
+            }
             const hLabel = document.getElementById("heroClaimedLabel");
             if (hLabel) hLabel.textContent = count + " claimed";
           }
