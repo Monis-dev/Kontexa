@@ -1585,8 +1585,10 @@
           />
         </div>
         <div class="hero-text">
-          <!-- 1. Small Subtle Badge -->
-          <div id="heroBadge" style="
+          <!-- Early bird badge -->
+          <div
+            id="heroBadge"
+            style="
               display: inline-flex;
               align-items: center;
               gap: 8px;
@@ -1596,9 +1598,58 @@
               padding: 6px 14px;
               margin-bottom: 24px;
               animation: fadeUp 0.7s ease both;
-            ">
-            <span style="width: 6px; height: 6px; border-radius: 50%; background: #fbbf24; animation: ebPulse 2s infinite;"></span>
-            <span style="font-size: 13px; color: #fbbf24; font-weight: 600">Early Bird Open</span>
+            "
+          >
+            <span
+              style="
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background: #fbbf24;
+                animation: ebPulse 2s infinite;
+                flex-shrink: 0;
+              "
+            ></span>
+            <span style="font-size: 13px; color: #fbbf24; font-weight: 600"
+              >Early Bird Open — First 100 get Lifetime Pro Free</span
+            >
+          </div>
+
+          <!-- Launch countdown badge -->
+          <div
+            style="
+              display: inline-flex;
+              align-items: center;
+              gap: 8px;
+              background: rgba(79, 70, 229, 0.08);
+              border: 1px solid rgba(79, 70, 229, 0.2);
+              border-radius: 99px;
+              padding: 5px 14px;
+              margin-bottom: 20px;
+              animation: fadeUp 0.7s 0.05s ease both;
+            "
+          >
+            <svg
+              viewBox="0 0 24 24"
+              style="
+                width: 13px;
+                height: 13px;
+                stroke: #4f46e5;
+                fill: none;
+                stroke-width: 2;
+                stroke-linecap: round;
+                flex-shrink: 0;
+              "
+            >
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            <span style="font-size: 13px; color: #4f46e5; font-weight: 600"
+              >Launching on the Chrome Web Store —
+              <span id="launchCountdown" style="font-weight: 700"
+                >in ~1 week</span
+              ></span
+            >
           </div>
 
           <h1 class="hero-headline">
@@ -1606,29 +1657,75 @@
           </h1>
 
           <p class="hero-sub">
-            Highlight text, save notes, and organize what you find online — all in one place.
+            Highlight text, save notes, and organize what you find online — all
+            in one place. Currently under Chrome Store review.
           </p>
 
-          <!-- 2. Clean Urgency Text -->
-          <div id="heroEbText" style="margin-bottom: 32px; animation: fadeUp 0.7s 0.2s ease both">
+          <!-- Spots remaining -->
+          <div
+            id="heroEbText"
+            style="margin-bottom: 28px; animation: fadeUp 0.7s 0.2s ease both"
+          >
             <p style="font-size: 15px; color: var(--ink); font-weight: 500">
-              🎁 First 100 users get <span style="color: var(--acc); font-weight: 700">Lifetime Pro Free</span>
+              🎁 First 100 users get
+              <span style="color: var(--acc); font-weight: 700"
+                >Lifetime Pro — completely free</span
+              >
             </p>
             <p style="font-size: 13px; color: var(--muted); margin-top: 4px">
-              Only <span id="heroSpotsNum" style="color: var(--gold); font-weight: 700; font-family: monospace;">—</span> spots remaining.
+              Only
+              <span
+                id="heroSpotsNum"
+                style="
+                  color: var(--gold);
+                  font-weight: 700;
+                  font-family: monospace;
+                "
+                >—</span
+              >
+              spots remaining. No credit card needed.
             </p>
           </div>
 
-          <!-- 3. Action Buttons (ONLY ONE SET) -->
+          <!-- CTA buttons -->
           <div class="hero-actions">
-            <a href="/login" class="btn-primary">
-              <svg viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"></path>
+            <a
+              href="/login"
+              class="btn-primary"
+              style="box-shadow: 0 4px 20px rgba(79, 70, 229, 0.35)"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                style="
+                  width: 16px;
+                  height: 16px;
+                  fill: none;
+                  stroke: white;
+                  stroke-width: 2;
+                  stroke-linecap: round;
+                  stroke-linejoin: round;
+                  flex-shrink: 0;
+                "
+              >
+                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
               </svg>
-              Add to Chrome — Free
+              Claim Free Pro — Sign in with Google
             </a>
             <a href="#how" class="btn-secondary">How it works →</a>
           </div>
+
+          <!-- Small reassurance line -->
+          <p
+            style="
+              font-size: 12px;
+              color: var(--muted);
+              margin-top: 14px;
+              animation: fadeUp 0.7s 0.4s ease both;
+            "
+          >
+            Takes 10 seconds · No credit card · Instant activation
+          </p>
         </div>
       </div>
     </section>
@@ -2578,7 +2675,7 @@
           // 3. Update Banner (If you decide to add it back later, this won't crash)
           const bNum = document.getElementById("ebSpotsNum");
           if (bNum) bNum.textContent = left;
-          
+
           const bMeta = document.getElementById("ebBarMeta");
           if (bMeta) bMeta.textContent = count + " / 100 claimed";
         }
@@ -2602,6 +2699,29 @@
             var hBadge = document.getElementById("heroBadge");
             if (hBadge) hBadge.style.display = "none";
           });
+      })();
+
+      // Launch countdown — set LAUNCH_DATE to your target
+      (function () {
+        var LAUNCH_DATE = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+        // Or hardcode: new Date("2026-04-25T00:00:00Z")
+
+        function updateCountdown() {
+          var el = document.getElementById("launchCountdown");
+          if (!el) return;
+          var diff = LAUNCH_DATE - Date.now();
+          if (diff <= 0) {
+            el.textContent = "launching soon";
+            return;
+          }
+          var d = Math.floor(diff / 86400000);
+          var h = Math.floor((diff % 86400000) / 3600000);
+          var m = Math.floor((diff % 3600000) / 60000);
+          el.textContent =
+            d > 0 ? "in " + d + "d " + h + "h" : h + "h " + m + "m";
+        }
+        updateCountdown();
+        setInterval(updateCountdown, 60000);
       })();
     </script>
   </body>

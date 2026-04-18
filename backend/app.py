@@ -406,6 +406,49 @@ def authorize():
             
         db.session.add(user)
         db.session.commit()
+        if user.is_pro:
+            try:
+                welcome_msg = Message(
+                    subject="🎉 You're in — Kontexa Lifetime Pro is yours, free",
+                    recipients=[user_info['email']],
+                    html=f"""
+                    <div style="font-family:'DM Sans',sans-serif;max-width:520px;margin:0 auto;padding:40px 24px;color:#0d0f12;">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:32px;">
+                        <div style="width:32px;height:32px;background:linear-gradient(135deg,#6366f1,#4f46e5);border-radius:6px;display:flex;align-items:center;justify-content:center;">
+                        <span style="color:#fff;font-weight:700;font-size:16px;">K</span>
+                        </div>
+                        <span style="font-size:16px;font-weight:600;">Kontexa</span>
+                    </div>
+                    <h1 style="font-size:28px;font-weight:700;line-height:1.2;margin-bottom:12px;">You're one of our first 100. 🎉</h1>
+                    <p style="font-size:15px;color:#767b87;line-height:1.7;margin-bottom:24px;">
+                        Your account <strong style="color:#0d0f12;">{user_info['email']}</strong> has been upgraded to <strong style="color:#4f46e5;">Lifetime Pro — completely free.</strong>
+                        No payment needed, no expiry, no catch.
+                    </p>
+                    <div style="background:#f7f7f5;border-radius:12px;padding:20px 24px;margin-bottom:28px;">
+                        <p style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#767b87;margin-bottom:14px;">What's included in your Pro</p>
+                        <div style="display:flex;flex-direction:column;gap:10px;">
+                        {"".join(f'<div style="display:flex;gap:10px;align-items:center;font-size:14px;"><span style="color:#059669;font-weight:700;">✓</span><span>{f}</span></div>' for f in [
+                            "Cloud sync across all your devices",
+                            "Custom folders to organise notes",
+                            "AI research assistant (bring your own Gemini key)",
+                            "Screenshots &amp; YouTube timestamps",
+                            "Mobile PWA with sync",
+                            "Priority support"
+                        ])}
+                        </div>
+                    </div>
+                    <p style="font-size:14px;color:#767b87;line-height:1.7;margin-bottom:28px;">
+                        We're currently going through Chrome Web Store review. We'll email you the moment it's live — usually within a week. In the meantime, you can install the extension manually from GitHub if you'd like early access.
+                    </p>
+                    <div style="border-top:1px solid #e8e8e4;padding-top:20px;font-size:12px;color:#9ca3af;">
+                        Kontexa · <a href="https://kontexa.online" style="color:#4f46e5;text-decoration:none;">kontexa.online</a>
+                    </div>
+                    </div>
+                    """
+                )
+                mail.send(welcome_msg)
+            except Exception as mail_err:
+                app.logger.error(f"Welcome email failed: {mail_err}")
 
     session['user_id']    = user.id
     session['user_email'] = user.email
