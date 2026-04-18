@@ -39,7 +39,7 @@ _EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 # ─── Resend email setup ───────────────────────────────────────────────────────
 resend.api_key = os.getenv("RESEND_API_KEY", "")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "monisahmed015@gmail.com")
-FROM_EMAIL  = "Kontexa <noreply@kontexa.online>"
+FROM_EMAIL  = "Kontexa <onboarding@resend.dev>"
 
 # NOW app exists, so logging works
 if not resend.api_key:
