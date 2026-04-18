@@ -18,6 +18,11 @@ from sqlalchemy import func, text as sa_text
 from flask_mail import Mail, Message
 
 
+import resend
+resend.api_key = os.getenv("RESEND_API_KEY", "")
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "your-personal@gmail.com")  # where YOU get support emails
+FROM_EMAIL = "Kontexa <noreply@kontexa.online>"
+
 
 load_dotenv()
 app = Flask(__name__)
@@ -63,16 +68,6 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     }
 }
 db = SQLAlchemy(app)
-
-
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 465
-app.config['MAIL_USE_SSL'] = True
-app.config['MAIL_USERNAME'] = os.getenv("MAIL_USERNAME")
-app.config['MAIL_PASSWORD'] = os.getenv("MAIL_PASSWORD")
-app.config['MAIL_DEFAULT_SENDER'] = os.getenv("MAIL_USERNAME")
-
-mail = Mail(app)
 
 # ─── Razorpay ─────────────────────────────────────────────────────────────────
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
@@ -406,47 +401,94 @@ def authorize():
             
         db.session.add(user)
         db.session.commit()
+        # Send welcome email for new users
         if user.is_pro:
             try:
-                welcome_msg = Message(
-                    subject="🎉 You're in — Kontexa Lifetime Pro is yours, free",
-                    recipients=[user_info['email']],
-                    html=f"""
-                    <div style="font-family:'DM Sans',sans-serif;max-width:520px;margin:0 auto;padding:40px 24px;color:#0d0f12;">
-                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:32px;">
-                        <div style="width:32px;height:32px;background:linear-gradient(135deg,#6366f1,#4f46e5);border-radius:6px;display:flex;align-items:center;justify-content:center;">
-                        <span style="color:#fff;font-weight:700;font-size:16px;">K</span>
-                        </div>
-                        <span style="font-size:16px;font-weight:600;">Kontexa</span>
-                    </div>
-                    <h1 style="font-size:28px;font-weight:700;line-height:1.2;margin-bottom:12px;">You're one of our first 100. 🎉</h1>
-                    <p style="font-size:15px;color:#767b87;line-height:1.7;margin-bottom:24px;">
-                        Your account <strong style="color:#0d0f12;">{user_info['email']}</strong> has been upgraded to <strong style="color:#4f46e5;">Lifetime Pro — completely free.</strong>
-                        No payment needed, no expiry, no catch.
+                resend.Emails.send({
+                    "from": FROM_EMAIL,
+                    "to": [user_info['email']],
+                    "subject": "🎉 You're in — Kontexa Lifetime Pro is yours, free",
+                    "html": f"""
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="UTF-8"/></head>
+        <body style="margin:0;padding:0;background:#f7f7f5;font-family:'Helvetica Neue',Arial,sans-serif;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f7f5;padding:40px 0;">
+        <tr><td align="center">
+            <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;border:1px solid #e8e8e4;overflow:hidden;">
+
+            <!-- Header -->
+            <tr><td style="background:#0d0f12;padding:28px 36px;">
+                <table cellpadding="0" cellspacing="0">
+                <tr>
+                    <td style="width:32px;height:32px;background:linear-gradient(135deg,#6366f1,#4f46e5);border-radius:6px;text-align:center;vertical-align:middle;">
+                    <span style="color:#fff;font-size:18px;font-weight:700;line-height:32px;">K</span>
+                    </td>
+                    <td style="padding-left:10px;font-size:16px;font-weight:600;color:#fff;">Kontexa</td>
+                </tr>
+                </table>
+            </td></tr>
+
+            <!-- Body -->
+            <tr><td style="padding:36px 36px 0;">
+                <p style="margin:0 0 8px;font-size:24px;font-weight:700;color:#0d0f12;line-height:1.2;">You're one of our first 100. 🎉</p>
+                <p style="margin:0 0 24px;font-size:15px;color:#767b87;line-height:1.7;">
+                Your account <strong style="color:#0d0f12;">{user_info['email']}</strong> has been upgraded to
+                <strong style="color:#4f46e5;">Lifetime Pro — completely free.</strong>
+                No payment. No expiry. No catch.
+                </p>
+
+                <!-- Feature list -->
+                <table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f7f5;border-radius:12px;padding:20px 24px;margin-bottom:24px;">
+                <tr><td>
+                    <p style="margin:0 0 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#767b87;">What's included in your Pro</p>
+                    {''.join(f'<p style="margin:0 0 10px;font-size:14px;color:#0d0f12;"><span style="color:#059669;font-weight:700;margin-right:8px;">✓</span>{f}</p>' for f in [
+                        "Cloud sync across all your devices",
+                        "Custom folders to organise notes",
+                        "AI research assistant (Gemini)",
+                        "Screenshots &amp; YouTube timestamps",
+                        "Mobile PWA with live sync",
+                        "Priority support"
+                    ])}
+                </td></tr>
+                </table>
+
+                <!-- Launch notice -->
+                <table width="100%" cellpadding="0" cellspacing="0" style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;margin-bottom:28px;">
+                <tr><td style="padding:14px 18px;">
+                    <p style="margin:0;font-size:13px;color:#92400e;line-height:1.6;">
+                    <strong>⏳ Extension under Chrome Store review.</strong>
+                    We'll email you the moment it goes live — usually within a week.
+                    Your Pro account is already active and waiting.
                     </p>
-                    <div style="background:#f7f7f5;border-radius:12px;padding:20px 24px;margin-bottom:28px;">
-                        <p style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#767b87;margin-bottom:14px;">What's included in your Pro</p>
-                        <div style="display:flex;flex-direction:column;gap:10px;">
-                        {"".join(f'<div style="display:flex;gap:10px;align-items:center;font-size:14px;"><span style="color:#059669;font-weight:700;">✓</span><span>{f}</span></div>' for f in [
-                            "Cloud sync across all your devices",
-                            "Custom folders to organise notes",
-                            "AI research assistant (bring your own Gemini key)",
-                            "Screenshots &amp; YouTube timestamps",
-                            "Mobile PWA with sync",
-                            "Priority support"
-                        ])}
-                        </div>
-                    </div>
-                    <p style="font-size:14px;color:#767b87;line-height:1.7;margin-bottom:28px;">
-                        We're currently going through Chrome Web Store review. We'll email you the moment it's live — usually within a week. In the meantime, you can install the extension manually from GitHub if you'd like early access.
-                    </p>
-                    <div style="border-top:1px solid #e8e8e4;padding-top:20px;font-size:12px;color:#9ca3af;">
-                        Kontexa · <a href="https://kontexa.online" style="color:#4f46e5;text-decoration:none;">kontexa.online</a>
-                    </div>
-                    </div>
-                    """
-                )
-                mail.send(welcome_msg)
+                </td></tr>
+                </table>
+
+                <!-- CTA -->
+                <table cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
+                <tr><td style="background:#4f46e5;border-radius:10px;">
+                    <a href="https://kontexa.online" style="display:inline-block;padding:13px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;">
+                    Visit Kontexa →
+                    </a>
+                </td></tr>
+                </table>
+            </td></tr>
+
+            <!-- Footer -->
+            <tr><td style="padding:20px 36px;border-top:1px solid #e8e8e4;">
+                <p style="margin:0;font-size:12px;color:#9ca3af;">
+                Kontexa · <a href="https://kontexa.online" style="color:#4f46e5;text-decoration:none;">kontexa.online</a>
+                · You're receiving this because you signed up as an early user.
+                </p>
+            </td></tr>
+
+            </table>
+        </td></tr>
+        </table>
+        </body>
+        </html>"""
+                })
+                app.logger.info(f"Welcome email sent to {user_info['email']}")
             except Exception as mail_err:
                 app.logger.error(f"Welcome email failed: {mail_err}")
 
@@ -744,16 +786,85 @@ def support_contact():
         db.session.commit()
 
         # Email Notification
+        # Email notification — two emails: one to you, one confirmation to user
         try:
-            msg = Message(
-                subject=f"Kontexa Support: {fb_type} - {subject}",
-                recipients=[os.getenv("MAIL_USERNAME")], # Sends to your email
-                body=f"New message from: {email}\n\nTopic: {fb_type}\n\nMessage:\n{message}"
-            )
-            mail.send(msg)
+            # 1. Notify YOU
+            resend.Emails.send({
+                "from": FROM_EMAIL,
+                "to": [ADMIN_EMAIL],
+                "reply_to": [email],          # so you can just hit Reply
+                "subject": f"[Kontexa Support] {fb_type} — {subject}",
+                "html": f"""
+        <div style="font-family:Arial,sans-serif;max-width:520px;padding:24px;color:#0d0f12;">
+        <h2 style="margin:0 0 16px;font-size:18px;">New Support Message</h2>
+        <table style="width:100%;border-collapse:collapse;">
+            <tr><td style="padding:8px 0;color:#767b87;width:80px;">From</td><td style="padding:8px 0;font-weight:600;">{email}</td></tr>
+            <tr><td style="padding:8px 0;color:#767b87;">Topic</td><td style="padding:8px 0;">{fb_type}</td></tr>
+            <tr><td style="padding:8px 0;color:#767b87;">Subject</td><td style="padding:8px 0;">{subject}</td></tr>
+        </table>
+        <div style="background:#f7f7f5;border-radius:8px;padding:16px;margin-top:16px;font-size:14px;line-height:1.7;white-space:pre-wrap;">{message}</div>
+        <p style="font-size:12px;color:#9ca3af;margin-top:20px;">Hit Reply to respond directly to {email}</p>
+        </div>"""
+            })
+
+            # 2. Confirmation to the USER
+            resend.Emails.send({
+                "from": FROM_EMAIL,
+                "to": [email],
+                "subject": "We got your message — Kontexa Support",
+                "html": f"""
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="UTF-8"/></head>
+        <body style="margin:0;padding:0;background:#f7f7f5;font-family:'Helvetica Neue',Arial,sans-serif;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f7f5;padding:40px 0;">
+        <tr><td align="center">
+            <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;border:1px solid #e8e8e4;overflow:hidden;">
+
+            <tr><td style="background:#0d0f12;padding:24px 36px;">
+                <table cellpadding="0" cellspacing="0"><tr>
+                <td style="width:28px;height:28px;background:#4f46e5;border-radius:5px;text-align:center;vertical-align:middle;">
+                    <span style="color:#fff;font-size:15px;font-weight:700;">K</span>
+                </td>
+                <td style="padding-left:10px;font-size:15px;font-weight:600;color:#fff;">Kontexa</td>
+                </tr></table>
+            </td></tr>
+
+            <tr><td style="padding:32px 36px;">
+                <p style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0d0f12;">We got your message ✅</p>
+                <p style="margin:0 0 24px;font-size:14px;color:#767b87;line-height:1.7;">
+                Thanks for reaching out! We typically reply within 24 hours.
+                Here's a copy of what you sent us:
+                </p>
+
+                <table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f7f5;border-radius:10px;margin-bottom:24px;">
+                <tr><td style="padding:16px 20px;">
+                    <p style="margin:0 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#767b87;">Your message</p>
+                    <p style="margin:0 0 12px;font-size:13px;color:#767b87;"><strong style="color:#0d0f12;">Topic:</strong> {fb_type} &nbsp;·&nbsp; <strong style="color:#0d0f12;">Subject:</strong> {subject}</p>
+                    <p style="margin:0;font-size:14px;color:#0d0f12;line-height:1.7;white-space:pre-wrap;">{message}</p>
+                </td></tr>
+                </table>
+
+                <p style="margin:0;font-size:13px;color:#767b87;line-height:1.7;">
+                We'll reply to <strong style="color:#0d0f12;">{email}</strong>.
+                If it's urgent, reply to this email directly.
+                </p>
+            </td></tr>
+
+            <tr><td style="padding:16px 36px;border-top:1px solid #e8e8e4;">
+                <p style="margin:0;font-size:12px;color:#9ca3af;">
+                Kontexa · <a href="https://kontexa.online" style="color:#4f46e5;text-decoration:none;">kontexa.online</a>
+                </p>
+            </td></tr>
+
+            </table>
+        </td></tr>
+        </table>
+        </body>
+        </html>"""
+            })
         except Exception as mail_err:
-            app.logger.error(f"Email delivery failed: {mail_err}")
-            # We don't return error to user here because the DB save was successful
+            app.logger.error(f"Support email failed: {mail_err}")
  
         return jsonify({'ok': True}), 201
  
