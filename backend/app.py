@@ -135,7 +135,7 @@ class Website(db.Model):
     url         = db.Column(db.String(500), nullable=False, index=True)
     domain      = db.Column(db.String(200))
     custom_name = db.Column(db.String(255), nullable=True)
-    user_id     = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    user_id     = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE"), nullable=False, index=True)
     notes       = db.relationship('Note', backref='website', lazy=True, cascade="all, delete-orphan")
 
 class Note(db.Model):
@@ -149,19 +149,19 @@ class Note(db.Model):
     timestamp  = db.Column(db.String(20), nullable=True)
     folder     = db.Column(db.String(100), nullable=True)
     tags       = db.Column(db.Text, nullable=True)
-    website_id = db.Column(db.Integer, db.ForeignKey('website.id'), nullable=False)
+    website_id = db.Column(db.Integer, db.ForeignKey('website.id', ondelete="CASCADE"), nullable=False)
     deleted    = db.Column(db.Boolean, default=False)
     deleted_at = db.Column(db.DateTime, nullable=True)
 
 class Feedback(db.Model):
     __tablename__ = 'feedback'
-    id         = db.Column(db.Integer, primary_key=True)
-    user_id    = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True) 
-    email      = db.Column(db.String(255), nullable=True)
-    fb_type    = db.Column(db.String(50), default='feature')
-    subject    = db.Column(db.String(255), nullable=True)
-    message    = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    id            = db.Column(db.Integer, primary_key=True)
+    user_id       = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="SET NULL"), nullable=True)
+    email         = db.Column(db.String(255), nullable=True)
+    fb_type       = db.Column(db.String(50), default='feature')
+    subject       = db.Column(db.String(255), nullable=True)
+    message       = db.Column(db.Text, nullable=False)
+    created_at    = db.Column(db.DateTime, default=datetime.utcnow)
 
 class PricingConfig(db.Model):
     __tablename__      = 'pricing_config'
@@ -232,6 +232,55 @@ google = oauth.register(
     server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
     client_kwargs={'scope': 'openid email profile'}
 )
+
+
+@app.route("/fix-cascade")
+def fix_cascade():
+    if not _admin_token_required():
+        return jsonify({"error": "Forbidden"}), 403
+    try:
+        with db.engine.connect() as con:
+            # Fix website → user
+            con.execute(db.text("""
+                ALTER TABLE website
+                DROP CONSTRAINT IF EXISTS website_user_id_fkey;
+            """))
+            con.execute(db.text("""
+                ALTER TABLE website
+                ADD CONSTRAINT website_user_id_fkey
+                FOREIGN KEY (user_id) REFERENCES "user"(id)
+                ON DELETE CASCADE;
+            """))
+
+            # Fix note → website
+            con.execute(db.text("""
+                ALTER TABLE note
+                DROP CONSTRAINT IF EXISTS note_website_id_fkey;
+            """))
+            con.execute(db.text("""
+                ALTER TABLE note
+                ADD CONSTRAINT note_website_id_fkey
+                FOREIGN KEY (website_id) REFERENCES website(id)
+                ON DELETE CASCADE;
+            """))
+
+            # Fix feedback → user (SET NULL so feedback survives)
+            con.execute(db.text("""
+                ALTER TABLE feedback
+                DROP CONSTRAINT IF EXISTS feedback_user_id_fkey;
+            """))
+            con.execute(db.text("""
+                ALTER TABLE feedback
+                ADD CONSTRAINT feedback_user_id_fkey
+                FOREIGN KEY (user_id) REFERENCES "user"(id)
+                ON DELETE SET NULL;
+            """))
+
+            con.commit()
+        return jsonify({"ok": True, "message": "Cascade constraints applied"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route("/wakeUp")
 def wakeUp():
@@ -553,6 +602,23 @@ def init_db():
     except Exception as e:
         app.logger.error(f"init-db error: {e}")
         return "Internal error during DB init.", 500
+    
+
+@app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
+def admin_delete_user(user_id):
+    if not _admin_token_required():
+        return jsonify({"error": "Forbidden"}), 403
+    try:
+        user = db.session.get(User, user_id)
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        db.session.delete(user)
+        db.session.commit()
+        return jsonify({"ok": True, "message": f"User {user_id} and all associated data deleted"}), 200
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"admin_delete_user error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 # ─── Pricing & Razorpay ───────────────────────────────────────────────────────
