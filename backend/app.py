@@ -1,37 +1,25 @@
 import os
-import razorpay
+import re
 import hmac
 import hashlib
-import re
+import razorpay
+import resend
 from datetime import datetime, timedelta
-
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 from flask import Flask, request, jsonify, session, redirect, url_for, render_template, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import joinedload
-from urllib.parse import urlparse
+from sqlalchemy import func, text as sa_text
 from authlib.integrations.flask_client import OAuth
 from flask_cors import CORS
 from dotenv import load_dotenv
 from markupsafe import escape
-from sqlalchemy import func, text as sa_text
-from flask_mail import Mail, Message
-
-
-import resend
-resend.api_key = os.getenv("RESEND_API_KEY", "")
-if not resend.api_key:
-    app.logger.error("RESEND_API_KEY is missing or empty — emails will not send")
-else:
-    app.logger.info(f"Resend configured — key starts with: {resend.api_key[:6]}...")
-ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "monisahmed015@gmail.com")  # where YOU get support emails
-FROM_EMAIL = "Kontexa <noreply@kontexa.online>"
-
 
 load_dotenv()
+
 app = Flask(__name__)
 
-# ─── Startup validation — fail fast if required env vars are missing ──────────
+# ─── Startup validation ───────────────────────────────────────────────────────
 _REQUIRED_ENV = ["SECRET_KEY", "DATABASE_URL", "CLIENT_ID", "CLIENT_SECRET",
                  "RAZORPAY_KEY_ID", "RAZORPAY_SECRET_KEY"]
 _missing = [k for k in _REQUIRED_ENV if not os.getenv(k)]
@@ -44,25 +32,34 @@ app.config.update(
     SESSION_COOKIE_SAMESITE="None",
     PERMANENT_SESSION_LIFETIME=timedelta(days=30),
 )
-
-# No fallback — raises KeyError at startup if SECRET_KEY is not set
 app.secret_key = os.environ["SECRET_KEY"]
 
 _EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 
+# ─── Resend email setup ───────────────────────────────────────────────────────
+resend.api_key = os.getenv("RESEND_API_KEY", "")
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "monisahmed015@gmail.com")
+FROM_EMAIL  = "Kontexa <noreply@kontexa.online>"
+
+# NOW app exists, so logging works
+if not resend.api_key:
+    app.logger.warning("RESEND_API_KEY is not set — emails will not send")
+else:
+    app.logger.info(f"Resend ready — key prefix: {resend.api_key[:6]}...")
+
 # ─── Database ─────────────────────────────────────────────────────────────────
-uri = os.getenv("DATABASE_URL")
-if uri and uri.startswith("postgres://"):
+uri = os.getenv("DATABASE_URL", "")
+if uri.startswith("postgres://"):
     uri = uri.replace("postgres://", "postgresql://", 1)
 
 app.config["SQLALCHEMY_DATABASE_URI"] = uri
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_pre_ping": True,
-    "pool_size": 2,           
-    "max_overflow": 5,        
+    "pool_size": 2,
+    "max_overflow": 5,
     "pool_recycle": 300,
-    "pool_timeout": 30,       
+    "pool_timeout": 30,
     "connect_args": {
         "sslmode": "require",
         "keepalives": 1,
