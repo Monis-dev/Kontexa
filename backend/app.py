@@ -20,7 +20,11 @@ from flask_mail import Mail, Message
 
 import resend
 resend.api_key = os.getenv("RESEND_API_KEY", "")
-ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "your-personal@gmail.com")  # where YOU get support emails
+if not resend.api_key:
+    app.logger.error("RESEND_API_KEY is missing or empty — emails will not send")
+else:
+    app.logger.info(f"Resend configured — key starts with: {resend.api_key[:6]}...")
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "monisahmed015@gmail.com")  # where YOU get support emails
 FROM_EMAIL = "Kontexa <noreply@kontexa.online>"
 
 
@@ -234,53 +238,21 @@ google = oauth.register(
 )
 
 
-@app.route("/fix-cascade")
-def fix_cascade():
+@app.route("/test-email")
+def test_email():
     if not _admin_token_required():
         return jsonify({"error": "Forbidden"}), 403
     try:
-        with db.engine.connect() as con:
-            # Fix website → user
-            con.execute(db.text("""
-                ALTER TABLE website
-                DROP CONSTRAINT IF EXISTS website_user_id_fkey;
-            """))
-            con.execute(db.text("""
-                ALTER TABLE website
-                ADD CONSTRAINT website_user_id_fkey
-                FOREIGN KEY (user_id) REFERENCES "user"(id)
-                ON DELETE CASCADE;
-            """))
-
-            # Fix note → website
-            con.execute(db.text("""
-                ALTER TABLE note
-                DROP CONSTRAINT IF EXISTS note_website_id_fkey;
-            """))
-            con.execute(db.text("""
-                ALTER TABLE note
-                ADD CONSTRAINT note_website_id_fkey
-                FOREIGN KEY (website_id) REFERENCES website(id)
-                ON DELETE CASCADE;
-            """))
-
-            # Fix feedback → user (SET NULL so feedback survives)
-            con.execute(db.text("""
-                ALTER TABLE feedback
-                DROP CONSTRAINT IF EXISTS feedback_user_id_fkey;
-            """))
-            con.execute(db.text("""
-                ALTER TABLE feedback
-                ADD CONSTRAINT feedback_user_id_fkey
-                FOREIGN KEY (user_id) REFERENCES "user"(id)
-                ON DELETE SET NULL;
-            """))
-
-            con.commit()
-        return jsonify({"ok": True, "message": "Cascade constraints applied"}), 200
+        result = resend.Emails.send({
+            "from": "Kontexa <noreply@kontexa.online>",
+            "to": [os.getenv("ADMIN_EMAIL", "your@gmail.com")],
+            "subject": "Resend test from Kontexa",
+            "html": "<p>If you see this, Resend is working correctly.</p>"
+        })
+        return jsonify({"ok": True, "result": str(result)}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
+    
 
 @app.route("/wakeUp")
 def wakeUp():
