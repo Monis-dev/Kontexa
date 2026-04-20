@@ -467,11 +467,27 @@ function renderHome(data) {
 }
 
 // ═══════════════════════════════════════════════════════════
+//  IMAGE GUARD
+//  Returns true only when image_data is a non-empty string that
+//  starts with a recognised data-URL or https prefix.
+//  On the PWA, notes can arrive with image_data = "" | null |
+//  a broken/partial base64 string — all of which must be suppressed.
+// ═══════════════════════════════════════════════════════════
+function hasValidImage(img) {
+  if (!img || typeof img !== "string") return false;
+  const t = img.trim();
+  if (!t) return false;
+  // Must begin with a real data-URL image prefix or an https URL
+  return t.startsWith("data:image/") || t.startsWith("https://");
+}
+
+// ═══════════════════════════════════════════════════════════
 //  NOTE CARD
 // ═══════════════════════════════════════════════════════════
 function nCard(n, displayLabel) {
   const sel = n.selection?.trim();
   const body = n.content?.trim();
+  const img = hasValidImage(n.image_data);
   const hasFooter = n.pinned || n.folder || n.timestamp;
 
   let contentParts = "";
@@ -479,7 +495,7 @@ function nCard(n, displayLabel) {
     contentParts += `<div class="nc-s">"${esc(sel.length > 120 ? sel.slice(0, 120) + "…" : sel)}"</div>`;
   if (body)
     contentParts += `<div class="nc-b">${esc(body.length > 160 ? body.slice(0, 160) + "…" : body)}</div>`;
-  if (!sel && !body && !n.image_data && !n.timestamp)
+  if (!sel && !body && !img && !n.timestamp)
     contentParts += `<div class="nc-empty">No description added.</div>`;
 
   const footerHtml = hasFooter
@@ -501,7 +517,7 @@ function nCard(n, displayLabel) {
       <div class="nc-t">${esc(n.title || "Untitled")}</div>
       ${contentParts}
     </div>
-    ${n.image_data ? `<img class="nc-img" src="${n.image_data}" loading="lazy" alt="Screenshot"/>` : ""}
+    ${img ? `<img class="nc-img" src="${n.image_data}" loading="lazy" alt="Screenshot"/>` : ""}
     ${footerHtml}
   </div>`;
 }
@@ -602,7 +618,7 @@ function openNote(id) {
   if (n.selection?.trim())
     h += `<div class="nd-sel">"${esc(n.selection)}"</div>`;
   if (n.content?.trim()) h += `<div class="nd-body">${esc(n.content)}</div>`;
-  if (n.image_data)
+  if (hasValidImage(n.image_data))
     h += `<img class="nd-img" src="${n.image_data}" loading="lazy"/>`;
 
   if (n.url && n.url !== "general://notes" && n.url !== "folder://notes")
