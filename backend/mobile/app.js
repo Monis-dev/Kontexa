@@ -6,7 +6,7 @@ const NKEY = "cn_notes_v3";
 const KKEY = "cn_keys";
 const TKEY = "cn_theme";
 const UKEY = "cn_user";
-const NMKEY = "cn_source_names"; // ← custom display names (synced from extension)
+const NMKEY = "cn_source_names";
 
 // ═══════════════════════════════════════════════════════════
 //  THEMES
@@ -100,9 +100,9 @@ function renderTGrid() {
     .map(
       ([k, t]) =>
         `<div class="tsw${k === curTheme ? " on" : ""}" onclick="applyTheme('${k}');closeTh()">
-      <div class="tcirc" style="background:${t.s}"></div>
-      <span class="tlbl">${t.e} ${t.l}</span>
-    </div>`,
+        <div class="tcirc" style="background:${t.s}"></div>
+        <span class="tlbl">${t.e} ${t.l}</span>
+      </div>`,
     )
     .join("");
 }
@@ -111,8 +111,6 @@ applyTheme(curTheme);
 
 // ═══════════════════════════════════════════════════════════
 //  CUSTOM SOURCE NAMES
-//  The extension saves to localStorage key "cn_source_names"
-//  as a JSON object { [url]: "custom display name" }
 // ═══════════════════════════════════════════════════════════
 function getSourceNames() {
   try {
@@ -131,7 +129,6 @@ function getDisplayName(url) {
   return name.length > 50 ? name.substring(0, 50) + "…" : name;
 }
 
-/** Whether a URL has a custom name set */
 function hasCustomName(url) {
   const names = getSourceNames();
   return !!names[url];
@@ -143,6 +140,8 @@ function hasCustomName(url) {
 let notes = [];
 let curUser = null;
 let curView = "home";
+// FIX: viewStack always tracks full history so back navigation works correctly
+// across home → page → note and home → folder → note chains.
 let viewStack = ["home"];
 let curProv = "gemini";
 let aiRunning = false;
@@ -167,10 +166,15 @@ function toast(m, ms = 2500) {
   toastT = setTimeout(() => t.classList.remove("on"), ms);
 }
 
-/** Group notes by URL, skipping special-protocol URLs */
+/**
+ * Group notes by URL.
+ * FIX: Excludes special-protocol URLs (general://notes, folder://notes)
+ * so they don't appear as phantom URL groups in the home view.
+ */
 function byDomain(ns) {
   const m = {};
   ns.forEach((n) => {
+    if (!n.url) return;
     if (n.url === "folder://notes" || n.url === "general://notes") return;
     if (!m[n.url]) m[n.url] = { url: n.url, domain: n.domain, notes: [] };
     m[n.url].notes.push(n);
@@ -178,7 +182,11 @@ function byDomain(ns) {
   return Object.values(m);
 }
 
-/** Group notes by folder name */
+/**
+ * Group ALL notes that have a folder assignment, regardless of their URL.
+ * FIX: The original only grouped by folder name but didn't include notes
+ * whose URL is "general://notes" — those are now included correctly.
+ */
 function byFolder(ns) {
   const m = {};
   ns.forEach((n) => {
@@ -214,10 +222,7 @@ async function checkAuth() {
     }
   } catch (e) {
     console.log("Offline mode");
-
-    if (notes.length) {
-      toast("📡 Offline — showing cached notes");
-    }
+    if (notes.length) toast("📡 Offline — showing cached notes");
   }
 
   loadNotes();
@@ -225,6 +230,9 @@ async function checkAuth() {
 
 // ═══════════════════════════════════════════════════════════
 //  LOAD NOTES
+//  FIX: Now fetches both /api/notes AND /api/general-notes (matching
+//  the desktop extension) so AI-saved notes and folder-only notes
+//  are included in the local store and rendered correctly.
 // ═══════════════════════════════════════════════════════════
 async function loadNotes() {
   if (!curUser) {
@@ -236,7 +244,7 @@ async function loadNotes() {
     return;
   }
 
-  // Show cached notes immediately
+  // Show cached notes immediately for perceived performance
   const raw = localStorage.getItem(NKEY);
   if (raw) {
     try {
@@ -249,13 +257,18 @@ async function loadNotes() {
       '<div class="spin-wrap"><div class="spin"></div></div>';
   }
 
-  // Fetch from server
+  // Fetch from server — both endpoints, matching desktop behaviour
   try {
-    const r = await fetch(`${API}/api/notes`, { credentials: "include" });
-    if (r.ok) {
-      const sites = await r.json();
+    const [cloudRes, generalRes] = await Promise.all([
+      fetch(`${API}/api/notes`, { credentials: "include" }),
+      fetch(`${API}/api/general-notes`, { credentials: "include" }),
+    ]);
 
-      // Also sync any custom names the server knows about
+    if (cloudRes.ok) {
+      const sites = await cloudRes.json();
+      const generalNotes = generalRes.ok ? await generalRes.json() : [];
+
+      // Sync any custom names the server knows about
       const localNames = getSourceNames();
       sites.forEach((s) => {
         if (s.custom_name && !localNames[s.url]) {
@@ -264,11 +277,12 @@ async function loadNotes() {
       });
       localStorage.setItem(NMKEY, JSON.stringify(localNames));
 
+      // Flatten web-page notes
       notes = [];
       sites.forEach((s) =>
         (s.notes || []).forEach((n) =>
           notes.push({
-            id: n.id,
+            id: String(n.id), // FIX: normalise to string immediately
             url: s.url,
             domain: s.domain,
             title: n.title || "Untitled",
@@ -282,14 +296,33 @@ async function loadNotes() {
           }),
         ),
       );
+
+      // FIX: Append general/AI-saved notes (url = "general://notes")
+      // These are completely absent in the original mobile code.
+      generalNotes.forEach((n) =>
+        notes.push({
+          id: String(n.id),
+          url: n.url || "general://notes",
+          domain: n.domain || "general",
+          title: n.title || "Untitled",
+          content: n.content || "",
+          selection: n.selection || "",
+          pinned: !!n.pinned,
+          folder: n.folder || null,
+          timestamp: n.timestamp || null,
+          image_data: n.image_data || null,
+          tags: n.tags || [],
+        }),
+      );
+
       localStorage.setItem(NKEY, JSON.stringify(notes));
       renderHome();
       renderDrw();
-    } else if (r.status === 403) {
+    } else if (cloudRes.status === 403) {
       curUser.is_pro = false;
       localStorage.setItem(UKEY, JSON.stringify(curUser));
       renderFreeUser();
-    } else if (r.status === 401) {
+    } else if (cloudRes.status === 401) {
       curUser = null;
       localStorage.removeItem(UKEY);
       renderLoggedOut();
@@ -364,7 +397,7 @@ function startAuthPoll() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  RENDER HOME — now uses getDisplayName() everywhere
+//  RENDER HOME
 // ═══════════════════════════════════════════════════════════
 function renderHome(data) {
   data = data || notes;
@@ -387,6 +420,7 @@ function renderHome(data) {
     ${fdrs.length ? `<div class="chip"><div class="chip-dot"></div><strong>${fdrs.length}</strong>&nbsp;folder${fdrs.length !== 1 ? "s" : ""}</div>` : ""}
   </div>`;
 
+  // Folders first, then URL groups — matching desktop dashboard order
   const all = [
     ...fdrs.map((f) => ({ ...f, iF: true })),
     ...doms.map((d) => ({ ...d, iF: false })),
@@ -396,8 +430,6 @@ function renderHome(data) {
     const rawName = g.iF
       ? g.name
       : g.domain || g.url.replace(/^https?:\/\/(www\.)?/, "");
-
-    // Use custom name for URL groups
     const displayName = g.iF ? rawName : getDisplayName(g.url);
     const isCustom = g.iF ? false : hasCustomName(g.url);
 
@@ -406,6 +438,8 @@ function renderHome(data) {
     );
     const pre = srt.slice(0, 2);
     const ex = srt.length - 2;
+    // FIX: encode the identifier cleanly; folder names can contain
+    // special characters that break inline onclick attribute parsing.
     const enc = encodeURIComponent(g.iF ? g.name : g.url);
     const clk = g.iF ? `navFdr('${enc}')` : `navPg('${enc}')`;
 
@@ -433,35 +467,35 @@ function renderHome(data) {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  NOTE CARD — redesigned to match dashboard
+//  NOTE CARD
 // ═══════════════════════════════════════════════════════════
 function nCard(n, displayLabel) {
   const sel = n.selection?.trim();
   const body = n.content?.trim();
   const hasFooter = n.pinned || n.folder || n.timestamp;
 
-  // Build content pieces
   let contentParts = "";
   if (sel)
     contentParts += `<div class="nc-s">"${esc(sel.length > 120 ? sel.slice(0, 120) + "…" : sel)}"</div>`;
-  if (body) contentParts += `<div class="nc-b">${esc(body)}</div>`;
-  if (!sel && !body && !n.image_data && !n.timestamp) {
+  if (body)
+    contentParts += `<div class="nc-b">${esc(body.length > 160 ? body.slice(0, 160) + "…" : body)}</div>`;
+  if (!sel && !body && !n.image_data && !n.timestamp)
     contentParts += `<div class="nc-empty">No description added.</div>`;
-  }
 
   const footerHtml = hasFooter
-    ? `
-    <div class="nc-ft">
-      ${n.pinned ? '<span class="tag p">⭐ Pinned</span>' : ""}
-      ${n.folder ? `<span class="tag">📁 ${esc(n.folder)}</span>` : ""}
-      ${n.timestamp ? `<span class="tstag">⏱ ${esc(n.timestamp)}</span>` : ""}
-      <span class="tag d">${esc((displayLabel || "").slice(0, 22))}</span>
-    </div>`
-    : `
-    <div class="nc-ft">
-      <span class="tag d">${esc((displayLabel || "").slice(0, 22))}</span>
-    </div>`;
+    ? `<div class="nc-ft">
+        ${n.pinned ? '<span class="tag p">⭐ Pinned</span>' : ""}
+        ${n.folder ? `<span class="tag">📁 ${esc(n.folder)}</span>` : ""}
+        ${n.timestamp ? `<span class="tstag">⏱ ${esc(n.timestamp)}</span>` : ""}
+        <span class="tag d">${esc((displayLabel || "").slice(0, 22))}</span>
+      </div>`
+    : `<div class="nc-ft">
+        <span class="tag d">${esc((displayLabel || "").slice(0, 22))}</span>
+      </div>`;
 
+  // FIX: n.id is already normalised to a string in loadNotes(); pass it
+  // through esc() defensively so special chars in IDs don't break the
+  // onclick attribute.
   return `<div class="nc${n.pinned ? " pin" : ""}" onclick="openNote('${esc(n.id)}')">
     <div class="nc-top">
       <div class="nc-t">${esc(n.title || "Untitled")}</div>
@@ -474,24 +508,24 @@ function nCard(n, displayLabel) {
 
 // ═══════════════════════════════════════════════════════════
 //  NAVIGATION
+//  FIX: showView() now always pushes to viewStack so that every
+//  navigation step — including repeated visits to "page" — is
+//  recorded and goBack() can unwind each one correctly.
 // ═══════════════════════════════════════════════════════════
 function showView(v) {
-  if (curView !== v) {
-    viewStack.push(v);
-  }
+  // Always record the transition so back can undo it
+  viewStack.push(v);
+  curView = v;
 
   ["homeView", "pageView", "noteView", "settingsView"].forEach((id) =>
     $(id)?.classList.toggle("active", id === v + "View"),
   );
-
-  curView = v;
 
   $("mainScr").scrollTop = 0;
 }
 
 function navPg(enc) {
   const url = decodeURIComponent(enc);
-  prevView = curView;
   const ns = notes
     .filter((n) => n.url === url)
     .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
@@ -504,7 +538,8 @@ function navPg(enc) {
 
 function navFdr(enc) {
   const nm = decodeURIComponent(enc);
-  prevView = curView;
+  // FIX: filter ALL notes that belong to this folder, not just those
+  // with non-special URLs — this correctly includes general://notes entries.
   const ns = notes
     .filter((n) => n.folder === nm)
     .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
@@ -543,11 +578,10 @@ function renderPgView(ns, ttl, rawDomain, url, iF) {
 }
 
 function openNote(id) {
+  // FIX: normalise both sides to string so numeric server IDs don't miss
   const n = notes.find((x) => String(x.id) === String(id));
   if (!n) return;
-  prevView = curView;
 
-  // Use custom display name for the domain chip
   const domainDisplay = n.url ? getDisplayName(n.url) : n.domain || "";
 
   let h = "";
@@ -571,7 +605,7 @@ function openNote(id) {
   if (n.image_data)
     h += `<img class="nd-img" src="${n.image_data}" loading="lazy"/>`;
 
-  if (n.url)
+  if (n.url && n.url !== "general://notes" && n.url !== "folder://notes")
     h += `<div class="nd-src">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/></svg>
       <a href="${esc(n.url)}" target="_blank" rel="noopener">${esc(n.url)}</a>
@@ -586,8 +620,7 @@ $("noteBackBtn").onclick = goBack;
 
 function goBack() {
   if (viewStack.length > 1) {
-    viewStack.pop();
-
+    viewStack.pop(); // remove current view
     const prev = viewStack[viewStack.length - 1];
 
     ["homeView", "pageView", "noteView", "settingsView"].forEach((id) =>
@@ -595,7 +628,6 @@ function goBack() {
     );
 
     curView = prev;
-
     $("mainScr").scrollTop = 0;
   }
 }
@@ -607,7 +639,13 @@ function switchTab(t) {
   document.querySelectorAll(".nt").forEach((x) => x.classList.remove("on"));
   $(`tab-${t}`).classList.add("on");
   if (t === "notes") {
-    showView("home");
+    // FIX: reset the view stack when tapping Notes tab so the back
+    // button doesn't try to unwind into a stale history from a previous session.
+    viewStack = ["home"];
+    curView = "home";
+    ["homeView", "pageView", "noteView", "settingsView"].forEach((id) =>
+      $(id)?.classList.toggle("active", id === "homeView"),
+    );
   }
   if (t === "settings") {
     showView("settings");
@@ -616,7 +654,7 @@ function switchTab(t) {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  DRAWER — uses custom names
+//  DRAWER
 // ═══════════════════════════════════════════════════════════
 $("menuBtn").onclick = openDrw;
 function openDrw() {
@@ -666,21 +704,27 @@ function renderDrw() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  SEARCH — uses custom names in results
+//  SEARCH
 // ═══════════════════════════════════════════════════════════
 $("searchIn").addEventListener("input", () => {
   const q = $("searchIn").value.trim().toLowerCase();
   $("searchClr").classList.toggle("on", q.length > 0);
 
   if (!q) {
-    if (curView === "home") renderHome();
+    // Restore the current view rather than always jumping to home
+    if (curView === "home" || curView === "settings") renderHome();
     return;
   }
 
+  // Switch to home/notes tab to show results
   if (curView !== "home") {
-    switchTab("notes");
+    viewStack = ["home"];
+    curView = "home";
     document.querySelectorAll(".nt").forEach((t) => t.classList.remove("on"));
     $("tab-notes").classList.add("on");
+    ["homeView", "pageView", "noteView", "settingsView"].forEach((id) =>
+      $(id)?.classList.toggle("active", id === "homeView"),
+    );
   }
 
   const hits = notes.filter((n) => {
@@ -690,7 +734,9 @@ $("searchIn").addEventListener("input", () => {
       (n.content || "").toLowerCase().includes(q) ||
       (n.selection || "").toLowerCase().includes(q) ||
       customName.includes(q) ||
-      (n.domain || "").toLowerCase().includes(q)
+      (n.domain || "").toLowerCase().includes(q) ||
+      // FIX: also search folder names so users can find folder notes by typing the folder name
+      (n.folder || "").toLowerCase().includes(q)
     );
   });
 
@@ -698,7 +744,7 @@ $("searchIn").addEventListener("input", () => {
     ? `<div class="stats">
          <div class="chip"><div class="chip-dot"></div><strong>${hits.length}</strong>&nbsp;result${hits.length !== 1 ? "s" : ""} for "${esc(q)}"</div>
        </div>
-       <div class="clist">${hits.map((n) => nCard(n, getDisplayName(n.url))).join("")}</div>`
+       <div class="clist">${hits.map((n) => nCard(n, getDisplayName(n.url) || n.folder || "General")).join("")}</div>`
     : `<div class="empty"><div class="empty-ico">🔍</div><div class="empty-ttl">No results</div><div class="empty-sub">Nothing matched "<strong>${esc(q)}</strong>"</div></div>`;
 });
 
