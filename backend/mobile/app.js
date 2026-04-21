@@ -490,36 +490,40 @@ function nCard(n, displayLabel) {
   const body = n.content?.trim();
   const img = hasValidImage(n.image_data);
 
-  // Clean up the folder name: if it's "None", "none", or empty, treat as null
+  // 1. Clean folder name
   const folderName =
-    n.folder &&
-    n.folder !== "None" &&
-    n.folder !== "none" &&
-    n.folder.trim() !== ""
+    n.folder && n.folder.toLowerCase() !== "none" && n.folder.trim() !== ""
       ? n.folder
       : null;
+
+  // 2. Strict YouTube & Timestamp check
+  // Regex explains: matches 0:00, 00:00, or 0:00:00 formats
+  const timeRegex = /^(\d{1,2}:)?(\d{1,2}):(\d{2})$/;
+  const isYouTube =
+    n.url && (n.url.includes("youtube.com") || n.url.includes("youtu.be"));
+  const isValidTimestamp = n.timestamp && timeRegex.test(n.timestamp.trim());
+
+  const showTimestamp = isYouTube && isValidTimestamp;
 
   let contentParts = "";
   if (sel)
     contentParts += `<div class="nc-s">"${esc(sel.length > 120 ? sel.slice(0, 120) + "…" : sel)}"</div>`;
   if (body)
     contentParts += `<div class="nc-b">${esc(body.length > 160 ? body.slice(0, 160) + "…" : body)}</div>`;
-  if (!sel && !body && !img && !n.timestamp)
+  if (!sel && !body && !img && !showTimestamp)
     contentParts += `<div class="nc-empty">No description added.</div>`;
 
-  // Build the tags/footer array dynamically
+  // 3. Build footer tags dynamically
   let footerTags = [];
   if (n.pinned) footerTags.push('<span class="tag p">⭐ Pinned</span>');
-
-  // Only show folder tag if it exists and is valid
   if (folderName)
     footerTags.push(`<span class="tag">📁 ${esc(folderName)}</span>`);
 
-  // Only show timestamp if it exists
-  if (n.timestamp && n.timestamp.trim() !== "")
-    footerTags.push(`<span class="tstag">⏱ ${esc(n.timestamp)}</span>`);
+  // Only add if it passed the Regex and YouTube check
+  if (showTimestamp) {
+    footerTags.push(`<span class="tstag">⏱ ${esc(n.timestamp.trim())}</span>`);
+  }
 
-  // Show source label
   footerTags.push(
     `<span class="tag d">${esc((displayLabel || "").slice(0, 22))}</span>`,
   );
@@ -533,7 +537,6 @@ function nCard(n, displayLabel) {
     <div class="nc-ft">${footerTags.join("")}</div>
   </div>`;
 }
-
 
 function showView(v) {
   // Always record the transition so back can undo it
