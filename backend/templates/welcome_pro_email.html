@@ -39,28 +39,31 @@
                   text-align: center;
                 "
               >
-                <div
-                  style="
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                  "
-                >
-                  <!-- Note: _external=True is REQUIRED for emails so it generates an absolute URL like https://yourdomain.com/static/... -->
-                  <img
-                    src="https://res.cloudinary.com/dzlguccgc/image/upload/v1776791491/icon-128_aqwrct.png"
-                    alt="Kontexa Logo"
-                    style="
-                      height: 32px;
-                      width: auto;
-                      margin-right: 12px;
-                      display: block;
-                    "
-                  />
-                  <span style="font-size: 20px; font-weight: 600; color: #fff">
-                    Kontexa
-                  </span>
-                </div>
+                <!-- We use a table instead of a div with flexbox -->
+                <table cellpadding="0" cellspacing="0" style="margin: 0 auto">
+                  <tr>
+                    <td style="vertical-align: middle">
+                      <img
+                        src="https://res.cloudinary.com/dzlguccgc/image/upload/v1776791491/icon-128_aqwrct.png"
+                        alt="Kontexa Logo"
+                        width="32"
+                        height="32"
+                        style="display: block; width: 32px; height: 32px"
+                      />
+                    </td>
+                    <td
+                      style="
+                        padding-left: 12px;
+                        font-size: 20px;
+                        font-weight: 600;
+                        color: #fff;
+                        font-family: sans-serif;
+                      "
+                    >
+                      Kontexa
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
 
