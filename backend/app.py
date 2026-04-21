@@ -401,7 +401,11 @@ def authorize():
     user_info = token.get('userinfo')
     user = User.query.filter_by(email=user_info['email']).first()
 
+    # Track if this is a brand new signup
+    is_new_user = False
+
     if not user:
+        is_new_user = True
         total_users = User.query.count()
         if total_users < 100:
             user = User(
@@ -419,92 +423,19 @@ def authorize():
             
         db.session.add(user)
         db.session.commit()
-        # Send welcome email for new users
+        
+        # Send welcome email for new Pro users
         if user.is_pro:
             try:
+                # 1. Render the HTML file into a string variable
+                email_html = render_template('welcome_pro_email.html', email=user_info['email'])
+                
+                # 2. Pass the rendered string to the Resend API
                 resend.Emails.send({
                     "from": FROM_EMAIL,
                     "to": [user_info['email']],
                     "subject": "🎉 You're in — Kontexa Lifetime Pro is yours, free",
-                    "html": f"""
-        <!DOCTYPE html>
-        <html>
-        <head><meta charset="UTF-8"/></head>
-        <body style="margin:0;padding:0;background:#f7f7f5;font-family:'Helvetica Neue',Arial,sans-serif;">
-        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f7f5;padding:40px 0;">
-        <tr><td align="center">
-            <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;border:1px solid #e8e8e4;overflow:hidden;">
-
-            <!-- Header -->
-            <tr><td style="background:#0d0f12;padding:28px 36px;">
-                <table cellpadding="0" cellspacing="0">
-                <tr>
-                    <td style="width:32px;height:32px;background:linear-gradient(135deg,#6366f1,#4f46e5);border-radius:6px;text-align:center;vertical-align:middle;">
-                    <span style="color:#fff;font-size:18px;font-weight:700;line-height:32px;">K</span>
-                    </td>
-                    <td style="padding-left:10px;font-size:16px;font-weight:600;color:#fff;">Kontexa</td>
-                </tr>
-                </table>
-            </td></tr>
-
-            <!-- Body -->
-            <tr><td style="padding:36px 36px 0;">
-                <p style="margin:0 0 8px;font-size:24px;font-weight:700;color:#0d0f12;line-height:1.2;">You're one of our first 100. 🎉</p>
-                <p style="margin:0 0 24px;font-size:15px;color:#767b87;line-height:1.7;">
-                Your account <strong style="color:#0d0f12;">{user_info['email']}</strong> has been upgraded to
-                <strong style="color:#4f46e5;">Lifetime Pro — completely free.</strong>
-                No payment. No expiry. No catch.
-                </p>
-
-                <!-- Feature list -->
-                <table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f7f5;border-radius:12px;padding:20px 24px;margin-bottom:24px;">
-                <tr><td>
-                    <p style="margin:0 0 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#767b87;">What's included in your Pro</p>
-                    {''.join(f'<p style="margin:0 0 10px;font-size:14px;color:#0d0f12;"><span style="color:#059669;font-weight:700;margin-right:8px;">✓</span>{f}</p>' for f in [
-                        "Cloud sync across all your devices",
-                        "Custom folders to organise notes",
-                        "AI research assistant (Gemini)",
-                        "Screenshots &amp; YouTube timestamps",
-                        "Mobile PWA with live sync",
-                        "Priority support"
-                    ])}
-                </td></tr>
-                </table>
-
-                <!-- Launch notice -->
-                <table width="100%" cellpadding="0" cellspacing="0" style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;margin-bottom:28px;">
-                <tr><td style="padding:14px 18px;">
-                    <p style="margin:0;font-size:13px;color:#92400e;line-height:1.6;">
-                    <strong>⏳ Extension under Chrome Store review.</strong>
-                    We'll email you the moment it goes live — usually within a week.
-                    Your Pro account is already active and waiting.
-                    </p>
-                </td></tr>
-                </table>
-
-                <!-- CTA -->
-                <table cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
-                <tr><td style="background:#4f46e5;border-radius:10px;">
-                    <a href="https://kontexa.online" style="display:inline-block;padding:13px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;">
-                    Visit Kontexa →
-                    </a>
-                </td></tr>
-                </table>
-            </td></tr>
-
-            <!-- Footer -->
-            <tr><td style="padding:20px 36px;border-top:1px solid #e8e8e4;">
-                <p style="margin:0;font-size:12px;color:#9ca3af;">
-                Kontexa · <a href="https://kontexa.online" style="color:#4f46e5;text-decoration:none;">kontexa.online</a>
-                · You're receiving this because you signed up as an early user.
-                </p>
-            </td></tr>
-
-            </table>
-        </td></tr>
-        </table>
-        </body>
-        </html>"""
+                    "html": email_html
                 })
                 app.logger.info(f"Welcome email sent to {user_info['email']}")
             except Exception as mail_err:
@@ -514,10 +445,18 @@ def authorize():
     session['user_email'] = user.email
     session.permanent     = True
 
-    origin = session.pop("login_origin", "desktop")
-    email  = user_info['email']  # Jinja2 auto-escapes in templates
+    # Pop login_origin to clear it from session, but we no longer need it to determine logic
+    session.pop("login_origin", "desktop")
+    email  = user_info['email']
 
-    template = "auth_success_mobile.html" if origin == "mobile" else "auth_success_desktop.html"
+    # LOGIC UPDATE:
+    # If NEW user -> Show Celebration screen
+    # If OLD user -> Show standard "Signed in" screen
+    if is_new_user:
+        template = "auth_success_desktop.html" 
+    else:
+        template = "auth_success_mobile.html"
+
     return render_template(template, email=email)
 
 @app.route('/api/me')
