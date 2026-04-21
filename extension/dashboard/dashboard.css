@@ -6,7 +6,7 @@
 @import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap");
 @import url("https://fonts.cdnfonts.com/css/neoneon");
 :root {
-  --nav: 240px;
+  --nav: 260px;
   --top: 60px;
   --panel: 300px;
 }
@@ -20,6 +20,7 @@
 }
 
 body {
+
   font-family: "DM Sans", sans-serif;
   background: var(--bg);
   color: var(--ink);
@@ -35,26 +36,29 @@ body {
 /* ─── TOPBAR ─────────────────────────────────────────── */
 .topbar {
   height: var(--top);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  z-index: 93;
+  padding: 0;                        /* remove all padding from topbar itself */
   background: var(--sur);
   border-bottom: 1px solid var(--bdr);
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  z-index: 100;
-  padding-right: 18px;
-  transition:
-    background 0.3s,
-    border-color 0.3s;
+  transition: background 0.3s, border-color 0.3s;
 }
 .tl {
-  width: var(--nav);
+  width: 260px;              /* hardcoded, not var() */
+  min-width: 260px;
+  max-width: 260px;
+  flex-shrink: 0;
+  flex-grow: 0;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding: 0 16px;
-  flex-shrink: 0;
   border-right: 1px solid var(--bdr);
   height: 100%;
+  overflow: hidden;          /* nothing escapes */
   transition: border-color 0.3s;
 }
 .logo {
@@ -231,6 +235,7 @@ body {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+  padding-right: 18px;    /* padding lives here now, not on topbar */
 }
 .icon-btn {
   width: 36px;
@@ -348,27 +353,34 @@ body {
 }
 
 /* ─── SETTINGS PANEL ──────────────────────────────────── */
+/* AFTER */
 .settings-panel {
   position: fixed;
-  top: var(--top);
-  right: 0;
-  bottom: 0;
+  top: calc(var(--top) + 10px);   /* slight gap from topbar */
+  right: 12px;                     /* float off the edge */
+  bottom: 12px;                    /* float off the bottom */
   width: var(--panel);
   background: var(--sur);
-  border-left: 1px solid var(--bdr);
+  border: 1px solid var(--bdr);
+  border-radius: 20px;             /* rounded, not sharp */
   z-index: 95;
   display: flex;
   flex-direction: column;
-  transform: translateX(100%);
+  transform: translateX(calc(100% + 20px));
   transition:
-    transform 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.36s cubic-bezier(0.16, 1, 0.3, 1),
     background 0.3s,
     border-color 0.3s;
   overflow-y: auto;
+  overflow-x: hidden;
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.14),
+    0 4px 16px rgba(0, 0, 0, 0.06);
 }
 .settings-panel.open {
   transform: translateX(0);
 }
+/* AFTER */
 .sp-header {
   display: flex;
   align-items: center;
@@ -376,6 +388,12 @@ body {
   padding: 20px 18px 16px;
   border-bottom: 1px solid var(--bdr);
   flex-shrink: 0;
+  border-radius: 20px 20px 0 0;   /* match panel top corners */
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--acc) 5%, transparent),
+    transparent
+  );
 }
 .sp-title {
   font-size: 13.5px;
@@ -429,7 +447,7 @@ body {
   gap: 12px;
   width: 100%;
   padding: 11px 12px;
-  border-radius: 12px;
+  border-radius: 14px;
   border: 1.5px solid transparent;
   background: transparent;
   cursor: pointer;
@@ -520,43 +538,67 @@ body {
 .sp-theme-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 5px;
+  gap: 6px;
+  padding: 2px;
 }
 .palette-swatch {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   cursor: pointer;
-  padding: 10px 4px;
-  border-radius: 12px;
+  padding: 10px 6px;
+  border-radius: 14px;
   border: 2px solid transparent;
-  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  background: transparent;
 }
 .palette-swatch:hover {
   background: var(--bg);
   border-color: var(--bdr);
-  transform: translateY(-2px);
+  transform: translateY(-3px);
 }
 .palette-swatch.active {
   border-color: var(--acc);
   background: var(--acc-bg);
-  transform: translateY(-2px);
+  transform: translateY(-3px);
 }
 .swatch-circle {
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  border: 3px solid rgba(0, 0, 0, 0.08);
+  border: none;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+  box-shadow: 
+    0 3px 10px rgba(0, 0, 0, 0.18),
+    inset 0 1px 2px rgba(255, 255, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+.swatch-circle::after {
+  content: "";
+  position: absolute;
+  top: 10%;
+  left: 15%;
+  width: 35%;
+  height: 25%;
+  background: rgba(255, 255, 255, 0.28);
+  border-radius: 50%;
+  filter: blur(2px);
+}
+.palette-swatch.active .swatch-circle {
+  box-shadow: 
+    0 4px 14px rgba(0, 0, 0, 0.22),
+    0 0 0 3px var(--acc),
+    inset 0 1px 2px rgba(255, 255, 255, 0.3);
 }
 .swatch-label {
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 600;
   color: var(--mut);
   text-align: center;
   white-space: nowrap;
+  letter-spacing: 0.01em;
 }
 .palette-swatch.active .swatch-label {
   color: var(--acc);
@@ -569,11 +611,12 @@ body {
   overflow: hidden;
   position: relative;
 }
+/* AFTER */
 .ovl {
   display: none;
   position: fixed;
   inset: 0;
-  top: var(--top);
+  top: 0;               /* cover header too */
   background: rgba(16, 24, 40, 0.28);
   z-index: 94;
   backdrop-filter: blur(3px);
@@ -584,26 +627,29 @@ body {
 
 /* ─── SIDEBAR ─────────────────────────────────────────── */
 .side {
-  width: var(--nav);
+  width: 260px;              /* hardcoded, matches .tl exactly */
+  min-width: 260px;
+  max-width: 260px;
+  flex-shrink: 0;
+  flex-grow: 0;
+  box-sizing: border-box;
   background: var(--sur);
   border-right: 1px solid var(--bdr);
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
-  overflow: hidden;
-  transition:
-    width 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-    border-color 0.3s,
-    background 0.3s;
+  overflow: hidden;           /* THIS is what stops stretching */
   z-index: 90;
+  transition: border-color 0.3s, background 0.3s;
 }
 .side.closed {
   width: 0;
   border-right-color: transparent;
 }
 .shd {
-  padding: 16px 14px 8px;
+  padding: 16px 16px 8px;    /* 16px left = same as .tl padding-left */
   flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 .slbl {
   font-size: 9.5px;
@@ -611,8 +657,7 @@ body {
   color: var(--mut2);
   text-transform: uppercase;
   letter-spacing: 0.11em;
-  padding: 0 8px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -620,14 +665,21 @@ body {
 .smeta {
   font-size: 11px;
   color: var(--mut);
-  padding: 0 8px 10px;
+  padding: 0 0 10px;
   border-bottom: 1px solid var(--bdr);
   margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .sscroll {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;         /* key — never allow horizontal growth */
   padding: 4px 8px 20px;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;               /* prevents flex children from expanding this */
 }
 .sscroll::-webkit-scrollbar {
   width: 3px;
@@ -639,57 +691,56 @@ body {
 .na {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 8px 10px;
+  gap: 8px;
+  padding: 9px 8px;
   border-radius: 10px;
   cursor: pointer;
   margin-bottom: 2px;
   text-decoration: none;
-  transition:
-    background 0.15s,
-    transform 0.15s;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;           /* clip long content */
+  min-width: 0;               /* allow shrinking */
+  transition: background 0.15s, transform 0.15s;
   animation: fadeIn 0.25s ease both;
 }
 .na:hover {
   background: var(--bg);
   transform: translateX(2px);
 }
+
 .na.on {
   background: linear-gradient(135deg, var(--acc), var(--logo2));
   box-shadow: 0 3px 12px color-mix(in srgb, var(--acc) 28%, transparent);
 }
-.na.on .dot {
-  background: rgba(255, 255, 255, 0.85);
-}
-.na.on .nd {
-  color: #fff;
-  font-weight: 600;
-}
-.na.on .bdg {
-  background: rgba(255, 255, 255, 0.22);
-  color: #fff;
-  border-color: transparent;
-}
+
+.na.on .dot { background: rgba(255, 255, 255, 0.85); }
+.na.on .nd  { color: #fff; font-weight: 600; }
+.na.on .bdg { background: rgba(255,255,255,0.22); color: #fff; border-color: transparent; }
+
 .dot {
   width: 6px;
   height: 6px;
+  min-width: 6px;
   border-radius: 50%;
   background: var(--bdrs);
-  flex-shrink: 0;
-  transition: background 0.15s;
+  flex-shrink: 0;             /* never squish the dot */
 }
-.na:hover .dot {
-  background: var(--acc);
-}
+
+.na:hover .dot { background: var(--acc); }
+
 .nd {
   font-size: 12.5px;
   font-weight: 500;
   color: var(--ink2);
   flex: 1;
+  min-width: 0;               /* CRITICAL — without this flex:1 doesn't truncate */
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+  text-overflow: ellipsis;    /* long names become "Long Nam..." */
 }
+
 .bdg {
   font-size: 10px;
   font-weight: 700;
@@ -698,9 +749,61 @@ body {
   border: 1px solid var(--bdr);
   border-radius: 20px;
   padding: 1px 7px;
-  flex-shrink: 0;
-  transition: all 0.15s;
+  flex-shrink: 0;             /* badge never gets squished */
+  white-space: nowrap;
 }
+
+/* Sidebar skeleton items */
+.na-skeleton {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+  margin-bottom: 2px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.na-skeleton .sk-dot {
+  width: 6px;
+  height: 6px;
+  min-width: 6px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, var(--bdr) 25%, var(--bg) 50%, var(--bdr) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  flex-shrink: 0;
+}
+
+.na-skeleton .sk-label {
+  height: 11px;
+  border-radius: 6px;
+  flex: 1;
+  background: linear-gradient(90deg, var(--bdr) 25%, var(--bg) 50%, var(--bdr) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+.na-skeleton .sk-badge {
+  width: 22px;
+  height: 18px;
+  border-radius: 20px;
+  background: linear-gradient(90deg, var(--bdr) 25%, var(--bg) 50%, var(--bdr) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  flex-shrink: 0;
+}
+
+/* stagger the shimmer per item */
+.na-skeleton:nth-child(2) .sk-label,
+.na-skeleton:nth-child(2) .sk-dot,
+.na-skeleton:nth-child(2) .sk-badge { animation-delay: 0.1s; }
+.na-skeleton:nth-child(3) .sk-label,
+.na-skeleton:nth-child(3) .sk-dot,
+.na-skeleton:nth-child(3) .sk-badge { animation-delay: 0.2s; }
+.na-skeleton:nth-child(4) .sk-label,
+.na-skeleton:nth-child(4) .sk-dot,
+.na-skeleton:nth-child(4) .sk-badge { animation-delay: 0.3s; }
 
 /* AI Chat Mode Toggle */
 .ai-mode-toggle {

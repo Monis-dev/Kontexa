@@ -47,29 +47,56 @@ function generateNoteId(prefix = "note") {
 /* ═══════════════════════════════════════
    FOLDER DROPDOWN
 ═══════════════════════════════════════ */
+// REPLACE entire loadFolderDropdown function
 function loadFolderDropdown() {
   const select = document.getElementById("folderSelect");
   if (!select) return;
 
   chrome.storage.local.get([FOLDERS_KEY], (res) => {
-    const folders = res[FOLDERS_KEY] || [];
-    const row = document.getElementById("folderRow");
-    if (row) row.style.display = "flex";
-
-    if (folders.length === 0) {
-      chrome.storage.local.set({ [FOLDERS_KEY]: ["General Notes"] });
-      select.innerHTML = `
-        <option value="">No folder</option>
-        <option value="General Notes">General Notes</option>`;
-      return;
-    }
+    const folders = (res[FOLDERS_KEY] || []).filter(
+      (f) => f && f !== "None" && f !== "none" && f.trim() !== ""
+    );
 
     select.innerHTML =
       `<option value="">No folder</option>` +
-      folders
-        .map((f) => `<option value="${esc(f)}">${esc(f)}</option>`)
-        .join("");
+      folders.map((f) => `<option value="${esc(f)}">${esc(f)}</option>`).join("") +
+      `<option value="__CREATE_NEW__">＋ Create new folder…</option>`;
   });
+}
+
+// ADD this new helper function
+async function createFolderFromPopup() {
+  const name = prompt("New folder name:");
+  if (!name || !name.trim()) return null;
+
+  const clean = name.trim();
+  if (clean.length > 100) {
+    alert("Folder name too long (max 100 characters).");
+    return null;
+  }
+  if (clean === "None" || clean === "none") {
+    alert("Invalid folder name.");
+    return null;
+  }
+
+  const res = await chrome.storage.local.get([FOLDERS_KEY]);
+  const folders = res[FOLDERS_KEY] || [];
+
+  if (!folders.includes(clean)) {
+    folders.push(clean);
+    await chrome.storage.local.set({ [FOLDERS_KEY]: folders });
+  }
+
+  // Rebuild dropdown and select the new folder
+  loadFolderDropdown();
+
+  // Wait for dropdown to rebuild then select new folder
+  setTimeout(() => {
+    const select = document.getElementById("folderSelect");
+    if (select) select.value = clean;
+  }, 50);
+
+  return clean;
 }
 
 /* ═══════════════════════════════════════
@@ -100,6 +127,19 @@ function setupGeneralNoteToggle() {
 
   row.style.display = "flex";
   if (folderRow) folderRow.style.display = "none";
+
+  if (folderSelect) {
+    folderSelect.addEventListener("change", async () => {
+      if (folderSelect.value === "__CREATE_NEW__") {
+        const created = await createFolderFromPopup();
+        if (!created) {
+          // User cancelled — reset to no folder
+          folderSelect.value = "";
+        }
+        // If created, setTimeout in createFolderFromPopup sets the value
+      }
+    });
+  }
 
   let isGeneral = false;
 
@@ -221,10 +261,10 @@ function setupSaveButton() {
       });
     }
 
-    const noteUrl = isGeneral || finalFolder ? "folder://notes" : tab.url;
+    const noteUrl = isGeneral || finalFolder ? "general://notes" : tab.url;
     const noteDomain =
       isGeneral || finalFolder
-        ? "folder"
+        ? "general"
         : new URL(tab.url).hostname || "Unknown";
 
     const note = {
@@ -324,8 +364,8 @@ async function loadPageNotes() {
             <div class="note-actions">
               <button class="btn-edit"
                 data-id="${n.id}"
-                data-title="${esc(n.title)}"
-                data-content="${esc(n.content)}"
+                data-title="${n.title.replace(/"/g, "&quot;")}"
+                data-content="${(n.content || "").replace(/"/g, "&quot;")}"
                 title="Edit">
                 <svg viewBox="0 0 24 24" width="10" height="10" style="stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;pointer-events:none;">
                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -371,50 +411,63 @@ function setupEditDeleteHandler() {
 
     if (deleteBtn) {
       const id = deleteBtn.dataset.id;
-      let notes = await getNotes();
-      notes = notes.filter((n) => String(n.id) !== String(id));
-      cachedNotes = notes;
-      rebuildNotesCache(notes);
-      await chrome.storage.local.set({ [STORAGE_KEY]: notes });
-      loadPageNotes();
+      if (!id) return;
+
+      // Read fresh, filter, write, then force cache invalidation
+      const fresh = await getNotes();
+      const updated = fresh.filter((n) => String(n.id) !== String(id));
+
+      await chrome.storage.local.set({ [STORAGE_KEY]: updated });
+
+      // Invalidate cache AFTER storage write so loadPageNotes re-reads correctly
+      cachedNotes = updated;
+      notesByUrlCache = null;          // force full rebuild on next loadPageNotes
+      rebuildNotesCache(updated);
+      await loadPageNotes();
       return;
     }
 
     if (editBtn) {
       const id = editBtn.dataset.id;
+      if (!id) return;
 
-      // FIX: validate prompt input length before writing back to storage.
-      // Previously there was no length check — a very long title or content
-      // would be stored and then silently truncated by the backend on sync.
-      const title = prompt("Edit title:", editBtn.dataset.title);
+      const currentTitle = editBtn.dataset.title || "";
+      const currentContent = editBtn.dataset.content || "";
+
+      const title = prompt("Edit title:", currentTitle);
       if (title === null) return;
       if (title.trim().length > MAX_TITLE_LEN) {
         alert(`Title too long (max ${MAX_TITLE_LEN} characters).`);
         return;
       }
 
-      const content = prompt("Edit content:", editBtn.dataset.content);
+      const content = prompt("Edit content:", currentContent);
       if (content === null) return;
       if (content.trim().length > MAX_CONTENT_LEN) {
-        alert(
-          `Content too long (max ${MAX_CONTENT_LEN.toLocaleString()} characters).`,
-        );
+        alert(`Content too long (max ${MAX_CONTENT_LEN.toLocaleString()} characters).`);
         return;
       }
 
-      let notes = await getNotes();
-      const note = notes.find((n) => String(n.id) === String(id));
-      if (!note) return;
+      const fresh = await getNotes();
+      const note = fresh.find((n) => String(n.id) === String(id));
+      if (!note) {
+        alert("Note not found — it may have been deleted.");
+        return;
+      }
+
       note.title = title.trim() || "Untitled";
       note.content = content.trim();
-      cachedNotes = notes;
-      rebuildNotesCache(notes);
-      await chrome.storage.local.set({ [STORAGE_KEY]: notes });
-      loadPageNotes();
+      note._synced = false;            // mark for re-sync after edit
+
+      await chrome.storage.local.set({ [STORAGE_KEY]: fresh });
+
+      cachedNotes = fresh;
+      notesByUrlCache = null;
+      rebuildNotesCache(fresh);
+      await loadPageNotes();
     }
   });
 }
-
 /* ═══════════════════════════════════════
    AI: SUMMARIZE PAGE
 ═══════════════════════════════════════ */
@@ -569,25 +622,25 @@ if (aiGenerateBtn) {
       Save Selected Notes`;
     aiNotesContainer.appendChild(saveBtnEl);
 
+    // AFTER
+    // AFTER
     saveBtnEl.addEventListener("click", async () => {
       saveBtnEl.disabled = true;
       saveBtnEl.innerHTML = "Saving…";
-      const folderName = isYouTube ? "YouTube Notes" : null;
+      // No automatic folder — user decides via dashboard if they want to move it
 
       const notesToSave = generatedNotes
         .filter((_, idx) => document.getElementById(`ai-chk-${idx}`)?.checked)
-        .map((n, idx) => ({
-          // FIX: standardised ID with entropy — was Date.now()-idx which still
-          // risks collision and produces non-unique IDs across sessions.
+        .map((n) => ({
           id: generateNoteId("ai"),
-          url: tab.url,
+          url: tab.url, // keeps youtube.com URL
           domain: new URL(tab.url).hostname || "Unknown",
           title: (isYouTube ? "🎬 " : "✨ ") + (n.title || "AI Note"),
           content: n.content || "",
           tags: n.tags || [],
           selection: "",
           pinned: false,
-          folder: folderName,
+          folder: null, // never auto-assign folder
           timestamp: null,
           image_data: "",
         }));

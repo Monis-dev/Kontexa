@@ -217,7 +217,7 @@ const CN_THEME_VARS = {
 
 // --- MAIN LOGIC ---
 async function executeContextNoteFlow(tab, explicitSelection = null) {
-  const API_BASE = "https://context-notes.onrender.com";
+  const API_BASE = "https://www.kontexa.online";
 
   // 1. Check Auth
   let isPro = false;
@@ -265,10 +265,13 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
 
       if (!isProUser) media.timestamp = null;
 
-      if (!selectionText && media.timestamp) {
+      const isYouTubePage =
+        window.location.hostname.includes("youtube.com") ||
+        window.location.hostname.includes("youtu.be");
+
+      if (!selectionText && media.timestamp && isYouTubePage) {
         selectionText = `Saved at timestamp ${media.timestamp}`;
       }
-
       // ── Build dialog ──
       const dialog = document.createElement("dialog");
       dialog.id = "cn-ext-dialog";
@@ -298,14 +301,14 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
 
       // ── Meta HTML ──
       let metaHtml = "";
-      if (media.hasVideo) {
+      if (media.hasVideo && isYouTubePage) {
+        // ← only show on YouTube
         if (isProUser && media.timestamp) {
           metaHtml = `<span style="background:#eef2ff;color:#4f46e5;padding:4px 8px;border-radius:4px;font-size:12px;font-weight:bold;display:inline-flex;align-items:center;gap:4px;border:1px solid #c7d2fe;">⏱️ ${media.timestamp}</span>`;
         } else {
-          metaHtml = `<span onclick="alert('👑 Unlock YouTube Timestamps with Kontexa Pro!')" style="background:#fff1f2;color:#e11d48;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:bold;display:inline-flex;align-items:center;border:1px solid #fecdd3;cursor:pointer;">👑 Pro Timestamp</span>`;
+          metaHtml = `<span onclick="alert('Unlock YouTube Timestamps with Kontexa Pro!')" style="background:#fff1f2;color:#e11d48;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:bold;display:inline-flex;align-items:center;border:1px solid #fecdd3;cursor:pointer;">👑 Pro Timestamp</span>`;
         }
       }
-
       // ── Folder HTML ──
       const generalToggleHtml = `
         <label style="display:flex;align-items:center;gap:6px;margin-bottom:10px;font-size:12px;color:var(--mut);cursor:pointer;">
@@ -327,7 +330,7 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
           </select>
         `;
       } else if (!isProUser) {
-        folderHtml = `<div style="font-size:11px;color:var(--mut);margin-bottom:12px;text-align:right;">👑 Pro: Save to Folders</div>`;
+        folderHtml = `<div style="font-size:11px;color:var(--mut);margin-bottom:12px;text-align:right;"> Pro: Save to Folders</div>`;
       }
 
       dialog.innerHTML = `
@@ -431,14 +434,15 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
         let noteUrl;
         let noteDomain;
 
-        if (isGeneral || selectedFolder !== null) {
-          noteUrl = "folder://notes";
-          noteDomain = "folder";
+        if (isGeneral) {
+          // Only pure general notes get the generic URL
+          noteUrl = "general://notes";
+          noteDomain = "general";
         } else {
+          // Keep the real URL always — folder is metadata, not a URL replacement
           noteUrl = window.location.href;
           noteDomain = window.location.hostname;
         }
-
         chrome.runtime.sendMessage({
           action: "save_highlight_data",
           data: {
@@ -448,7 +452,8 @@ async function executeContextNoteFlow(tab, explicitSelection = null) {
             title: title,
             content: desc,
             selection: selectionText.trim(),
-            timestamp: media.timestamp,
+            timestamp:
+              isYouTubePage && media.timestamp ? media.timestamp : null,
             image_data: currentImage || null,
             pinned: false,
             folder: selectedFolder,

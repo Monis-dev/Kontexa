@@ -14,10 +14,7 @@ const MAX_TAG_LEN = 50;
 let mId = null;
 let userFolders = [];
 let sourceNames = {};
-
-// FIX: isProUserUI is never seeded from chrome.storage — only ever set from
-// a live server response in checkAuthAndSync(). This prevents any local
-// storage manipulation from bypassing the Pro paywall.
+let currentUiMode = "talk";
 let isProUserUI = false;
 
 let notesById = {};
@@ -27,23 +24,29 @@ let folderCounts = {};
 let pendingAiSaveIndex = null;
 
 // ─── Sync queue — debounced, batched ──────────────────────────────────────────
-// These constants are now actually used by the debounced sync implementation.
-const SYNC_DEBOUNCE = 4000; // ms to wait after last change before flushing
-const SYNC_MAX_INTERVAL = 30000; // flush at most once per 30 s even if quiet
-const MAX_BATCH_SIZE = 25; // notes per /api/sync request
+const SYNC_DEBOUNCE = 4000;
+const SYNC_MAX_INTERVAL = 30000;
+const MAX_BATCH_SIZE = 25;
 
-let _syncQueue = []; // accumulated pending notes
-let _syncTimer = null; // debounce timer handle
-let _lastFlush = 0; // timestamp of last actual HTTP sync
+let _syncQueue = [];
+let _syncTimer = null;
+let _lastFlush = 0;
 
-// FIX: replaces the old queueSync that fired immediately on every call.
-// Now accumulates notes and flushes after SYNC_DEBOUNCE ms of quiet,
-// or immediately if SYNC_MAX_INTERVAL has elapsed since the last flush.
+function showSidebarSkeleton() {
+  const skeletonItem = `
+    <div class="na-skeleton">
+      <div class="sk-dot"></div>
+      <div class="sk-label"></div>
+      <div class="sk-badge"></div>
+    </div>`;
+  $("snav").innerHTML = skeletonItem.repeat(4);
+  $("fnav").innerHTML = skeletonItem.repeat(2);
+}
+
 function queueSync(notes) {
-  if (!isLoggedIn || !isProUserUI) return; // FIX: guard both login AND pro
+  if (!isLoggedIn || !isProUserUI) return;
   if (!Array.isArray(notes)) notes = [notes];
 
-  // Merge into queue, deduplicating by id
   const queueMap = new Map(_syncQueue.map((n) => [n.id, n]));
   notes.forEach((n) => queueMap.set(n.id, n));
   _syncQueue = Array.from(queueMap.values());
@@ -65,7 +68,6 @@ async function _flushSync() {
   clearTimeout(_syncTimer);
   _lastFlush = Date.now();
 
-  // Drain the queue in batches
   const toSend = _syncQueue.splice(0, MAX_BATCH_SIZE);
 
   try {
@@ -84,17 +86,14 @@ async function _flushSync() {
         );
         chrome.storage.local.set({ [STORAGE_KEY]: stored });
       });
-      // If more items remain in queue, flush again after debounce
       if (_syncQueue.length) _syncTimer = setTimeout(_flushSync, SYNC_DEBOUNCE);
     }
   } catch (err) {
     console.warn("Sync flush failed:", err);
-    // Re-queue failed notes for retry
     _syncQueue = [...toSend, ..._syncQueue];
   }
 }
 
-// ─── Unique note ID generator — enough entropy to prevent collisions ──────────
 function generateNoteId(prefix = "note") {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
@@ -125,24 +124,26 @@ const toast = (m, ms = 2600) => {
   tT = setTimeout(() => t.classList.remove("on"), ms);
 };
 
+// ═══════════════════════════════════════
+//  IMAGE GUARD
+//  FIX: Notes sometimes arrive from the server with image_data = "" or a
+//  partial/broken base64 string (happens when the screenshot capture fails
+//  mid-flight in the extension). A simple truthy check renders a broken <img>.
+//  This helper rejects anything that isn't a genuine data-URL or https URL.
+// ═══════════════════════════════════════
+function hasValidImage(img) {
+  if (!img || typeof img !== "string") return false;
+  const t = img.trim();
+  if (!t) return false;
+  return t.startsWith("data:image/") || t.startsWith("https://");
+}
+
 /* ═══════════════════════════════════════
    SIDEBAR TOGGLE
 ═══════════════════════════════════════ */
 const mob = () => window.innerWidth <= 768;
-const openS = () => {
-  // $("side").classList.remove("closed");
-  // $("hbtn").classList.add("open");
-  // if (mob()) {
-  //   _ovlUsers.add("sidebar");
-  //   $("ovl").classList.add("on");
-  // }
-};
-const closeS = () => {
-  // $("side").classList.add("closed");
-  // $("hbtn").classList.remove("open");
-  // _ovlUsers.delete("sidebar");
-  // if (_ovlUsers.size === 0) $("ovl").classList.remove("on");
-};
+const openS = () => {};
+const closeS = () => {};
 
 $("side").classList.remove("closed");
 E($("ovl"), "click", () => {
@@ -302,14 +303,15 @@ function openNoteModal(noteId) {
     contentEl.style.display = "none";
   }
 
+  // FIX: use hasValidImage() instead of bare truthy check
   const imgWrap = $("vImageWrap");
-  const img = $("vImage");
-  if (n.image_data) {
-    img.src = n.image_data;
+  const imgEl = $("vImage");
+  if (hasValidImage(n.image_data)) {
+    imgEl.src = n.image_data;
     imgWrap.style.display = "block";
   } else {
     imgWrap.style.display = "none";
-    img.src = "";
+    imgEl.src = "";
   }
 
   $("viewModal").classList.add("on");
@@ -325,10 +327,8 @@ E($("viewModal"), "click", (e) => {
 ═══════════════════════════════════════ */
 function renameSource(url, currentName) {
   const newName = prompt(`Rename "${currentName}" to:`, currentName);
-  // FIX: use `clean` consistently — avoids calling .trim() on null if prompt was cancelled
   const clean = newName?.trim();
   if (!clean || clean === currentName) return;
-  // FIX: client-side length validation before sending to server
   if (clean.length > MAX_FOLDER_LEN) {
     toast(`Name too long (max ${MAX_FOLDER_LEN} characters).`);
     return;
@@ -368,18 +368,25 @@ const card = (n, dom, index = 0) => {
   const searchStr = (title + " " + body).toLowerCase();
   const pinColor = n.pinned ? "#f59e0b" : "currentColor";
   const pinFill = n.pinned ? "#f59e0b" : "none";
+  // FIX: validate before rendering — prevents broken <img> from empty/partial
+  // image_data that the extension sometimes writes when capture fails mid-flight
+  const validImg = hasValidImage(n.image_data);
 
   let contentPieces = "";
-  if (n.timestamp)
+  const isYouTube =
+    n.url && (n.url.includes("youtube.com") || n.url.includes("youtu.be"));
+  if (n.timestamp && isYouTube)
     contentPieces += `<div class="c-timestamp">⏱️ ${esc(n.timestamp)}</div>`;
   if (sel)
     contentPieces += `<div class="chi" style="white-space:pre-wrap;word-break:break-word;">"${esc(sel)}"</div>`;
   if (body)
     contentPieces += `<div class="cb" style="white-space:pre-wrap;word-break:break-word;">${esc(body)}</div>`;
-  if (!sel && !body && !n.image_data && !n.timestamp)
+  // FIX: use validImg in the "no content" fallback check too
+  if (!sel && !body && !validImg && !n.timestamp)
     contentPieces += `<div class="card-empty-hint">No description added.</div>`;
 
-  const imageHtml = n.image_data
+  // FIX: only render <img> when the data URL is actually valid
+  const imageHtml = validImg
     ? `<img class="card-img" loading="lazy" src="${n.image_data}" alt="Screenshot"/>`
     : "";
 
@@ -762,7 +769,6 @@ document.addEventListener("click", (e) => {
     const oldName = renameFolderBtn.dataset.folder;
     const newName = prompt("Rename folder:", oldName);
     if (!newName || newName.trim() === oldName) return;
-    // FIX: client-side length validation before sending
     if (newName.trim().length > MAX_FOLDER_LEN) {
       toast(`Folder name too long (max ${MAX_FOLDER_LEN} characters).`);
       return;
@@ -801,7 +807,6 @@ E($("newFolderNameInput"), "keydown", (e) => {
 E($("confirmCreateFolder"), "click", () => {
   const name = $("newFolderNameInput").value.trim();
   if (!name) return;
-  // FIX: client-side length validation
   if (name.length > MAX_FOLDER_LEN) {
     toast(`Folder name too long (max ${MAX_FOLDER_LEN} characters).`);
     return;
@@ -851,13 +856,12 @@ E($("confirmCreateFolder"), "click", () => {
 
 function saveAINote(note, folderName = null) {
   const newNote = {
-    // FIX: use standardised ID generator — no collision risk
     id: generateNoteId("ai"),
     title: note.title,
     content: note.content,
     tags: note.tags || [],
-    url: "general://notes",
-    domain: "general",
+    url: note.sourceUrl || "general://notes",
+    domain: note.sourceDomain || "general",
     folder: folderName,
     pinned: false,
     timestamp: null,
@@ -873,6 +877,12 @@ function saveAINote(note, folderName = null) {
     chrome.storage.local.set({ context_notes_data: notes }, () => {
       toast("Note saved ✓");
       loadLocalUI();
+      // FIX: sync the new AI note to server immediately after auth is confirmed.
+      // Previously this was missing entirely from saveAINote, so AI-generated
+      // notes were never pushed to the cloud and wouldn't appear in other browsers.
+      if (isLoggedIn && isProUserUI) {
+        queueSync([newNote]);
+      }
     });
   });
 }
@@ -885,11 +895,12 @@ E($("cancelMove"), "click", () => {
   mId = null;
 });
 E($("saveMove"), "click", async () => {
-  // FIX: capture mId into a local const before any async operation.
-  // Prevents the global being overwritten if the user clicks Move on another
-  // note while this save is still in-flight.
   const savedMoveId = mId;
-  const selectedFolder = $("folderSelect").value;
+  const rawSelected = $("folderSelect").value;
+  const selectedFolder =
+    !rawSelected || rawSelected === "None" || rawSelected === "none"
+      ? null
+      : rawSelected;
   const idx = allNotesFlat.findIndex((n) => n.id === savedMoveId);
   if (idx > -1) {
     allNotesFlat[idx].folder = selectedFolder || null;
@@ -926,7 +937,6 @@ E($("saveEdit"), "click", async () => {
   const titleVal = $("etitle").value.trim() || "Untitled";
   const contentVal = $("eta").value.trim();
 
-  // FIX: client-side length validation before sending
   if (titleVal.length > MAX_TITLE_LEN) {
     toast(`Title too long (max ${MAX_TITLE_LEN} characters).`);
     return;
@@ -1048,6 +1058,10 @@ E($("sc"), "click", () => {
 
 /* ═══════════════════════════════════════
    LOAD & GROUP DATA
+   FIX: Notes with a folder assignment AND a real URL (e.g. saved from a
+   webpage then moved to a folder) were only appearing in the URL group.
+   Now they are correctly added to BOTH groupedUrls AND groupedFolders so
+   the folder view is never empty when notes exist in it.
 ═══════════════════════════════════════ */
 function loadLocalUI() {
   chrome.storage.local.get([STORAGE_KEY, FOLDERS_KEY, NAMES_KEY], (res) => {
@@ -1059,7 +1073,17 @@ function loadLocalUI() {
         stored = [];
       }
     }
-    allNotesFlat = (stored || []).map((n) => ({ ...n, tags: n.tags || [] }));
+    allNotesFlat = (stored || []).map((n) => ({
+      ...n,
+      tags: n.tags || [],
+      folder:
+        !n.folder ||
+        n.folder === "None" ||
+        n.folder === "none" ||
+        n.folder.trim() === ""
+          ? null
+          : n.folder,
+    }));
     notesById = Object.fromEntries(allNotesFlat.map((n) => [n.id, n]));
     sourceNames = res[NAMES_KEY] || {};
 
@@ -1069,7 +1093,11 @@ function loadLocalUI() {
     folderCounts = {};
 
     for (const n of allNotesFlat) {
-      if (n.url !== "general://notes" && n.url !== "folder://notes") {
+      // URL groups: only real web pages, not special protocol notes
+      if (n.domain === "error" || n.folder === "error" || n.url === "error" || (n.url && n.url.startsWith("chrome-error"))) {
+          continue; 
+      }
+      if (n.url && n.url !== "general://notes" && n.url !== "folder://notes") {
         if (!notesByUrl[n.url]) notesByUrl[n.url] = [];
         notesByUrl[n.url].push(n);
         if (!groupedUrls[n.url]) {
@@ -1083,9 +1111,15 @@ function loadLocalUI() {
         }
         groupedUrls[n.url].notes.push(n);
       }
-      if (n.folder) {
-        folderCounts[n.folder] = (folderCounts[n.folder] || 0) + 1;
-        if (!groupedFolders[n.folder]) {
+
+      const safeFolder =
+        !n.folder || n.folder === "None" || n.folder === "none"
+          ? null
+          : n.folder;
+      if (safeFolder) {
+        n.folder = safeFolder; // normalize in place
+        folderCounts[safeFolder] = (folderCounts[safeFolder] || 0) + 1;
+        if (!groupedFolders[safeFolder]) {
           groupedFolders[n.folder] = {
             id: getSafeId("folder_" + n.folder),
             domain: n.folder,
@@ -1102,12 +1136,18 @@ function loadLocalUI() {
     const foldersFromNotes = allNotesFlat.map((n) => n.folder).filter(Boolean);
     userFolders = [...new Set([...persistedFolders, ...foldersFromNotes])];
     userFolders = userFolders.filter(
-      (f) => f !== "General Notes" && f.trim() !== "",
+      (f) =>
+        f !== "General Notes" &&
+        f !== "None" &&
+        f !== "none" &&
+        f.trim() !== "",
     );
 
     if (JSON.stringify(persistedFolders) !== JSON.stringify(userFolders)) {
       chrome.storage.local.set({ [FOLDERS_KEY]: userFolders });
     }
+
+    // Ensure every known folder has a group entry even if currently empty
     userFolders.forEach((f) => {
       if (!groupedFolders[f]) {
         groupedFolders[f] = {
@@ -1129,7 +1169,13 @@ function loadLocalUI() {
 }
 
 function renderFoldersSidebar() {
-  if (!isProUserUI) {
+  // FIX: show folders optimistically from local storage even before the server
+  // confirms Pro status. The paywall only blocks the create-folder action, not
+  // the display of folders that already exist.  This prevents a race where the
+  // sidebar showed "Upgrade to Pro" for several seconds in a fresh browser
+  // because isProUserUI was still false while checkAuthAndSync() was in-flight.
+  const knownFolders = userFolders.length > 0;
+  if (!isProUserUI && !knownFolders) {
     $("fnav").innerHTML =
       '<p style="padding:12px;font-size:12px;color:var(--mut)">Upgrade to Pro to create custom folders.</p>';
     return;
@@ -1199,7 +1245,7 @@ function renderNoNotesSuggestion(question, notes) {
   chatBox.insertAdjacentHTML(
     "beforeend",
     `<div class="chat-msg chat-ai" style="padding:0;background:none;border:none;box-shadow:none;">
-      <div style="font-size:12px;color:var(--mut);margin-bottom:10px;padding:0 2px;">⚠️ You have no notes on this topic. Here are some suggested notes you can save:</div>
+      <div style="font-size:12px;color:var(--mut);margin-bottom:10px;padding:0 2px;"> You have no notes on this topic. Here are some suggested notes you can save:</div>
       <div style="display:flex;flex-direction:column;gap:10px;">${cardsHtml}</div>
     </div>`,
   );
@@ -1240,10 +1286,9 @@ E($("paywallLogoutBtn"), "click", async () => {
   $("uStatus").textContent = "Local Mode Only";
   const logoutBtnEl = $("logoutBtn");
   if (logoutBtnEl) {
-    logoutBtnEl.outerHTML = `<div class="sitem" id="loginBtn">🔑 Sync via Google</div>`;
+    logoutBtnEl.outerHTML = `<div class="sitem" id="loginBtn">Sync via Google</div>`;
     E($("loginBtn"), "click", () => {
       $("synmenu").classList.remove("on");
-      $("proceedLoginBtn").style.display = "block";
       $("guideModal").classList.add("on");
     });
   }
@@ -1274,8 +1319,6 @@ async function checkAuthAndSync() {
     if (res.ok) {
       const user = await res.json();
       isLoggedIn = true;
-      // FIX: isProUserUI is ONLY set here from a live server response.
-      // It is never read from chrome.storage, preventing local spoofing.
       isProUserUI = user.is_pro;
 
       // First 100 users celebration
@@ -1295,7 +1338,7 @@ async function checkAuthAndSync() {
                   const pill = document.createElement("div");
                   pill.className = "cn-celebrate-pill";
                   pill.innerHTML = `
-              <div class="cn-pill-icon">🎉</div>
+              <div class="cn-pill-icon"></div>
               <div class="cn-pill-text">
                 <span class="cn-pill-main">You're a founding member!</span>
                 <span class="cn-pill-sub">First 100 users get Pro free forever 🚀</span>
@@ -1326,7 +1369,7 @@ async function checkAuthAndSync() {
       );
       chrome.storage.local.set({ [PRO_CACHE_KEY]: user.is_pro });
 
-      if (user.is_pro && !wasPro) {
+      if (user.is_pro && wasPro == false) {
         launchProCelebration();
         return;
       }
@@ -1334,6 +1377,10 @@ async function checkAuthAndSync() {
         $("createFolderBtn").style.display = "flex";
         $("proBadge").style.display = "inline";
         $("feedbackSection").style.display = "block";
+        // FIX: re-render the sidebar now that we know the user is Pro —
+        // the initial loadLocalUI() call in window.onload ran before
+        // isProUserUI was set, so the sidebar may have shown the upgrade prompt.
+        renderFoldersSidebar();
       }
 
       const planName = user.is_pro ? "Pro Plan" : "Free Plan";
@@ -1345,6 +1392,13 @@ async function checkAuthAndSync() {
           `<div class="sitem danger" id="logoutBtn">🚪 Logout</div>`;
 
       if (!user.is_pro) {
+        chrome.storage.local.get(["cn_guide_shown"], (r) => {
+          if (!r.cn_guide_shown) {
+            chrome.storage.local.set({ cn_guide_shown: true });
+            $("proceedLoginBtn").style.display = "none";
+            $("guideModal").classList.add("on");
+          }
+        });
         $("paywallModal")?.classList.add("on");
         loadLocalUI();
         return;
@@ -1398,6 +1452,7 @@ async function checkAuthAndSync() {
           let flattenedCloudNotes = [];
           cloudData.forEach((site) =>
             site.notes.forEach((n) => {
+              const rawFolder = n.folder || localForFolderLookup[n.id] || null;
               flattenedCloudNotes.push({
                 id: n.id,
                 url: site.url,
@@ -1408,7 +1463,13 @@ async function checkAuthAndSync() {
                 pinned: n.pinned,
                 timestamp: n.timestamp,
                 image_data: n.image_data,
-                folder: n.folder || localForFolderLookup[n.id] || null,
+                folder:
+                  !rawFolder ||
+                  rawFolder === "None" ||
+                  rawFolder === "none" ||
+                  rawFolder.trim() === ""
+                    ? null
+                    : rawFolder,
                 deleted: n.deleted || false,
                 _synced: true,
               });
@@ -1461,9 +1522,6 @@ E($("loginBtn"), "click", () => {
   $("synmenu").classList.remove("on");
   $("loginModal").classList.add("on");
 });
-// FIX: Only ONE focus listener — the duplicate at the bottom of the original
-// file has been removed. Both shared the same lastAuthCheck guard anyway,
-// making the second one a no-op while risking a future double-registration.
 let lastAuthCheck = 0;
 window.addEventListener("focus", () => {
   const now = Date.now();
@@ -1475,10 +1533,8 @@ window.addEventListener("focus", () => {
 
 window.onload = () => {
   if (!mob()) openS();
-  // FIX: Do NOT seed isProUserUI from chrome.storage here.
-  // Just load the local UI immediately for responsiveness,
-  // then let checkAuthAndSync() set isProUserUI from the server.
-  loadLocalUI();
+  showSidebarSkeleton();
+  cleanupNoneFolders(); 
   checkAuthAndSync();
 };
 
@@ -1518,7 +1574,6 @@ async function saveNewNote() {
     setTimeout(() => ($("anTitle").style.borderColor = ""), 1200);
     return;
   }
-  // FIX: client-side length validation
   if (titleVal.length > MAX_TITLE_LEN) {
     toast(`Title too long (max ${MAX_TITLE_LEN} characters).`);
     return;
@@ -1534,7 +1589,6 @@ async function saveNewNote() {
   const isGeneralNote = context.type === "folder";
 
   const newNote = {
-    // FIX: standardised ID with entropy
     id: generateNoteId("dash"),
     title: titleVal,
     content: contentVal,
@@ -1577,7 +1631,6 @@ async function saveNewNote() {
       toast("Note added ✓");
       if (context.type === "page") openSpecificPage(newNote.url);
       else openSpecificFolder(context.folderName);
-      // FIX: guard both login AND pro before syncing
       if (isLoggedIn && isProUserUI) {
         queueSync([newNote]);
       }
@@ -1765,8 +1818,6 @@ function openSpecificFolder(folderName) {
 
 /* ═══════════════════════════════════════
    MARKDOWN RENDERER (for AI chat)
-   IMPORTANT: HTML-encode FIRST, then add markup tags.
-   Never reverse this order — doing so would create an XSS vector.
 ═══════════════════════════════════════ */
 function renderMarkdown(text) {
   return text
@@ -1818,81 +1869,76 @@ function renderMarkdown(text) {
    AI CHAT
 ═══════════════════════════════════════ */
 let aiMode = "talk";
-
-document.addEventListener("DOMContentLoaded", () => {
-  const aiBtn = $("aiBtn");
-  const closeAiBtn = $("closeAiBtn");
-
-  if (aiBtn) {
-    aiBtn.addEventListener("click", () => {
-      $("aiChatBox").innerHTML =
-        '<div class="chat-msg chat-ai">Ask me anything about your saved notes.</div>';
-      $("aiModal").dataset.context = JSON.stringify(allNotesFlat || []);
-      $("aiModal").classList.add("on");
-    });
-  }
-  if (closeAiBtn) {
-    closeAiBtn.addEventListener("click", () =>
-      $("aiModal").classList.remove("on"),
-    );
-  }
-
-  const btnTalk = $("modeTalk");
-  const btnResearch = $("modeResearch");
-
-  if (btnTalk && btnResearch) {
-    btnTalk.addEventListener("click", () => {
-      aiMode = "talk";
-      btnTalk.style.cssText =
-        "flex:1;padding:8px;border-radius:6px;cursor:pointer;font-weight:600;border:1px solid var(--acc);background:var(--acc-bg);color:var(--acc);";
-      btnResearch.style.cssText =
-        "flex:1;padding:8px;border-radius:6px;cursor:pointer;font-weight:500;border:1px solid transparent;background:transparent;color:var(--mut);";
-      const chatBox = $("aiChatBox");
-      if (chatBox.children.length <= 1)
-        chatBox.innerHTML =
-          '<div class="chat-msg chat-ai">Ask me anything about your saved notes.</div>';
-      else {
-        chatBox.insertAdjacentHTML(
-          "beforeend",
-          `<div class="chat-msg chat-ai" style="font-size:12px;opacity:0.8;padding:8px;"><em>Switched to <strong>🧠 Talk Mode</strong>. Now searching saved notes.</em></div>`,
-        );
-        chatBox.scrollTop = chatBox.scrollHeight;
-      }
-    });
-
-    btnResearch.addEventListener("click", () => {
-      aiMode = "research";
-      btnResearch.style.cssText =
-        "flex:1;padding:8px;border-radius:6px;cursor:pointer;font-weight:600;border:1px solid var(--acc);background:var(--acc-bg);color:var(--acc);";
-      btnTalk.style.cssText =
-        "flex:1;padding:8px;border-radius:6px;cursor:pointer;font-weight:500;border:1px solid transparent;background:transparent;color:var(--mut);";
-      const chatBox = $("aiChatBox");
-      if (chatBox.children.length <= 1)
-        chatBox.innerHTML =
-          '<div class="chat-msg chat-ai">Enter a topic to generate new research notes.</div>';
-      else {
-        chatBox.insertAdjacentHTML(
-          "beforeend",
-          `<div class="chat-msg chat-ai" style="font-size:12px;opacity:0.8;padding:8px;"><em>Switched to <strong>🔬 Research Mode</strong>. Asking the AI directly.</em></div>`,
-        );
-        chatBox.scrollTop = chatBox.scrollHeight;
-      }
-    });
-  }
-});
-
 let isAiProcessing = false;
+
+const aiBtn = $("aiBtn");
+const closeAiBtn = $("closeAiBtn");
+const btnTalk = $("modeTalk");
+const btnResearch = $("modeResearch");
+
+if (aiBtn) {
+  aiBtn.onclick = () => {
+    $("aiChatBox").innerHTML =
+      '<div class="chat-msg chat-ai">Ask me anything about your saved notes.</div>';
+    $("aiModal").dataset.context = JSON.stringify(allNotesFlat || []);
+    $("aiModal").classList.add("on");
+
+    aiMode = "talk";
+    if (btnTalk && btnResearch) {
+      btnTalk.style.cssText =
+        "flex:1;padding:8px;border-radius:6px;cursor:pointer;font-weight:600;border:1px solid var(--acc);background:var(--acc-bg);color:var(--acc);";
+      btnResearch.style.cssText =
+        "flex:1;padding:8px;border-radius:6px;cursor:pointer;font-weight:500;border:1px solid transparent;background:transparent;color:var(--mut);";
+    }
+  };
+}
+
+if (closeAiBtn) {
+  closeAiBtn.onclick = () => $("aiModal").classList.remove("on");
+}
+
+if (btnTalk && btnResearch) {
+  btnTalk.onclick = () => {
+    aiMode = "talk";
+    btnTalk.style.cssText =
+      "flex:1;padding:8px;border-radius:6px;cursor:pointer;font-weight:600;border:1px solid var(--acc);background:var(--acc-bg);color:var(--acc);";
+    btnResearch.style.cssText =
+      "flex:1;padding:8px;border-radius:6px;cursor:pointer;font-weight:500;border:1px solid transparent;background:transparent;color:var(--mut);";
+    $("aiChatBox").insertAdjacentHTML(
+      "beforeend",
+      `<div class="chat-msg chat-ai" style="font-size:12px;opacity:0.8;padding:8px;"><em>Switched to <strong>Talk Mode</strong>. Searching saved notes.</em></div>`,
+    );
+    $("aiChatBox").scrollTop = $("aiChatBox").scrollHeight;
+  };
+
+  btnResearch.onclick = () => {
+    aiMode = "research";
+    btnResearch.style.cssText =
+      "flex:1;padding:8px;border-radius:6px;cursor:pointer;font-weight:600;border:1px solid var(--acc);background:var(--acc-bg);color:var(--acc);";
+    btnTalk.style.cssText =
+      "flex:1;padding:8px;border-radius:6px;cursor:pointer;font-weight:500;border:1px solid transparent;background:transparent;color:var(--mut);";
+    $("aiChatBox").insertAdjacentHTML(
+      "beforeend",
+      `<div class="chat-msg chat-ai" style="font-size:12px;opacity:0.8;padding:8px;"><em>Switched to <strong>Research Mode</strong>. Asking AI directly.</em></div>`,
+    );
+    $("aiChatBox").scrollTop = $("aiChatBox").scrollHeight;
+  };
+}
+
 async function handleAiSubmit() {
   if (isAiProcessing) return;
+
   const input = $("aiInput");
   const sendBtn = $("aiSendBtn");
   const chatBox = $("aiChatBox");
   const q = input.value.trim();
+
   if (!q || q === "Thinking..." || q === "Checking permissions...") return;
 
   isAiProcessing = true;
   sendBtn.disabled = true;
   input.disabled = true;
+
   const tempMsgId = "msg-" + Date.now();
   chatBox.insertAdjacentHTML(
     "beforeend",
@@ -1910,158 +1956,63 @@ async function handleAiSubmit() {
     isAiProcessing = false;
     return;
   }
+
   input.value = "Thinking...";
 
   try {
     if (aiMode === "research") {
       chatBox.insertAdjacentHTML(
         "beforeend",
-        `<div class="chat-msg chat-ai">Generating research notes…</div>`,
+        `<div class="chat-msg chat-ai" id="ai-loading">Generating research notes…</div>`,
       );
       chatBox.scrollTop = chatBox.scrollHeight;
-      try {
-        const suggestions = await AIService.generateNotesFromQuestion(q);
-        chatBox.lastElementChild.remove(); // remove "Generating suggestions…" bubble
-        renderNoNotesSuggestion(q, suggestions);
-      } catch (e) {
-        chatBox.lastElementChild.remove();
-        const isKeyMissing = e?.message === "API_KEY_MISSING";
-        const isUnavailable = e?.message === "GEMINI_UNAVAILABLE";
+
+      const suggestions = await AIService.generateNotesFromQuestion(q);
+      document.getElementById("ai-loading")?.remove();
+      renderNoNotesSuggestion(q, suggestions);
+    } else {
+      const contextNotes = allNotesFlat || [];
+      const filteredNotes = smartFilterNotes(contextNotes, q);
+
+      if (!Array.isArray(filteredNotes) || filteredNotes.length === 0) {
         chatBox.insertAdjacentHTML(
           "beforeend",
-          isKeyMissing
-            ? `...api key message...`
-            : isUnavailable
-              ? `<div class="chat-msg chat-ai">Gemini is temporarily overloaded. Wait a few seconds and try again.</div>`
-              : `<div class="chat-msg chat-ai">Error: Could not connect to AI.</div>`
-                ? `<div class="chat-msg chat-ai" style="display:flex;flex-direction:column;gap:10px;">
-          <div<strong>No Gemini API key found.</strong></div>
-          <div style="font-size:12px;color:var(--mut,#64748b);line-height:1.6;">
-            Get a free key at 
-            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener"
-               style="color:var(--acc,#3b82f6);">aistudio.google.com</a>, 
-            then add it via <strong>Settings → API Key</strong>.
-          </div>
-          <button
-            onclick="document.getElementById('apiSettingsBtn')?.click()"
-            style="align-self:flex-start;font-size:12px;font-weight:500;padding:6px 14px;
-                   border-radius:8px;border:1px solid var(--acc,#3b82f6);
-                   background:var(--acc,#3b82f6);color:#fff;cursor:pointer;">
-            Open API Key Settings
-          </button>
-        </div>`
-                : `<div class="chat-msg chat-ai">Could not generate suggestions. Try again.</div>`,
+          `<div class="chat-msg chat-ai">No saved notes found. Try Research Mode.</div>`,
+        );
+      } else {
+        const result = await AIService.chat(q, filteredNotes);
+        const aiAnswer = result?.answer || "No answer received.";
+        chatBox.insertAdjacentHTML(
+          "beforeend",
+          `<div class="chat-msg chat-ai" style="line-height:1.6">${renderMarkdown(aiAnswer)}</div>`,
         );
       }
-      input.value = "";
-      input.disabled = false;
-      sendBtn.disabled = false;
-      isAiProcessing = false;
-      chatBox.scrollTop = chatBox.scrollHeight;
-      setTimeout(() => input.focus(), 10);
-      return;
     }
-
-    const contextNotes = allNotesFlat || [];
-    const domain = detectDomain(q);
-    let scopedNotes = contextNotes;
-    if (domain) {
-      const domainFiltered = contextNotes.filter((n) =>
-        (n.tags || []).some((tag) => tag.includes(domain)),
-      );
-      if (domainFiltered.length > 0) scopedNotes = domainFiltered;
-    }
-    const filteredNotes = smartFilterNotes(scopedNotes, q);
-
-    if (!Array.isArray(filteredNotes) || filteredNotes.length === 0) {
-      chatBox.insertAdjacentHTML(
-        "beforeend",
-        `<div class="chat-msg chat-ai">No saved notes found. Try Research Mode.</div>`,
-      );
-      chatBox.scrollTop = chatBox.scrollHeight;
-      input.value = "";
-      input.disabled = false;
-      sendBtn.disabled = false;
-      isAiProcessing = false;
-      setTimeout(() => input.focus(), 10);
-      return;
-    }
-
-    const result = await AIService.chat(q, filteredNotes);
-    const aiAnswer = result?.answer || "No answer received.";
-    const aiTags = result?.tags || {};
-
-    const res = await new Promise((resolve) =>
-      chrome.storage.local.get("context_notes_data", resolve),
-    );
-    let allNotes = res.context_notes_data || [];
-    const updated = allNotes.map((note) => {
-      const alreadyHasTags = Array.isArray(note.tags) && note.tags.length > 0;
-      if (alreadyHasTags) return note; // ← never touch notes that already have tags
-
-      const newTags = aiTags[note.id];
-      if (newTags && newTags.length > 0) {
-        return { ...note, tags: newTags };
-      }
-      return note;
-    });
-    await new Promise((resolve) =>
-      chrome.storage.local.set({ context_notes_data: updated }, resolve),
-    );
-
-    const tagUpdates = Object.entries(aiTags)
-      .filter(([, tags]) => tags?.length > 0)
-      .map(([id, tags]) => ({ id, tags }));
-    if (tagUpdates.length > 0 && isLoggedIn && isProUserUI) {
-      try {
-        // FIX: updated endpoint from /api/notes/tags → /api/notes/batch-tags
-        await fetch(`${API_BASE}/api/notes/tags`, {
-          method: "PUT",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(tagUpdates),
-        });
-      } catch (e) {
-        console.warn("Tag sync failed", e);
-      }
-    }
-
-    chatBox.insertAdjacentHTML(
-      "beforeend",
-      `<div class="chat-msg chat-ai" style="line-height:1.6">${renderMarkdown(aiAnswer)}</div>`,
-    );
   } catch (e) {
-    const isKeyMissing = e?.message === "API_KEY_MISSING";
+    document.getElementById("ai-loading")?.remove();
+    let message = "⚠️ Error: Could not connect to AI.";
+
+    if (e.message === "API_KEY_MISSING")
+      message = `<div><strong>No Gemini API key found.</strong></div> Check your API Key settings.`;
+    else if (e.message === "RATE_LIMIT_EXCEEDED")
+      message = `<strong>Rate limit hit.</strong> Wait 60 seconds and try again.`;
+    else if (e.message === "GEMINI_UNAVAILABLE")
+      message = `<strong>Gemini is overloaded.</strong> The servers are busy. Wait a few seconds and try again.`;
+    else if (e.message === "API_KEY_INVALID")
+      message = `<strong>Invalid API Key.</strong> Check your key in Settings.`;
+
     chatBox.insertAdjacentHTML(
       "beforeend",
-      isKeyMissing
-        ? `<div class="chat-msg chat-ai" style="display:flex;flex-direction:column;gap:10px;">
-          <div>⚠️ <strong>No Gemini API key found.</strong> The AI features require your own Gemini key.</div>
-          <div style="font-size:12px;color:var(--mut,#64748b);line-height:1.6;">
-            1. Get a free key at 
-            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener"
-               style="color:var(--acc,#3b82f6);">aistudio.google.com</a><br>
-            2. Open <strong>Settings → API Key</strong> in the extension<br>
-            3. Paste your key and save
-          </div>
-          <button
-            onclick="document.getElementById('apiSettingsBtn')?.click()"
-            style="align-self:flex-start;font-size:12px;font-weight:500;padding:6px 14px;
-                   border-radius:8px;border:1px solid var(--acc,#3b82f6);
-                   background:var(--acc,#3b82f6);color:#fff;cursor:pointer;">
-            Open API Key Settings
-          </button>
-        </div>`
-        : `<div class="chat-msg chat-ai">⚠️ Error: Could not connect to AI. Check your internet connection and API key.</div>`,
+      `<div class="chat-msg chat-ai">${message}</div>`,
     );
+  } finally {
+    input.value = "";
+    input.disabled = false;
+    sendBtn.disabled = false;
+    isAiProcessing = false;
+    chatBox.scrollTop = chatBox.scrollHeight;
+    setTimeout(() => input.focus(), 10);
   }
-
-  input.value = "";
-  input.disabled = false;
-  sendBtn.disabled = false;
-  isAiProcessing = false;
-  chatBox.scrollTop = chatBox.scrollHeight;
-  setTimeout(() => input.focus(), 10);
 }
 
 E($("aiSendBtn"), "click", handleAiSubmit);
@@ -2162,25 +2113,18 @@ window.addEventListener("load", function () {
 
 /* ═══════════════════════════════════════
    SERVER HEALTH CHECK
-   FIX: /wakeUp typo corrected to /weakUp (matching the backend route).
-   FIX: Only shows maintenance modal on confirmed server error (non-transient),
-        not on simple network failures which are just cold-start timeouts.
 ═══════════════════════════════════════ */
 (async function checkServerHealth() {
-  // Only worth checking for logged-in Pro users
   if (!isLoggedIn || !isProUserUI) return;
   try {
     const res = await fetch(`${API_BASE}/weakUp`, {
-      // FIX: was /wakeUp
       method: "GET",
       credentials: "include",
     });
-    // Only show modal on a real server error (5xx), not a network timeout
     if (res.status >= 500) {
       document.getElementById("maintenanceModal").classList.add("on");
     }
   } catch (e) {
-    // Network error = cold start or offline. Do not show maintenance modal.
     console.warn("Health check failed (likely cold start):", e.message);
   }
 })();
@@ -2358,7 +2302,6 @@ E($("syncNowBtn"), "click", async () => {
       desc.textContent = "Everything is up to date";
       toast("Already in sync ✓");
     } else {
-      // Force immediate flush rather than going through the debounce queue
       _syncQueue = [...unsynced, ..._syncQueue];
       await _flushSync();
       desc.textContent = `Synced ${unsynced.length} note${unsynced.length !== 1 ? "s" : ""} ✓`;
@@ -2381,171 +2324,231 @@ E($("pwaLinkBtn"), "click", () => {
   window.open(`${API_BASE}`, "_blank");
 });
 
-
 E($("manageSubBtn"), "click", () => {
   if (!isLoggedIn) {
-    // If they aren't logged in, show the login guide
     $("proceedLoginBtn").style.display = "block";
     $("guideModal").classList.add("on");
     closeSettingsPanel();
     return;
   }
-
-  // Open the pricing page
   window.open(`${API_BASE}/pricing`, "_blank");
   closeSettingsPanel();
 });
-
 
 /* ═══════════════════════════════════════
    GUIDE MODAL — lazy video slider
 ═══════════════════════════════════════ */
 (function () {
-  // ── Video sources: swap in your real URLs ──────────────────────────────────
+  // 1. REPLACE THESE WITH YOUR SUPABASE PUBLIC URLS
   const GUIDE_VIDEOS = [
     {
-      src: chrome.runtime.getURL("dashboard/guide/Highlight-save.mp4"),
+      src: "https://jjxbgapyvewdnkrwtper.supabase.co/storage/v1/object/sign/Video_files/Highlight-save.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8zZWEwZWYwNy00MjQ5LTQ4OTQtYTdhYi0xM2I5M2UwNzM2NWUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJWaWRlb19maWxlcy9IaWdobGlnaHQtc2F2ZS5tcDQiLCJpYXQiOjE3NzY3NjA2NDUsImV4cCI6ODgxNzY2NzQyNDV9.TAFO2YDAZBdbwq0aNUB1jWs_xpe6eI5fwG5W94f_atY",
       poster: "",
     },
     {
-      src: chrome.runtime.getURL("dashboard/guide/dashboard-open.mp4"),
+      src: "https://jjxbgapyvewdnkrwtper.supabase.co/storage/v1/object/sign/Video_files/dashboard-open.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8zZWEwZWYwNy00MjQ5LTQ4OTQtYTdhYi0xM2I5M2UwNzM2NWUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJWaWRlb19maWxlcy9kYXNoYm9hcmQtb3Blbi5tcDQiLCJpYXQiOjE3NzY3NjA3NjEsImV4cCI6ODgxNzY2NzQzNjF9.GEp2fvpN0sV3Zbv_COWnFfVnfW5n7_myNAMDTxAvFCQ",
       poster: "",
     },
     {
-      src: chrome.runtime.getURL("dashboard/guide/Video-Stamp.mp4"),
+      src: "https://jjxbgapyvewdnkrwtper.supabase.co/storage/v1/object/sign/Video_files/Video-Stamp.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8zZWEwZWYwNy00MjQ5LTQ4OTQtYTdhYi0xM2I5M2UwNzM2NWUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJWaWRlb19maWxlcy9WaWRlby1TdGFtcC5tcDQiLCJpYXQiOjE3NzY3NjA0NDcsImV4cCI6ODgxNzY2NzQwNDd9.pyELqluFShwlyWxWctLqBrn7AIGgNogjEmeCgBD0NsI",
       poster: "",
     },
   ];
+
   let currentSlide = 0;
   const totalSlides = GUIDE_VIDEOS.length;
-  let videosLoaded = [false, false];
+  let videosLoaded = Array(totalSlides).fill(false);
+  let isFetching = Array(totalSlides).fill(false); // Prevents double-downloading if user swipes fast
 
-  function getSlides()    { return document.querySelectorAll(".guide-slide"); }
-  function getDots()      { return document.querySelectorAll(".guide-dot"); }
-  function getVideos()    { return document.querySelectorAll(".guide-slide video"); }
-  function getSlideEl(i) { return getSlides()[i]; }
+  function getSlides() {
+    return document.querySelectorAll(".guide-slide");
+  }
+  function getDots() {
+    return document.querySelectorAll(".guide-dot");
+  }
+  function getVideos() {
+    return document.querySelectorAll(".guide-slide video");
+  }
+  function getSlideEl(i) {
+    return getSlides()[i];
+  }
 
-  // Inject a <video> into slide i the first time it becomes visible
-  function loadVideoForSlide(i) {
-    if (videosLoaded[i]) return;
-    videosLoaded[i] = true;
+  // --- THE MAGIC: CACHE API ---
+  // This downloads the video from Supabase ONCE and saves it locally forever
+  async function getCachedVideoUrl(url) {
+    const cacheName = "extension-guide-videos-v1";
+    const cache = await caches.open(cacheName);
 
-    const placeholder = getSlideEl(i)?.querySelector(".guide-video-placeholder");
+    // 1. Check if we already downloaded it
+    let response = await cache.match(url);
+
+    // 2. If not, download it from Supabase and save it to Cache
+    if (!response) {
+      console.log("Downloading video from Supabase...");
+      response = await fetch(url);
+      if (response.ok) {
+        await cache.put(url, response.clone());
+      } else {
+        throw new Error("Failed to fetch video");
+      }
+    } else {
+      console.log("Loaded video from Local Cache!");
+    }
+
+    // 3. Convert the downloaded file into a local Object URL for the <video> tag
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
+  }
+
+  async function loadVideoForSlide(i) {
+    if (videosLoaded[i] || isFetching[i]) return;
+    isFetching[i] = true;
+
+    const placeholder = getSlideEl(i)?.querySelector(
+      ".guide-video-placeholder",
+    );
     if (!placeholder) return;
 
     const cfg = GUIDE_VIDEOS[i];
-    const vid = document.createElement("video");
-    vid.src        = cfg.src;
-    vid.loop       = true;
-    vid.muted      = true;
-    vid.autoplay   = false;
-    vid.playsinline = true;
-    vid.controls   = false;
-    if (cfg.poster) vid.poster = cfg.poster;
-    vid.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;";
 
-    // Remove the play-icon placeholder, insert video
-    placeholder.replaceWith(vid);
+    try {
+      // Fetch from Supabase or Local Cache
+      const localUrl = await getCachedVideoUrl(cfg.src);
+
+      const vid = document.createElement("video");
+      vid.src = localUrl; // Use the local cached blob URL
+      vid.loop = true;
+      vid.muted = true;
+      vid.autoplay = false;
+      vid.playsinline = true;
+      vid.controls = false;
+      if (cfg.poster) vid.poster = cfg.poster;
+      vid.style.cssText =
+        "width:100%;height:100%;object-fit:cover;display:block;";
+
+      placeholder.replaceWith(vid);
+      videosLoaded[i] = true;
+
+      // If this is the currently active slide, play it once loaded
+      if (currentSlide === i) {
+        vid.play().catch(() => {});
+      }
+    } catch (err) {
+      console.error("Error loading video:", err);
+      // Optional: Add a fallback UI here if the user has no internet on first load
+    } finally {
+      isFetching[i] = false;
+    }
   }
 
   function goToSlide(i) {
-    // Pause video leaving
     const leaving = getSlideEl(currentSlide)?.querySelector("video");
     if (leaving) leaving.pause();
 
     currentSlide = i;
-
-    // Slide the wrapper
     const slidesEl = document.getElementById("guideSlides");
     if (slidesEl) slidesEl.style.transform = `translateX(-${i * 100}%)`;
 
-    // Dots
     getDots().forEach((d) => {
       const isActive = parseInt(d.dataset.dot) === i;
-      d.style.background = isActive ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.35)";
+      d.style.background = isActive
+        ? "rgba(255,255,255,0.9)"
+        : "rgba(255,255,255,0.35)";
     });
 
-    // Arrows
     const prev = document.getElementById("guidePrev");
     const next = document.getElementById("guideNext");
-    if (prev) { prev.style.opacity = i === 0 ? "0" : "1"; prev.style.pointerEvents = i === 0 ? "none" : "auto"; }
-    if (next) { next.style.opacity = i === totalSlides - 1 ? "0" : "1"; next.style.pointerEvents = i === totalSlides - 1 ? "none" : "auto"; }
+    if (prev) {
+      prev.style.opacity = i === 0 ? "0" : "1";
+      prev.style.pointerEvents = i === 0 ? "none" : "auto";
+    }
+    if (next) {
+      next.style.opacity = i === totalSlides - 1 ? "0" : "1";
+      next.style.pointerEvents = i === totalSlides - 1 ? "none" : "auto";
+    }
 
-    // Lazy-load and play
+    // Attempt to load/play
     loadVideoForSlide(i);
     const arriving = getSlideEl(i)?.querySelector("video");
     if (arriving) arriving.play().catch(() => {});
   }
 
-  // Open: load + play slide 0, reset to start
   function onGuideOpen() {
     goToSlide(0);
   }
 
-  // Close: pause all videos
   function onGuideClose() {
     getVideos().forEach((v) => v.pause());
   }
 
-  // Wire up existing close button + overlay click (supplement existing listeners)
+  // Event Listeners
   const closeBtn = document.getElementById("closeGuideBtn");
   if (closeBtn) closeBtn.addEventListener("click", onGuideClose);
-
   const overlay = document.getElementById("guideModal");
   if (overlay) {
     overlay.addEventListener("click", (e) => {
       if (e.target === overlay) onGuideClose();
     });
   }
-
-  // Intercept the infoBtn click to also trigger onGuideOpen
   const infoBtn = document.getElementById("infoBtn");
   if (infoBtn) {
     infoBtn.addEventListener("click", onGuideOpen);
   }
-  // Also hook proceedLoginBtn open path (the guide can open from paywall flow too)
   const proceedBtn = document.getElementById("proceedLoginBtn");
   if (proceedBtn) {
     proceedBtn.addEventListener("click", onGuideClose);
   }
 
-  // Prev / Next buttons
   document.getElementById("guidePrev")?.addEventListener("click", () => {
     if (currentSlide > 0) goToSlide(currentSlide - 1);
   });
   document.getElementById("guideNext")?.addEventListener("click", () => {
     if (currentSlide < totalSlides - 1) goToSlide(currentSlide + 1);
   });
-
-  // Dot clicks
   document.querySelectorAll(".guide-dot").forEach((dot) => {
     dot.addEventListener("click", () => goToSlide(parseInt(dot.dataset.dot)));
   });
 
-  // Touch swipe support
   let touchStartX = 0;
   const sliderEl = document.getElementById("guideSlider");
   if (sliderEl) {
-    sliderEl.addEventListener("touchstart", (e) => { touchStartX = e.touches[0].clientX; }, { passive: true });
-    sliderEl.addEventListener("touchend", (e) => {
-      const diff = touchStartX - e.changedTouches[0].clientX;
-      if (Math.abs(diff) > 40) {
-        if (diff > 0 && currentSlide < totalSlides - 1) goToSlide(currentSlide + 1);
-        if (diff < 0 && currentSlide > 0) goToSlide(currentSlide - 1);
-      }
-    }, { passive: true });
+    sliderEl.addEventListener(
+      "touchstart",
+      (e) => {
+        touchStartX = e.touches[0].clientX;
+      },
+      { passive: true },
+    );
+    sliderEl.addEventListener(
+      "touchend",
+      (e) => {
+        const diff = touchStartX - e.changedTouches[0].clientX;
+        if (Math.abs(diff) > 40) {
+          if (diff > 0 && currentSlide < totalSlides - 1)
+            goToSlide(currentSlide + 1);
+          if (diff < 0 && currentSlide > 0) goToSlide(currentSlide - 1);
+        }
+      },
+      { passive: true },
+    );
   }
 })();
 
-E($("manageSubBtn"), "click", () => {
-  if (!isLoggedIn) {
-    // If they aren't logged in, show the login prompt
-    $("loginModal").classList.add("on");
-    closeSettingsPanel();
-    return;
-  }
-
-  // Open the pricing page
-  window.open(`${API_BASE}/pricing`, "_blank");
-  closeSettingsPanel();
-});
+// Add this function near the top of dashboard.js
+function cleanupNoneFolders() {
+  chrome.storage.local.get([STORAGE_KEY], (res) => {
+    let stored = res[STORAGE_KEY] || [];
+    let changed = false;
+    stored = stored.map((n) => {
+      if (n.folder === "None" || n.folder === "none" || n.folder === "") {
+        changed = true;
+        return { ...n, folder: null };
+      }
+      return n;
+    });
+    if (changed) {
+      chrome.storage.local.set({ [STORAGE_KEY]: stored });
+      toast("Cleaned up folder assignments ✓");
+    }
+  });
+}
