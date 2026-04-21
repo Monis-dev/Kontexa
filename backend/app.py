@@ -427,7 +427,11 @@ def authorize():
         if user.is_pro:
             try:
                 # Render the HTML file into a string variable
-                email_html = render_template('welcome_pro_email.html', email=user_info['email'])
+                email_html = render_template(
+                    'welcome_pro_email.html', 
+                    email=user_info['email'],
+                    logo_url=url_for('static', filename='images/logo.png', _external=True)
+                )
                 
                 resend.Emails.send({
                     "from": FROM_EMAIL,
