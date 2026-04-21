@@ -401,11 +401,11 @@ def authorize():
     user_info = token.get('userinfo')
     user = User.query.filter_by(email=user_info['email']).first()
 
-    # Track if this is a brand new signup
+    # Track if this is a brand new user
     is_new_user = False
 
     if not user:
-        is_new_user = True
+        is_new_user = True  # Mark as true ONLY if they did not exist in the DB
         total_users = User.query.count()
         if total_users < 100:
             user = User(
@@ -424,13 +424,11 @@ def authorize():
         db.session.add(user)
         db.session.commit()
         
-        # Send welcome email for new Pro users
         if user.is_pro:
             try:
-                # 1. Render the HTML file into a string variable
+                # Render the HTML file into a string variable
                 email_html = render_template('welcome_pro_email.html', email=user_info['email'])
                 
-                # 2. Pass the rendered string to the Resend API
                 resend.Emails.send({
                     "from": FROM_EMAIL,
                     "to": [user_info['email']],
@@ -445,19 +443,12 @@ def authorize():
     session['user_email'] = user.email
     session.permanent     = True
 
-    # Pop login_origin to clear it from session, but we no longer need it to determine logic
-    session.pop("login_origin", "desktop")
-    email  = user_info['email']
+    session.pop("login_origin", None)
 
-    # LOGIC UPDATE:
-    # If NEW user -> Show Celebration screen
-    # If OLD user -> Show standard "Signed in" screen
     if is_new_user:
-        template = "auth_success_desktop.html" 
+        return render_template("auth_success_desktop.html", email=user.email)
     else:
-        template = "auth_success_mobile.html"
-
-    return render_template(template, email=email)
+        return render_template("auth_success_mobile.html", email=user.email)
 
 @app.route('/api/me')
 def get_me():
@@ -640,13 +631,9 @@ def verify_payment():
 
 @app.route('/success')
 def success():
-    return """
-    <div style="text-align:center;font-family:sans-serif;margin-top:50px;">
-        <h1 style="color:#4f46e5;">Payment Successful! &#127881;</h1>
-        <p>Your account has been upgraded to Kontexa Pro.</p>
-        <p><b>Close this tab and click 'Account &rarr; Sync' in your extension to activate.</b></p>
-    </div>"""
-
+    email = session.get('user_email', 'Pro User')
+    
+    return render_template("auth_success_desktop.html", email=email)
 
 @app.route('/test/time-travel/<int:days_left>')
 def time_travel(days_left):
