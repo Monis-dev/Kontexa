@@ -1,5 +1,6 @@
 {
   "name": "Kontexa",
+  "version": "1.0.1",
   "short_name": "Kontexa",
   "description": "Your saved notes, everywhere.",
   "start_url": "/mobile/index.html",
