@@ -182,15 +182,15 @@ function byDomain(ns) {
   return Object.values(m);
 }
 
-/**
- * Group ALL notes that have a folder assignment, regardless of their URL.
- * FIX: The original only grouped by folder name but didn't include notes
- * whose URL is "general://notes" — those are now included correctly.
- */
 function byFolder(ns) {
   const m = {};
   ns.forEach((n) => {
-    if (n.folder) {
+    // Only group if folder exists and is not "None"
+    if (
+      n.folder &&
+      n.folder.toLowerCase() !== "none" &&
+      n.folder.trim() !== ""
+    ) {
       if (!m[n.folder]) m[n.folder] = { name: n.folder, notes: [] };
       m[n.folder].notes.push(n);
     }
@@ -289,7 +289,12 @@ async function loadNotes() {
             content: n.content || "",
             selection: n.selection || "",
             pinned: !!n.pinned,
-            folder: n.folder || null,
+            folder:
+              !n.folder ||
+              n.folder.toLowerCase() === "none" ||
+              n.folder.trim() === ""
+                ? null
+                : n.folder,
             timestamp: n.timestamp || null,
             image_data: n.image_data || null,
             tags: n.tags || [],
@@ -468,10 +473,6 @@ function renderHome(data) {
 
 // ═══════════════════════════════════════════════════════════
 //  IMAGE GUARD
-//  Returns true only when image_data is a non-empty string that
-//  starts with a recognised data-URL or https prefix.
-//  On the PWA, notes can arrive with image_data = "" | null |
-//  a broken/partial base64 string — all of which must be suppressed.
 // ═══════════════════════════════════════════════════════════
 function hasValidImage(img) {
   if (!img || typeof img !== "string") return false;
@@ -488,7 +489,15 @@ function nCard(n, displayLabel) {
   const sel = n.selection?.trim();
   const body = n.content?.trim();
   const img = hasValidImage(n.image_data);
-  const hasFooter = n.pinned || n.folder || n.timestamp;
+
+  // Clean up the folder name: if it's "None", "none", or empty, treat as null
+  const folderName =
+    n.folder &&
+    n.folder !== "None" &&
+    n.folder !== "none" &&
+    n.folder.trim() !== ""
+      ? n.folder
+      : null;
 
   let contentParts = "";
   if (sel)
@@ -498,36 +507,34 @@ function nCard(n, displayLabel) {
   if (!sel && !body && !img && !n.timestamp)
     contentParts += `<div class="nc-empty">No description added.</div>`;
 
-  const footerHtml = hasFooter
-    ? `<div class="nc-ft">
-        ${n.pinned ? '<span class="tag p">⭐ Pinned</span>' : ""}
-        ${n.folder ? `<span class="tag">📁 ${esc(n.folder)}</span>` : ""}
-        ${n.timestamp ? `<span class="tstag">⏱ ${esc(n.timestamp)}</span>` : ""}
-        <span class="tag d">${esc((displayLabel || "").slice(0, 22))}</span>
-      </div>`
-    : `<div class="nc-ft">
-        <span class="tag d">${esc((displayLabel || "").slice(0, 22))}</span>
-      </div>`;
+  // Build the tags/footer array dynamically
+  let footerTags = [];
+  if (n.pinned) footerTags.push('<span class="tag p">⭐ Pinned</span>');
 
-  // FIX: n.id is already normalised to a string in loadNotes(); pass it
-  // through esc() defensively so special chars in IDs don't break the
-  // onclick attribute.
+  // Only show folder tag if it exists and is valid
+  if (folderName)
+    footerTags.push(`<span class="tag">📁 ${esc(folderName)}</span>`);
+
+  // Only show timestamp if it exists
+  if (n.timestamp && n.timestamp.trim() !== "")
+    footerTags.push(`<span class="tstag">⏱ ${esc(n.timestamp)}</span>`);
+
+  // Show source label
+  footerTags.push(
+    `<span class="tag d">${esc((displayLabel || "").slice(0, 22))}</span>`,
+  );
+
   return `<div class="nc${n.pinned ? " pin" : ""}" onclick="openNote('${esc(n.id)}')">
     <div class="nc-top">
       <div class="nc-t">${esc(n.title || "Untitled")}</div>
       ${contentParts}
     </div>
     ${img ? `<img class="nc-img" src="${n.image_data}" loading="lazy" alt="Screenshot"/>` : ""}
-    ${footerHtml}
+    <div class="nc-ft">${footerTags.join("")}</div>
   </div>`;
 }
 
-// ═══════════════════════════════════════════════════════════
-//  NAVIGATION
-//  FIX: showView() now always pushes to viewStack so that every
-//  navigation step — including repeated visits to "page" — is
-//  recorded and goBack() can unwind each one correctly.
-// ═══════════════════════════════════════════════════════════
+
 function showView(v) {
   // Always record the transition so back can undo it
   viewStack.push(v);
