@@ -102,18 +102,24 @@
         color: var(--ink);
         letter-spacing: -0.3px;
       }
-      .nav-back {
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+      }
+      .nav-links a {
         font-size: 14px;
         font-weight: 500;
         color: var(--muted);
         text-decoration: none;
-        display: flex;
-        align-items: center;
-        gap: 6px;
         transition: color 0.15s;
       }
-      .nav-back:hover {
+      .nav-links a:hover {
         color: var(--acc);
+      }
+      .nav-links a.active {
+        color: var(--ink);
+        font-weight: 600;
       }
 
       /* ── PAGE ── */
@@ -336,7 +342,7 @@
     <!-- ── NAV ── -->
     <nav>
       <a href="/" class="nav-logo">
-        <div class="logo" id="logo">
+        <div class="logo">
           <span
             style="
               font-family: &quot;Neoneon&quot;, sans-serif;
@@ -353,8 +359,13 @@
         </div>
         <span class="nav-logo-name">Kontexa</span>
       </a>
-      <a href="/" class="nav-back">← Back to Home</a>
+      <div class="nav-links">
+        <a href="/">Home</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/support" class="active">Support</a>
+      </div>
     </nav>
+
 
     <!-- ── CONTENT ── -->
     <div class="page">
