@@ -41,7 +41,6 @@ resend.api_key = os.getenv("RESEND_API_KEY", "")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "monisahmed015@gmail.com")
 FROM_EMAIL  = "Kontexa <noreply@kontexa.online>"
 
-# NOW app exists, so logging works
 if not resend.api_key:
     app.logger.warning("RESEND_API_KEY is not set — emails will not send")
 else:
@@ -76,8 +75,6 @@ RAZORPAY_SECRET = os.getenv("RAZORPAY_SECRET_KEY")
 client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_SECRET))
 
 # ─── CORS ─────────────────────────────────────────────────────────────────────
-# Set EXTENSION_ID in your environment to your published Chrome Web Store ID.
-# For local unpacked development, also set EXTENSION_ID_DEV.
 EXTENSION_ID     = os.getenv("EXTENSION_ID", "")
 EXTENSION_ID_DEV = os.getenv("EXTENSION_ID_DEV", "")
 
@@ -103,9 +100,9 @@ oauth = OAuth(app)
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 def _admin_token_required():
-    """Returns True if the request carries a valid admin token, False otherwise.
-    The token must be sent as the X-Admin-Token header and must match the
-    ADMIN_SECRET environment variable."""
+    """Returns True if the request carries a valid admin token.
+    The token must be sent as the X-Admin-Token header and must match
+    the ADMIN_SECRET environment variable."""
     secret = os.getenv("ADMIN_SECRET", "")
     if not secret:
         return False
@@ -113,11 +110,32 @@ def _admin_token_required():
     # Constant-time comparison to prevent timing attacks
     return hmac.compare_digest(provided, secret)
 
-_NOTE_MAX_COUNT       = 500
-_NOTE_TITLE_MAX       = 255
-_NOTE_CONTENT_MAX     = 100_000   # 100 KB of plain text
-_NOTE_IMAGE_MAX       = 2_000_000 # 2 MB base64
-_FOLDER_NAME_MAX      = 100
+
+def _sanitize_folder(raw) -> str | None:
+    """Normalize a folder value — returns None for empty/None/invalid strings."""
+    if not raw:
+        return None
+    cleaned = str(raw).strip()[:_FOLDER_NAME_MAX]
+    if cleaned.lower() in ("", "none", "null", "undefined"):
+        return None
+    return cleaned
+
+
+def _sanitize_timestamp(raw) -> str | None:
+    """Normalize a timestamp value — returns None for empty/None/invalid strings."""
+    if not raw:
+        return None
+    cleaned = str(raw).strip()[:20]
+    if cleaned.lower() in ("", "none", "null", "undefined"):
+        return None
+    return cleaned
+
+
+_NOTE_MAX_COUNT   = 500
+_NOTE_TITLE_MAX   = 255
+_NOTE_CONTENT_MAX = 100_000   # 100 KB
+_NOTE_IMAGE_MAX   = 2_000_000 # 2 MB base64
+_FOLDER_NAME_MAX  = 100
 
 
 # ─── Models ───────────────────────────────────────────────────────────────────
@@ -126,10 +144,10 @@ class User(db.Model):
     id             = db.Column(db.Integer, primary_key=True)
     email          = db.Column(db.String(120), unique=True, nullable=False)
     is_pro         = db.Column(db.Boolean, default=False)
-    plan_type      = db.Column(db.String(20), default='free') # 'free', 'monthly', 'lifetime'
+    plan_type      = db.Column(db.String(20), default='free')
     pro_expires_at = db.Column(db.DateTime, nullable=True)
     websites       = db.relationship('Website', backref='user', lazy=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at     = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Website(db.Model):
     id          = db.Column(db.Integer, primary_key=True)
@@ -167,7 +185,7 @@ class Feedback(db.Model):
 class PricingConfig(db.Model):
     __tablename__      = 'pricing_config'
     id                 = db.Column(db.Integer, primary_key=True)
-    plan_type          = db.Column(db.String(20), unique=True, nullable=False) # 'monthly' or 'lifetime'
+    plan_type          = db.Column(db.String(20), unique=True, nullable=False)
     base_usd           = db.Column(db.Integer, nullable=False)
     base_inr_paise     = db.Column(db.Integer, nullable=False)
     discount_usd       = db.Column(db.Integer, nullable=True)
@@ -175,54 +193,47 @@ class PricingConfig(db.Model):
     promo_badge        = db.Column(db.String(100), nullable=True)
 
 
-# ─── Pricing Config ───────────────────────────────────────────────────────────────────
-PRICING_CONFIG = {
-    "monthly": {
-        "base_usd": 2,
-        "base_inr_paise": 18000,  # 180.00 INR
-        "discount_usd": None,     # Set to an integer (e.g., 1) to run a sale
-        "discount_inr_paise": None, 
-        "promo_badge": "Most Popular"
-    },
-    "lifetime": {
-        "base_usd": 40,
-        "base_inr_paise": 350000, # 3500.00 INR
-        "discount_usd": 25,       # EXAMPLE ACTIVE SALE: Reduced to $25
-        "discount_inr_paise": 210000, # Reduced to 2100.00 INR
-        "promo_badge": "🔥 Launch Sale!"
-    }
-}
+# ─── Pricing Config ───────────────────────────────────────────────────────────
 
 DEFAULT_PRICING = {
     "monthly": {
-        "base_usd": 2, "base_inr_paise": 18000, 
-        "discount_usd": None, "discount_inr_paise": None, "promo_badge": "Most Popular"
+        "base_usd": 2,
+        "base_inr_paise": 18000,
+        "discount_usd": None,
+        "discount_inr_paise": None,
+        "promo_badge": "Most Popular",
+        "badge": "Most Popular"
     },
     "lifetime": {
-        "base_usd": 40, "base_inr_paise": 350000, 
-        "discount_usd": None, "discount_inr_paise": None, "promo_badge": "🔥 Launch Sale!"
+        "base_usd": 40,
+        "base_inr_paise": 350000,
+        "discount_usd": 25,
+        "discount_inr_paise": 210000,
+        "promo_badge": "🔥 Launch Sale!",
+        "badge": "🔥 Launch Sale!"
     }
 }
 
 def get_pricing_config():
-    """Fetches pricing from the DB, falls back to DEFAULT_PRICING per plan if missing."""
+    """Fetches pricing from DB, falls back to DEFAULT_PRICING if table missing or empty."""
     try:
         plans = PricingConfig.query.all()
-        config = {k: v.copy() for k, v in DEFAULT_PRICING.items()} # Start with defaults
-        
+        config = {k: v.copy() for k, v in DEFAULT_PRICING.items()}
         for p in plans:
             if p.plan_type in config:
                 config[p.plan_type] = {
-                    "base_usd": p.base_usd,
-                    "base_inr_paise": p.base_inr_paise,
-                    "discount_usd": p.discount_usd,
+                    "base_usd":           p.base_usd,
+                    "base_inr_paise":     p.base_inr_paise,
+                    "discount_usd":       p.discount_usd,
                     "discount_inr_paise": p.discount_inr_paise,
-                    "promo_badge": p.promo_badge
+                    "promo_badge":        p.promo_badge,
+                    "badge":              p.promo_badge,
                 }
         return config
     except Exception as e:
-        app.logger.error(f"Error fetching pricing: {e}")
-        return DEFAULT_PRICING
+        app.logger.warning(f"get_pricing_config fell back to defaults: {e}")
+        return {k: v.copy() for k, v in DEFAULT_PRICING.items()}
+
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -235,25 +246,7 @@ google = oauth.register(
 )
 
 
-@app.route("/test-email")
-def test_email():
-    if not _admin_token_required():
-        return jsonify({"error": "Forbidden"}), 403
-    try:
-        result = resend.Emails.send({
-            "from": "Kontexa <noreply@kontexa.online>",
-            "to": [os.getenv("ADMIN_EMAIL", "your@gmail.com")],
-            "subject": "Resend test from Kontexa",
-            "html": "<p>If you see this, Resend is working correctly.</p>"
-        })
-        return jsonify({"ok": True, "result": str(result)}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    
-
-@app.route("/wakeUp")
-def wakeUp():
-    return jsonify({"message": "Wake UP!!"}), 200
+# ─── Routes: Public ───────────────────────────────────────────────────────────
 
 @app.route("/")
 def home():
@@ -267,112 +260,148 @@ def privacy():
 def static_from_root():
     return send_from_directory(app.static_folder, 'sitemap.xml')
 
+@app.route('/support')
+def support():
+    return render_template('support.html')
+
+# FIX: expose both /wakeUp and /api/wakeUp so both server and dashboard.js work
+@app.route("/wakeUp")
+@app.route("/api/wakeUp")
+def wakeUp():
+    return jsonify({"status": "ok"}), 200
+
 @app.route("/api/user-count")
 def user_count():
-    count = db.session.query(User).count()  # adjust to your ORM
+    count = db.session.query(User).count()
     return jsonify({"count": count})
 
-# # ─── Self-ping (keep-alive for Render free tier) ──────────────────────────────
-# # Prefer an external uptime monitor (e.g. UptimeRobot) over this thread.
-# # If you upgrade to a paid Render plan, delete this block entirely.
-# import threading
-# import requests
-# import time
 
-# _stop_ping = threading.Event()
+# ─── Routes: Email test (admin only) ─────────────────────────────────────────
 
-# def self_ping():
-#     while not _stop_ping.wait(600):   # 10 minutes; stops cleanly on shutdown
-#         try:
-#             requests.get("https://kontexa.online/weakUp", timeout=10)
-#             app.logger.info("Self-ping OK")
-#         except Exception as e:
-#             app.logger.warning(f"Self-ping failed: {e}")
- 
-# ping_thread = threading.Thread(target=self_ping, daemon=True)
-# ping_thread.start()
+@app.route("/test-email")
+def test_email():
+    if not _admin_token_required():
+        return jsonify({"error": "Forbidden"}), 403
+    try:
+        result = resend.Emails.send({
+            "from": FROM_EMAIL,
+            "to": [os.getenv("ADMIN_EMAIL", "your@gmail.com")],
+            "subject": "Resend test from Kontexa",
+            "html": "<p>If you see this, Resend is working correctly.</p>"
+        })
+        return jsonify({"ok": True, "result": str(result)}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-# ─── Admin Dashboard ───────────────────────────────────────────────────────────────
+
+# ─── Routes: Admin Dashboard ──────────────────────────────────────────────────
 
 @app.route('/hq-admin-panel')
 def admin_dashboard():
-    # SECURE URL: Change 'hq-admin-panel' to whatever you want
     return render_template("admin.html")
 
 @app.route('/api/admin/stats')
 def admin_stats():
-    if not _admin_token_required(): return jsonify({"error": "Forbidden"}), 403
+    if not _admin_token_required():
+        return jsonify({"error": "Forbidden"}), 403
     try:
         s = {
-            "total_users": User.query.count(),
-            "pro_users": User.query.filter_by(is_pro=True).count(),
+            "total_users":    User.query.count(),
+            "pro_users":      User.query.filter_by(is_pro=True).count(),
             "lifetime_users": User.query.filter_by(plan_type='lifetime').count(),
-            "monthly_users": User.query.filter_by(plan_type='monthly').count(),
-            "free_users": User.query.filter_by(plan_type='free').count(),
-            "total_notes": Note.query.count(),
+            "monthly_users":  User.query.filter_by(plan_type='monthly').count(),
+            "free_users":     User.query.filter_by(plan_type='free').count(),
+            "total_notes":    Note.query.count(),
             "total_websites": Website.query.count(),
-            "expired_users": User.query.filter(User.plan_type == 'monthly', User.pro_expires_at < datetime.utcnow()).count()
+            "expired_users":  User.query.filter(
+                User.plan_type == 'monthly',
+                User.pro_expires_at < datetime.utcnow()
+            ).count()
         }
-        # DB Size check
         try:
             res = db.session.execute(sa_text("SELECT pg_database_size(current_database())")).fetchone()
             s["db_size_mb"] = round(res[0] / (1024 * 1024), 2) if res else 0
-        except: s["db_size_mb"] = 0
+        except:
+            s["db_size_mb"] = 0
         s["db_limit_mb"] = 512
         return jsonify(s)
-    except Exception as e: return jsonify({"error": str(e)}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/admin/users')
 def admin_users():
-    if not _admin_token_required(): return jsonify({"error": "Forbidden"}), 403
+    if not _admin_token_required():
+        return jsonify({"error": "Forbidden"}), 403
     users = User.query.order_by(User.id.desc()).all()
     return jsonify([{
-        "id": u.id, "email": u.email, "is_pro": u.is_pro, "plan_type": u.plan_type,
+        "id":            u.id,
+        "email":         u.email,
+        "is_pro":        u.is_pro,
+        "plan_type":     u.plan_type,
         "pro_expires_at": u.pro_expires_at.isoformat() if u.pro_expires_at else None,
-        "created_at": u.created_at.isoformat() if u.created_at else None, # Needed for charts
+        "created_at":    u.created_at.isoformat() if u.created_at else None,
     } for u in users])
+
+@app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
+def admin_delete_user(user_id):
+    if not _admin_token_required():
+        return jsonify({"error": "Forbidden"}), 403
+    try:
+        user = db.session.get(User, user_id)
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        db.session.delete(user)
+        db.session.commit()
+        return jsonify({"ok": True, "message": f"User {user_id} deleted"}), 200
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"admin_delete_user error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/admin/pricing', methods=['POST'])
 def admin_update_pricing():
     if not _admin_token_required():
         return jsonify({"error": "Forbidden"}), 403
-
     data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Invalid request"}), 400
     plan_type = data.get("plan_type")
-    
+    if plan_type not in ("monthly", "lifetime"):
+        return jsonify({"error": "Invalid plan type"}), 400
     try:
         plan = PricingConfig.query.filter_by(plan_type=plan_type).first()
         if not plan:
             plan = PricingConfig(plan_type=plan_type, base_usd=0, base_inr_paise=0)
             db.session.add(plan)
-
-        # Update base prices
-        if 'base_usd' in data: plan.base_usd = data['base_usd']
-        if 'base_inr_paise' in data: plan.base_inr_paise = data['base_inr_paise']
-        
-        # Update discounts (can be null)
-        plan.discount_usd = data.get('discount_usd')
-        plan.discount_inr_paise = data.get('discount_inr_paise')
-        plan.promo_badge = data.get('promo_badge')
-
+        if 'base_usd'           in data: plan.base_usd           = int(data['base_usd'])
+        if 'base_inr_paise'     in data: plan.base_inr_paise     = int(data['base_inr_paise'])
+        plan.discount_usd       = int(data['discount_usd'])       if data.get('discount_usd')       is not None else None
+        plan.discount_inr_paise = int(data['discount_inr_paise']) if data.get('discount_inr_paise') is not None else None
+        plan.promo_badge        = str(data.get('promo_badge', ''))[:100] if data.get('promo_badge') else None
         db.session.commit()
         return jsonify({"ok": True})
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
-@app.route('/api/admin/feedback-digest')
+# Single, secure admin feedback endpoint (header-based auth only)
+@app.route('/api/admin/feedback-digest', methods=['GET'])
 def admin_feedback():
-    if not _admin_token_required(): return jsonify({"error": "Forbidden"}), 403
+    if not _admin_token_required():
+        return jsonify({"error": "Forbidden"}), 403
     week_ago = datetime.utcnow() - timedelta(days=7)
     rows = Feedback.query.filter(Feedback.created_at >= week_ago).all()
     return jsonify([{
-        "id": f.id, "email": f.email, "type": f.fb_type, "message": f.message, "created_at": f.created_at.isoformat()
+        "id":         f.id,
+        "email":      f.email,
+        "type":       f.fb_type,
+        "subject":    f.subject,
+        "message":    f.message,
+        "created_at": f.created_at.isoformat()
     } for f in rows])
 
 
-
-# ─── Mobile PWA ───────────────────────────────────────────────────────────────
+# ─── Routes: Mobile PWA ───────────────────────────────────────────────────────
 
 @app.route("/mobile")
 def mobile_redirect():
@@ -387,7 +416,7 @@ def mobile_static(filename):
     return send_from_directory(MOBILE_DIR, filename)
 
 
-# ─── Login / OAuth ────────────────────────────────────────────────────────────
+# ─── Routes: Login / OAuth ────────────────────────────────────────────────────
 
 @app.route("/login")
 def login():
@@ -399,40 +428,38 @@ def login():
 def authorize():
     token     = google.authorize_access_token()
     user_info = token.get('userinfo')
-    user = User.query.filter_by(email=user_info['email']).first()
+    if not user_info or not user_info.get('email'):
+        return redirect(url_for('home'))
 
-    # Track if this is a brand new user
+    user = User.query.filter_by(email=user_info['email']).first()
     is_new_user = False
 
     if not user:
-        is_new_user = True  # Mark as true ONLY if they did not exist in the DB
+        is_new_user = True
         total_users = User.query.count()
         if total_users < 100:
             user = User(
-                email=user_info['email'], 
-                is_pro=True, 
+                email=user_info['email'],
+                is_pro=True,
                 plan_type='lifetime'
             )
-            app.logger.info(f"Early Bird User Created! ({total_users + 1}/100): {user_info['email']}")
+            app.logger.info(f"Early Bird User ({total_users + 1}/100): {user_info['email']}")
         else:
             user = User(
-                email=user_info['email'], 
-                is_pro=False, 
+                email=user_info['email'],
+                is_pro=False,
                 plan_type='free'
             )
-            
         db.session.add(user)
         db.session.commit()
-        
+
         if user.is_pro:
             try:
-                # Render the HTML file into a string variable
                 email_html = render_template(
-                    'welcome_pro_email.html', 
+                    'welcome_pro_email.html',
                     email=user_info['email'],
                     logo_url=url_for('static', filename='images/logo.png', _external=True)
                 )
-                
                 resend.Emails.send({
                     "from": FROM_EMAIL,
                     "to": [user_info['email']],
@@ -447,32 +474,34 @@ def authorize():
     session['user_email'] = user.email
     session.permanent     = True
 
-    session.pop("login_origin", None)
-
-    if is_new_user:
-        return render_template("auth_success_desktop.html", email=user.email)
-    else:
-        return render_template("auth_success_mobile.html", email=user.email)
+    # FIX: use login_origin to pick correct template, not is_new_user
+    origin   = session.pop("login_origin", "desktop")
+    template = "auth_success_mobile.html" if origin == "mobile" else "auth_success_desktop.html"
+    return render_template(template, email=user.email)
 
 @app.route('/api/me')
 def get_me():
     if 'user_id' not in session:
         return jsonify({"error": "Not logged in"}), 401
-        
+
     user = db.session.get(User, session['user_id'])
+    if not user:
+        session.clear()
+        return jsonify({"error": "User not found"}), 401
+
     days_left = None
     if user.is_pro and user.plan_type == 'monthly' and user.pro_expires_at:
         if datetime.utcnow() > user.pro_expires_at:
-            user.is_pro = False
+            user.is_pro    = False
             user.plan_type = 'free'
             db.session.commit()
         else:
-            delta = user.pro_expires_at - datetime.utcnow()
+            delta     = user.pro_expires_at - datetime.utcnow()
             days_left = delta.days
 
     return jsonify({
-        'email': session['user_email'], 
-        'is_pro': user.is_pro,
+        'email':     session['user_email'],
+        'is_pro':    user.is_pro,
         'plan_type': user.plan_type,
         'days_left': days_left
     })
@@ -483,9 +512,7 @@ def logout():
     return jsonify({"message": "Logged out"}), 200
 
 
-# ─── Database initialisation (admin-only) ─────────────────────────────────────
-# Protected by X-Admin-Token header. Run once after first deployment,
-# then prefer Flask-Migrate for subsequent schema changes.
+# ─── Routes: Database init (admin only) ───────────────────────────────────────
 
 @app.route("/init-db")
 def init_db():
@@ -505,82 +532,86 @@ def init_db():
     except Exception as e:
         app.logger.error(f"init-db error: {e}")
         return "Internal error during DB init.", 500
-    
-
-@app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
-def admin_delete_user(user_id):
-    if not _admin_token_required():
-        return jsonify({"error": "Forbidden"}), 403
-    try:
-        user = db.session.get(User, user_id)
-        if not user:
-            return jsonify({"error": "User not found"}), 404
-        db.session.delete(user)
-        db.session.commit()
-        return jsonify({"ok": True, "message": f"User {user_id} and all associated data deleted"}), 200
-    except Exception as e:
-        db.session.rollback()
-        app.logger.error(f"admin_delete_user error: {e}")
-        return jsonify({"error": str(e)}), 500
 
 
-# ─── Pricing & Razorpay ───────────────────────────────────────────────────────
+# ─── Routes: Pricing & Razorpay ───────────────────────────────────────────────
 
 @app.route('/pricing')
 def pricing():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     user = db.session.get(User, session['user_id'])
-
-    return render_template('pricing.html', email=user.email, razorpay_key_id=RAZORPAY_KEY_ID, pricing=get_pricing_config())
+    if not user:
+        session.clear()
+        return redirect(url_for('login'))
+    return render_template(
+        'pricing.html',
+        email=user.email,
+        razorpay_key_id=RAZORPAY_KEY_ID,
+        pricing=get_pricing_config()
+    )
 
 @app.route('/create-order', methods=['POST'])
 def create_order():
     if 'user_id' not in session:
         return jsonify({"error": "Login required"}), 401
-    user_id = session['user_id']
-    data = request.json
+
+    data = request.get_json(silent=True)
     if not data:
-        return jsonify({"error": "Invalid request"}), 400
-    
+        return jsonify({"error": "Invalid request body"}), 400
+
     plan_type = data.get("plan_type")
-    
-    # FETCH DYNAMIC PRICING HERE
-    current_pricing = get_pricing_config()
-    plan_data = current_pricing.get(plan_type)
-    
-    if not plan_data:
-        return jsonify({"error": "Invalid plan"}), 400
+    if plan_type not in ("monthly", "lifetime"):
+        return jsonify({"error": "Invalid plan type"}), 400
 
-    # It is safer to check 'is not None' in case discount is exactly 0
-    if plan_data["discount_inr_paise"] is not None:
-        amount = plan_data["discount_inr_paise"]
-    else:
-        amount = plan_data["base_inr_paise"]
-        
-    currency = "INR"
+    try:
+        current_pricing = get_pricing_config()
+        plan_data       = current_pricing.get(plan_type)
 
-    order = client.order.create({
-        "amount": amount,
-        "currency": currency,
-        "payment_capture": 1,
-        "notes": {
-            "user_id": str(user_id),
-            "plan_type": plan_type
-        }
-    })
-    return jsonify(order)
+        if not plan_data:
+            app.logger.error(f"Plan '{plan_type}' not found in pricing config")
+            return jsonify({"error": "Plan configuration not found"}), 500
+
+        # FIX: use discount if active, otherwise base price — never None or 0
+        amount = plan_data.get("discount_inr_paise") or plan_data.get("base_inr_paise")
+
+        if not amount or not isinstance(amount, int) or amount <= 0:
+            app.logger.error(f"Invalid amount for plan {plan_type}: {amount!r}")
+            return jsonify({"error": "Invalid pricing configuration — contact support"}), 500
+
+        user_id = session['user_id']
+
+        order = client.order.create({
+            "amount":          amount,
+            "currency":        "INR",
+            "payment_capture": 1,
+            "notes": {
+                "user_id":   str(user_id),
+                "plan_type": plan_type
+            }
+        })
+
+        if not order.get("id"):
+            app.logger.error(f"Razorpay returned order without ID: {order}")
+            return jsonify({"error": "Order creation failed"}), 500
+
+        return jsonify(order)
+
+    except razorpay.errors.BadRequestError as e:
+        app.logger.error(f"Razorpay bad request for plan={plan_type}: {e}")
+        return jsonify({"error": "Payment provider rejected the request"}), 400
+    except Exception as e:
+        app.logger.error(f"create_order error: {e}", exc_info=True)
+        return jsonify({"error": "Order creation failed — please try again"}), 500
 
 @app.route('/verify-payment', methods=['POST'])
 def verify_payment():
-    # Must be logged in
     if 'user_id' not in session:
         return jsonify({"error": "Login required"}), 401
 
-    data = request.json
+    data = request.get_json(silent=True)
     if not data:
         return jsonify({"status": "failed", "error": "Invalid request"}), 400
-    
 
     razorpay_order_id   = data.get('razorpay_order_id')
     razorpay_payment_id = data.get('razorpay_payment_id')
@@ -590,20 +621,19 @@ def verify_payment():
         return jsonify({"status": "failed", "error": "Missing payment fields"}), 400
 
     try:
-        # 1. Verify the cryptographic signature first
+        # 1. Verify cryptographic signature first
         client.utility.verify_payment_signature({
             'razorpay_order_id':   razorpay_order_id,
             'razorpay_payment_id': razorpay_payment_id,
             'razorpay_signature':  razorpay_signature
         })
 
-        # 2. Fetch the order and extract the user_id stored in notes
+        # 2. Fetch order and extract stored user_id
         order           = client.order.fetch(razorpay_order_id)
         order_user_id   = int(order["notes"]["user_id"])
         session_user_id = session['user_id']
-        
 
-        # 3. Ensure the logged-in user matches the order owner (TOCTOU guard)
+        # 3. TOCTOU guard — logged-in user must match order owner
         if order_user_id != session_user_id:
             app.logger.warning(
                 f"Payment user mismatch: order owner {order_user_id} "
@@ -613,17 +643,18 @@ def verify_payment():
 
         user = db.session.get(User, session_user_id)
         if user:
-            plan_type = order["notes"].get("plan_type", "lifetime")
-            user.is_pro = True
-            
+            plan_type    = order["notes"].get("plan_type", "lifetime")
+            user.is_pro  = True
             if plan_type == "monthly":
-                if user.plan_type == 'monthly' and user.pro_expires_at and user.pro_expires_at > datetime.utcnow():
+                if (user.plan_type == 'monthly'
+                        and user.pro_expires_at
+                        and user.pro_expires_at > datetime.utcnow()):
+                    # Extend existing subscription
                     user.pro_expires_at = user.pro_expires_at + timedelta(days=30)
                 else:
                     user.pro_expires_at = datetime.utcnow() + timedelta(days=30)
             else:
                 user.pro_expires_at = None
-                
             user.plan_type = plan_type
             db.session.commit()
 
@@ -636,238 +667,184 @@ def verify_payment():
 @app.route('/success')
 def success():
     email = session.get('user_email', 'Pro User')
-    
     return render_template("auth_success_desktop.html", email=email)
 
 @app.route('/test/time-travel/<int:days_left>')
 def time_travel(days_left):
     if 'user_id' not in session:
         return "Please log in first."
-    
     user = db.session.get(User, session['user_id'])
     if not user:
         return "User not found."
-    
-    # Fast-forward time so the subscription expires in 'X' days
     user.pro_expires_at = datetime.utcnow() + timedelta(days=days_left)
     db.session.commit()
-    
     return f"Time travel successful! Your account now expires in {days_left} days."
 
 
-# ─── FeedBack ────────────────────────────────────────────────────────────────
+# ─── Routes: Feedback ────────────────────────────────────────────────────────
 
 @app.route('/api/feedback', methods=['POST'])
 def submit_feedback():
     try:
         data    = request.get_json(silent=True) or {}
-        
-        fb_type = str(escape(data.get('type', 'feature')))
-        subject = str(escape(data.get('subject', '')))
-        message = str(escape(data.get('message', '')))
+        fb_type = str(escape(data.get('type',    'feature')))[:50]
+        subject = str(escape(data.get('subject', '')))[:255]
+        message = str(escape(data.get('message', '')))[:5000]
 
         if not message:
             return jsonify({'error': 'Message is required'}), 400
 
-        email = None
+        email   = None
         user_id = session.get('user_id')
-
         if user_id:
             user  = db.session.get(User, user_id)
             email = user.email if user else None
 
         feedback = Feedback(
-            user_id = user_id,
-            email   = email,
-            fb_type = fb_type,
-            subject = subject,
-            message = message,
+            user_id=user_id,
+            email=email,
+            fb_type=fb_type,
+            subject=subject,
+            message=message,
         )
-        
         db.session.add(feedback)
         db.session.commit()
         return jsonify({'ok': True}), 201
 
     except Exception as e:
-        # 3. FIX: Rollback the database if it crashes, otherwise your server locks up
         db.session.rollback()
         app.logger.error(f"Feedback error: {e}")
         return jsonify({'error': 'Internal Server Error'}), 500
-    
-@app.route('/api/admin/feedback-digest', methods=['GET'])
-def feedback_digest():
-    # Simple secret check — add ADMIN_SECRET to your Render env vars
-    secret = request.args.get('secret')
-    if secret != os.environ.get('ADMIN_SECRET'):
-        return jsonify({'error': 'Unauthorized'}), 401
 
-    one_week_ago = datetime.utcnow() - timedelta(days=7)
-    rows = Feedback.query.filter(
-        Feedback.created_at >= one_week_ago
-    ).order_by(Feedback.created_at.desc()).all()
 
-    return jsonify([{
-        'id':         f.id,
-        'email':      f.email or 'Anonymous',
-        'type':       f.fb_type,
-        'subject':    f.subject,
-        'message':    f.message,
-        'created_at': f.created_at.isoformat(),
-    } for f in rows])
+# ─── Routes: Support ─────────────────────────────────────────────────────────
 
-# ─── Support ────────────────────────────────────────────────────────────────
-
-@app.route('/support')
-def support():
-    """Renders the public support page. No login required."""
-    return render_template('support.html')
- 
- 
 @app.route('/api/support', methods=['POST'])
 def support_contact():
     try:
-        data = request.get_json(silent=True) or {}
- 
-        email   = str(data.get('email', '')).strip()[:255]
-        fb_type = str(data.get('type', 'general')).strip()[:50]
+        data    = request.get_json(silent=True) or {}
+        email   = str(data.get('email',   '')).strip()[:255]
+        fb_type = str(data.get('type',    'general')).strip()[:50]
         subject = str(data.get('subject', '')).strip()[:255]
         message = str(data.get('message', '')).strip()[:2000]
- 
+
         if not email or not _EMAIL_RE.match(email):
             return jsonify({'error': 'A valid email address is required.'}), 400
- 
         if not message:
             return jsonify({'error': 'Message is required.'}), 400
- 
-        # Persistence
+
+        existing_user = User.query.filter_by(email=email).first()
         feedback = Feedback(
-            user_id = User.query.filter_by(email=email).first().id if User.query.filter_by(email=email).first() else None,
-            email   = email,
-            fb_type = str(escape(fb_type)),
-            subject = str(escape(subject)),
-            message = str(escape(message)),
+            user_id=existing_user.id if existing_user else None,
+            email=email,
+            fb_type=str(escape(fb_type)),
+            subject=str(escape(subject)),
+            message=str(escape(message)),
         )
         db.session.add(feedback)
         db.session.commit()
 
-        # Email Notification
-        # Email notification — two emails: one to you, one confirmation to user
         try:
-            # 1. Notify YOU
             resend.Emails.send({
-                "from": FROM_EMAIL,
-                "to": [ADMIN_EMAIL],
-                "reply_to": [email],          # so you can just hit Reply
-                "subject": f"[Kontexa Support] {fb_type} — {subject}",
+                "from":     FROM_EMAIL,
+                "to":       [ADMIN_EMAIL],
+                "reply_to": [email],
+                "subject":  f"[Kontexa Support] {fb_type} — {subject}",
                 "html": f"""
-        <div style="font-family:Arial,sans-serif;max-width:520px;padding:24px;color:#0d0f12;">
-        <h2 style="margin:0 0 16px;font-size:18px;">New Support Message</h2>
-        <table style="width:100%;border-collapse:collapse;">
-            <tr><td style="padding:8px 0;color:#767b87;width:80px;">From</td><td style="padding:8px 0;font-weight:600;">{email}</td></tr>
-            <tr><td style="padding:8px 0;color:#767b87;">Topic</td><td style="padding:8px 0;">{fb_type}</td></tr>
-            <tr><td style="padding:8px 0;color:#767b87;">Subject</td><td style="padding:8px 0;">{subject}</td></tr>
-        </table>
-        <div style="background:#f7f7f5;border-radius:8px;padding:16px;margin-top:16px;font-size:14px;line-height:1.7;white-space:pre-wrap;">{message}</div>
-        <p style="font-size:12px;color:#9ca3af;margin-top:20px;">Hit Reply to respond directly to {email}</p>
-        </div>"""
+<div style="font-family:Arial,sans-serif;max-width:520px;padding:24px;color:#0d0f12;">
+<h2 style="margin:0 0 16px;font-size:18px;">New Support Message</h2>
+<table style="width:100%;border-collapse:collapse;">
+  <tr><td style="padding:8px 0;color:#767b87;width:80px;">From</td><td style="padding:8px 0;font-weight:600;">{email}</td></tr>
+  <tr><td style="padding:8px 0;color:#767b87;">Topic</td><td style="padding:8px 0;">{fb_type}</td></tr>
+  <tr><td style="padding:8px 0;color:#767b87;">Subject</td><td style="padding:8px 0;">{subject}</td></tr>
+</table>
+<div style="background:#f7f7f5;border-radius:8px;padding:16px;margin-top:16px;font-size:14px;line-height:1.7;white-space:pre-wrap;">{message}</div>
+<p style="font-size:12px;color:#9ca3af;margin-top:20px;">Hit Reply to respond directly to {email}</p>
+</div>"""
             })
-
-            # 2. Confirmation to the USER
             resend.Emails.send({
-                "from": FROM_EMAIL,
-                "to": [email],
+                "from":    FROM_EMAIL,
+                "to":      [email],
                 "subject": "We got your message — Kontexa Support",
-                "html": f"""
-        <!DOCTYPE html>
-        <html>
-        <head><meta charset="UTF-8"/></head>
-        <body style="margin:0;padding:0;background:#f7f7f5;font-family:'Helvetica Neue',Arial,sans-serif;">
-        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f7f5;padding:40px 0;">
-        <tr><td align="center">
-            <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;border:1px solid #e8e8e4;overflow:hidden;">
-
-            <tr><td style="background:#0d0f12;padding:24px 36px;">
-                <table cellpadding="0" cellspacing="0"><tr>
-                <td style="width:28px;height:28px;background:#4f46e5;border-radius:5px;text-align:center;vertical-align:middle;">
-                    <span style="color:#fff;font-size:15px;font-weight:700;">K</span>
-                </td>
-                <td style="padding-left:10px;font-size:15px;font-weight:600;color:#fff;">Kontexa</td>
-                </tr></table>
-            </td></tr>
-
-            <tr><td style="padding:32px 36px;">
-                <p style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0d0f12;">We got your message ✅</p>
-                <p style="margin:0 0 24px;font-size:14px;color:#767b87;line-height:1.7;">
-                Thanks for reaching out! We typically reply within 24 hours.
-                Here's a copy of what you sent us:
-                </p>
-
-                <table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f7f5;border-radius:10px;margin-bottom:24px;">
-                <tr><td style="padding:16px 20px;">
-                    <p style="margin:0 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#767b87;">Your message</p>
-                    <p style="margin:0 0 12px;font-size:13px;color:#767b87;"><strong style="color:#0d0f12;">Topic:</strong> {fb_type} &nbsp;·&nbsp; <strong style="color:#0d0f12;">Subject:</strong> {subject}</p>
-                    <p style="margin:0;font-size:14px;color:#0d0f12;line-height:1.7;white-space:pre-wrap;">{message}</p>
-                </td></tr>
-                </table>
-
-                <p style="margin:0;font-size:13px;color:#767b87;line-height:1.7;">
-                We'll reply to <strong style="color:#0d0f12;">{email}</strong>.
-                If it's urgent, reply to this email directly.
-                </p>
-            </td></tr>
-
-            <tr><td style="padding:16px 36px;border-top:1px solid #e8e8e4;">
-                <p style="margin:0;font-size:12px;color:#9ca3af;">
-                Kontexa · <a href="https://kontexa.online" style="color:#4f46e5;text-decoration:none;">kontexa.online</a>
-                </p>
-            </td></tr>
-
-            </table>
-        </td></tr>
-        </table>
-        </body>
-        </html>"""
+                "html": f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"/></head>
+<body style="margin:0;padding:0;background:#f7f7f5;font-family:'Helvetica Neue',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f7f5;padding:40px 0;">
+<tr><td align="center">
+  <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;border:1px solid #e8e8e4;overflow:hidden;">
+  <tr><td style="background:#0d0f12;padding:24px 36px;">
+    <table cellpadding="0" cellspacing="0"><tr>
+    <td style="width:28px;height:28px;background:#4f46e5;border-radius:5px;text-align:center;vertical-align:middle;">
+      <span style="color:#fff;font-size:15px;font-weight:700;">K</span>
+    </td>
+    <td style="padding-left:10px;font-size:15px;font-weight:600;color:#fff;">Kontexa</td>
+    </tr></table>
+  </td></tr>
+  <tr><td style="padding:32px 36px;">
+    <p style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0d0f12;">We got your message ✅</p>
+    <p style="margin:0 0 24px;font-size:14px;color:#767b87;line-height:1.7;">
+    Thanks for reaching out! We typically reply within 24 hours.</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f7f5;border-radius:10px;margin-bottom:24px;">
+    <tr><td style="padding:16px 20px;">
+      <p style="margin:0 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#767b87;">Your message</p>
+      <p style="margin:0 0 12px;font-size:13px;color:#767b87;"><strong style="color:#0d0f12;">Topic:</strong> {fb_type} &nbsp;·&nbsp; <strong style="color:#0d0f12;">Subject:</strong> {subject}</p>
+      <p style="margin:0;font-size:14px;color:#0d0f12;line-height:1.7;white-space:pre-wrap;">{message}</p>
+    </td></tr>
+    </table>
+    <p style="margin:0;font-size:13px;color:#767b87;line-height:1.7;">
+    We'll reply to <strong style="color:#0d0f12;">{email}</strong>.</p>
+  </td></tr>
+  <tr><td style="padding:16px 36px;border-top:1px solid #e8e8e4;">
+    <p style="margin:0;font-size:12px;color:#9ca3af;">
+    Kontexa · <a href="https://kontexa.online" style="color:#4f46e5;text-decoration:none;">kontexa.online</a></p>
+  </td></tr>
+  </table>
+</td></tr>
+</table>
+</body></html>"""
             })
         except Exception as mail_err:
             app.logger.error(f"Support email failed: {mail_err}")
- 
+
         return jsonify({'ok': True}), 201
- 
+
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"support_contact error: {e}")
         return jsonify({'error': 'Internal server error.'}), 500
-    
-    
-# ─── Notes API ────────────────────────────────────────────────────────────────
+
+
+# ─── Routes: Notes API ────────────────────────────────────────────────────────
 
 @app.route('/api/sync', methods=['POST'])
 def sync_notes():
     if 'user_id' not in session:
         return jsonify({"error": "Login required"}), 401
     user = db.session.get(User, session['user_id'])
-    if not user.is_pro:
+    if not user or not user.is_pro:
         return jsonify({"error": "Pro upgrade required"}), 403
 
-    notes = request.json
+    notes = request.get_json(silent=True)
     if not isinstance(notes, list):
         return jsonify({"error": "Invalid payload"}), 400
-
-    # Guard: cap total notes per sync to prevent abuse
     if len(notes) > _NOTE_MAX_COUNT:
         return jsonify({"error": f"Sync limit is {_NOTE_MAX_COUNT} notes per request"}), 400
 
-    existing_ids = {n.local_id for n in Note.query.join(Website).filter(Website.user_id == user.id).all()}
-    sites_cache  = {s.url: s for s in Website.query.filter_by(user_id=user.id).all()}
-    new_notes    = []
+    existing_ids = {
+        n.local_id for n in
+        Note.query.join(Website).filter(Website.user_id == user.id).all()
+    }
+    sites_cache = {s.url: s for s in Website.query.filter_by(user_id=user.id).all()}
+    new_notes   = []
 
     for note in notes:
-        local_id = str(note.get("id", ""))[:50]  # cap local_id length
+        local_id = str(note.get("id", ""))[:50]
+        if not local_id:
+            continue
 
         if note.get("deleted"):
             existing_note = (
-                Note.query
-                .join(Website)
+                Note.query.join(Website)
                 .filter(Website.user_id == user.id, Note.local_id == local_id)
                 .first()
             )
@@ -878,16 +855,20 @@ def sync_notes():
         if local_id in existing_ids:
             continue
 
-        # Validate and truncate fields
-        title      = str(note.get("title", "Untitled"))[:_NOTE_TITLE_MAX]
-        content    = str(note.get("content", ""))[:_NOTE_CONTENT_MAX]
-        image_data = str(note.get("image_data", ""))
+        # Validate and sanitize fields
+        title      = str(note.get("title", "Untitled") or "Untitled")[:_NOTE_TITLE_MAX]
+        content    = str(note.get("content", "") or "")[:_NOTE_CONTENT_MAX]
+        image_data = str(note.get("image_data", "") or "")
         if len(image_data) > _NOTE_IMAGE_MAX:
-            image_data = ""   # drop oversized images silently; log if needed
+            image_data = ""
 
-        site = sites_cache.get(note.get("url", ""))
+        # FIX: sanitize folder and timestamp — never store "None"/"null" strings
+        folder_val    = _sanitize_folder(note.get("folder"))
+        timestamp_val = _sanitize_timestamp(note.get("timestamp"))
+
+        raw_url = str(note.get("url", ""))[:500]
+        site    = sites_cache.get(raw_url)
         if not site:
-            raw_url = str(note.get("url", ""))[:500]
             site = Website(
                 url=raw_url,
                 domain=note.get("domain", urlparse(raw_url).netloc)[:200],
@@ -909,11 +890,11 @@ def sync_notes():
             local_id=local_id,
             title=title,
             content=content,
-            selection=str(note.get("selection", ""))[:5000],
+            selection=str(note.get("selection", "") or "")[:5000],
             pinned=bool(note.get("pinned", False)),
-            timestamp=str(note.get("timestamp", ""))[:20],
+            timestamp=timestamp_val,
             image_data=image_data,
-            folder=str(note.get("folder", ""))[:_FOLDER_NAME_MAX],
+            folder=folder_val,
             tags=parsed_tags,
             website_id=site.id
         ))
@@ -927,26 +908,32 @@ def get_notes():
     if 'user_id' not in session:
         return jsonify([]), 401
     user = db.session.get(User, session['user_id'])
-    if not user.is_pro:
+    if not user or not user.is_pro:
         return jsonify([]), 403
 
-    websites = Website.query.options(joinedload(Website.notes)).filter_by(user_id=user.id).all()
+    websites = (
+        Website.query
+        .options(joinedload(Website.notes))
+        .filter_by(user_id=user.id)
+        .all()
+    )
     result = []
     for s in websites:
-        if s.url == "general://notes":
+        # Skip general notes — served by /api/general-notes
+        if s.url in ("general://notes", "folder://notes"):
             continue
         filtered_notes = [{
-            "id":        n.local_id,
-            "title":     n.title,
-            "content":   n.content,
-            "selection": n.selection,
-            "pinned":    n.pinned,
-            "timestamp": n.timestamp,
-            "folder":    n.folder,
+            "id":         n.local_id,
+            "title":      n.title,
+            "content":    n.content,
+            "selection":  n.selection,
+            "pinned":     n.pinned,
+            "timestamp":  n.timestamp,
+            "folder":     n.folder,
             "image_data": n.image_data,
-            "tags":      n.tags.split(",") if n.tags else [],
-            "deleted":   n.deleted
-        } for n in s.notes]
+            "tags":       n.tags.split(",") if n.tags else [],
+            "deleted":    n.deleted
+        } for n in s.notes if not n.deleted]
         if not filtered_notes:
             continue
         result.append({
@@ -962,50 +949,61 @@ def get_general_notes():
     if 'user_id' not in session:
         return jsonify([]), 401
     user = db.session.get(User, session['user_id'])
-    if not user.is_pro:
+    if not user or not user.is_pro:
         return jsonify([]), 403
 
-    site = Website.query.filter_by(url="general://notes", user_id=user.id).first()
-    if not site:
-        return jsonify([])
+    # FIX: check both URL variants so nothing is missed
+    sites = Website.query.filter(
+        Website.user_id == user.id,
+        Website.url.in_(["general://notes", "folder://notes"])
+    ).all()
 
-    notes = [{
-        "id":        n.local_id,
-        "title":     n.title,
-        "content":   n.content,
-        "selection": n.selection,
-        "pinned":    n.pinned,
-        "timestamp": n.timestamp,
-        "folder":    n.folder,
-        "image_data": n.image_data,
-        "tags":      n.tags.split(",") if n.tags else [],
-        "deleted":   n.deleted,
-        "url":       "general://notes",
-        "domain":    "general",
-        "_synced":   True
-    } for n in site.notes if not n.deleted]
-
+    notes = []
+    for site in sites:
+        for n in site.notes:
+            if n.deleted:
+                continue
+            notes.append({
+                "id":         n.local_id,
+                "title":      n.title,
+                "content":    n.content,
+                "selection":  n.selection,
+                "pinned":     n.pinned,
+                "timestamp":  n.timestamp,
+                "folder":     n.folder,
+                "image_data": n.image_data,
+                "tags":       n.tags.split(",") if n.tags else [],
+                "deleted":    n.deleted,
+                "url":        "general://notes",
+                "domain":     "general",
+                "_synced":    True
+            })
     return jsonify(notes)
 
 @app.route('/api/notes/<string:local_id>', methods=['PUT'])
 def update_note(local_id):
     if 'user_id' not in session:
         return jsonify({"error": "Login required"}), 401
-    note = Note.query.join(Website).filter(
-        Website.user_id == session['user_id'],
-        Note.local_id == local_id
-    ).first()
+
+    note = (
+        Note.query.join(Website)
+        .filter(Website.user_id == session['user_id'], Note.local_id == local_id)
+        .first()
+    )
     if not note:
         return jsonify({"error": "Note not found"}), 404
-    data = request.json
+
+    data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "Invalid request"}), 400
+
     if 'title'   in data: note.title   = str(data['title'])[:_NOTE_TITLE_MAX]
     if 'content' in data: note.content = str(data['content'])[:_NOTE_CONTENT_MAX]
     if 'pinned'  in data: note.pinned  = bool(data['pinned'])
-    if 'folder'  in data: note.folder  = str(data['folder'])[:_FOLDER_NAME_MAX]
+    if 'folder'  in data: note.folder  = _sanitize_folder(data['folder'])
     if 'tags'    in data: note.tags    = data['tags']
     if 'deleted' in data: note.deleted = bool(data['deleted'])
+
     db.session.commit()
     return jsonify({"message": "Updated successfully"})
 
@@ -1014,10 +1012,11 @@ def delete_note(local_id):
     if 'user_id' not in session:
         return jsonify({"error": "Login required"}), 401
     try:
-        note = Note.query.join(Website).filter(
-            Website.user_id == session['user_id'],
-            Note.local_id == local_id
-        ).first()
+        note = (
+            Note.query.join(Website)
+            .filter(Website.user_id == session['user_id'], Note.local_id == local_id)
+            .first()
+        )
         if not note:
             return '', 204
         db.session.delete(note)
@@ -1033,9 +1032,10 @@ def update_note_tags():
     if 'user_id' not in session:
         return jsonify({"error": "Login required"}), 401
     user = db.session.get(User, session['user_id'])
-    if not user.is_pro:
+    if not user or not user.is_pro:
         return jsonify({"error": "Pro required"}), 403
-    data = request.json
+
+    data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "No data"}), 400
 
@@ -1043,10 +1043,11 @@ def update_note_tags():
     for item in data:
         local_id = str(item.get("id", ""))[:50]
         new_tags = item.get("tags", [])
-        note = Note.query.join(Website).filter(
-            Website.user_id == user.id,
-            Note.local_id == local_id
-        ).first()
+        note = (
+            Note.query.join(Website)
+            .filter(Website.user_id == user.id, Note.local_id == local_id)
+            .first()
+        )
         if note:
             existing = set(note.tags.split(",")) if note.tags else set()
             merged   = existing | set(str(t)[:50] for t in new_tags)
@@ -1061,11 +1062,11 @@ def rename_website():
     if 'user_id' not in session:
         return jsonify({"error": "Login required"}), 401
 
-    data = request.json
+    data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "Invalid request"}), 400
 
-    url = str(data.get("url", ""))[:500]
+    url         = str(data.get("url", ""))[:500]
     custom_name = data.get("custom_name")
 
     if not url:
@@ -1076,29 +1077,23 @@ def rename_website():
         if not custom_name:
             custom_name = None
 
-    user_id = session['user_id']
-
     try:
-        website = Website.query.filter_by(user_id=user_id, url=url).first()
-
+        website = Website.query.filter_by(user_id=session['user_id'], url=url).first()
         if website:
             website.custom_name = custom_name
             db.session.commit()
             return jsonify({"message": "Source renamed successfully"}), 200
         else:
-            from urllib.parse import urlparse
-            domain = urlparse(url).netloc[:200] if "://" in url else url[:200]
-            
+            domain   = urlparse(url).netloc[:200] if "://" in url else url[:200]
             new_site = Website(
-                url=url, 
-                domain=domain, 
-                custom_name=custom_name, 
-                user_id=user_id
+                url=url,
+                domain=domain,
+                custom_name=custom_name,
+                user_id=session['user_id']
             )
             db.session.add(new_site)
             db.session.commit()
-            return jsonify({"message": "Source tracked and renamed successfully"}), 200
-
+            return jsonify({"message": "Source tracked and renamed"}), 200
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"rename_website error: {e}")
@@ -1109,7 +1104,7 @@ def delete_folder(folder_name):
     if 'user_id' not in session:
         return jsonify({"error": "Login required"}), 401
 
-    folder_name = unquote(folder_name)[:_FOLDER_NAME_MAX]
+    folder_name = _sanitize_folder(unquote(folder_name))
     if not folder_name:
         return jsonify({"error": "Invalid folder name"}), 400
 
@@ -1119,10 +1114,11 @@ def delete_folder(folder_name):
             .filter(Website.user_id == session['user_id'], Note.folder == folder_name)
             .all()
         )
+        # FIX: unassign notes from folder instead of deleting them
         for note in notes:
-            db.session.delete(note)
+            note.folder = None
         db.session.commit()
-        return jsonify({"message": f"Folder and {len(notes)} notes deleted"}), 200
+        return jsonify({"message": f"Folder removed, {len(notes)} notes unassigned"}), 200
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"delete_folder error: {e}")
@@ -1133,12 +1129,12 @@ def rename_folder():
     if 'user_id' not in session:
         return jsonify({"error": "Login required"}), 401
 
-    data = request.json
+    data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "Invalid request"}), 400
 
-    old_name = str(data.get("old_name", ""))[:_FOLDER_NAME_MAX]
-    new_name = str(data.get("new_name", ""))[:_FOLDER_NAME_MAX]
+    old_name = _sanitize_folder(data.get("old_name", ""))
+    new_name = _sanitize_folder(data.get("new_name", ""))
 
     if not old_name or not new_name:
         return jsonify({"error": "Invalid folder names"}), 400
@@ -1152,22 +1148,21 @@ def rename_folder():
         for note in notes:
             note.folder = new_name
         db.session.commit()
-        return jsonify({"message": "Folder renamed"}), 200
+        return jsonify({"message": f"Folder renamed, {len(notes)} notes updated"}), 200
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"rename_folder error: {e}")
         return jsonify({"error": "An internal error occurred"}), 500
-    
+
+
+# ─── Startup ──────────────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    
-    # Run DB init inside the app context so it doesn't 
-    # block the server process from initializing
     with app.app_context():
         try:
             db.create_all()
             print("Database tables verified.")
         except Exception as e:
             print(f"Database connection skipped or failed: {e}")
-
     app.run(host='0.0.0.0', port=port)
