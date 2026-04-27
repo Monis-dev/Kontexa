@@ -555,14 +555,26 @@ def pricing():
 def create_order():
     if 'user_id' not in session:
         return jsonify({"error": "Login required"}), 401
+    
+    # TEMPORARY DEBUG — remove after fixing
+    app.logger.error(f"create_order raw body: {request.data}")
+    app.logger.error(f"create_order content_type: {request.content_type}")
+    app.logger.error(f"create_order json: {request.get_json(silent=True)}")
+    app.logger.error(f"create_order session user_id: {session.get('user_id')}")
 
-    data = request.get_json(silent=True)
+    data = request.get_json(silent=True, force=True)
     if not data:
+        # Try parsing form data as fallback
+        data = request.form.to_dict()
+
+    if not data:
+        app.logger.error(f"create_order: could not parse body. raw={request.data[:200]}")
         return jsonify({"error": "Invalid request body"}), 400
 
-    plan_type = data.get("plan_type")
+    plan_type = str(data.get("plan_type", "")).strip()
     if plan_type not in ("monthly", "lifetime"):
-        return jsonify({"error": "Invalid plan type"}), 400
+        app.logger.error(f"create_order: invalid plan_type={plan_type!r}")
+        return jsonify({"error": f"Invalid plan type: {plan_type!r}"}), 400
 
     try:
         current_pricing = get_pricing_config()
@@ -598,6 +610,7 @@ def create_order():
         return jsonify(order)
 
     except razorpay.errors.BadRequestError as e:
+        app.logger.error(f"create_order: plan={plan_type} amount={amount} paise")
         app.logger.error(f"Razorpay bad request for plan={plan_type}: {e}")
         return jsonify({"error": "Payment provider rejected the request"}), 400
     except Exception as e:
